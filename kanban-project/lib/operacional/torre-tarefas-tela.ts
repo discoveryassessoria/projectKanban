@@ -8,6 +8,7 @@
 // FONTE ÚNICA reaproveitada (nada recalculado): `PREDICADO_DO_KPI` (o mesmo dos cartões do topo), `nivelDeRisco`,
 // `diasAtePrazo`, `torre-bola.ts` (bolaCom / bolaDesde / cobrarEm), `ROTULO_STATUS_TAREFA` e `textoPrazoDaTarefa`.
 // ============================================================================
+import { ordenarLinhasDeCertidao, type LinhaDeCertidao } from './ordem-certidoes'
 import { diasPorExtenso } from './tempo-extenso'
 import { diaMesDoPrazo } from '@/src/lib/tarefa/texto-prazo'
 import { PREDICADO_DO_KPI, diasAtePrazo } from './torre-kpis'
@@ -276,7 +277,7 @@ export function acoesDaLinha(l: LinhaParaAcao): AcaoDaLinha[] {
 // ─── AGRUPAR / ORDENAR PARA A TELA ──────────────────────────────────────────
 export type Agrupar = 'fam' | 'resp' | 'fase' | 'org' | 'none'
 
-export interface LinhaParaGrupo {
+export interface LinhaParaGrupo extends LinhaDeCertidao {
   taskId: number
   statusTarefa: string
   familiaNome: string | null
@@ -299,13 +300,15 @@ export function chaveDoGrupo(l: LinhaParaGrupo, por: Agrupar): string {
 }
 
 /**
- * Agrupa mantendo a ordem de primeira aparição dos grupos (a ordem padrão do servidor decide quem vem antes) e a CANCELADA no
- * FIM de cada grupo (riscada: continua visível, nunca esconde — mas não ocupa o lugar do trabalho).
+ * Agrupa mantendo a ordem de primeira aparição dos grupos (a ordem do servidor ou do "Ordenar por" decide quem vem antes). DENTRO de cada grupo
+ * vale SEMPRE a regra fixa das certidões (`ordem-certidoes.ts`: família → geração → linha reta → nascimento → pessoa → Nascimento, Casamento,
+ * Óbito, outros). Status (inclusive CANCELADA), prazo e risco nunca reordenam certidões dentro da família: a cancelada continua visível, riscada,
+ * no lugar que a regra manda.
  */
 export function agruparParaTela<T extends LinhaParaGrupo>(linhas: T[], por: Agrupar): Array<[string, T[]]> {
   const m = new Map<string, T[]>()
   for (const l of linhas) { const k = chaveDoGrupo(l, por); (m.get(k) ?? m.set(k, []).get(k)!).push(l) }
-  return [...m.entries()].map(([k, itens]) => [k, [...itens.filter((x) => x.statusTarefa !== 'CANCELADA'), ...itens.filter((x) => x.statusTarefa === 'CANCELADA')]] as [string, T[]])
+  return [...m.entries()].map(([k, itens]) => [k, ordenarLinhasDeCertidao(itens)] as [string, T[]])
 }
 
 /** Dias até o prazo (dia operacional), `null` sem prazo — reexporta a conta única para quem monta a tela. */

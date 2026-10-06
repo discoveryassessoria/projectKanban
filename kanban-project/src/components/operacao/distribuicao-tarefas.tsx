@@ -35,6 +35,7 @@
 // ============================================================================
 "use client"
 
+import { ordenarLinhasDeCertidao } from "@/lib/operacional/ordem-certidoes"
 import { useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
@@ -196,10 +197,12 @@ function construirGrupos(linhas: LinhaGerencial[], agruparPor: AgruparPor): Grup
 function csvEscapar(v: string): string {
   return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
 }
-function exportarCsv(linhas: LinhaGerencial[]) {
-  const cabecalho = ["Família", "Pessoa", "Documento/Tarefa", "Fase", "Etapa atual", "Prazo", "Prioridade", "Responsável", "Status"]
+function exportarCsv(linhasEntrada: LinhaGerencial[]) {
+  const linhas = ordenarLinhasDeCertidao(linhasEntrada) // a exportação segue a MESMA regra fixa da tela (família → geração → linha reta → nascimento → tipo)
+  const cabecalho = ["Família", "Geração", "Pessoa", "Documento/Tarefa", "Fase", "Etapa atual", "Prazo", "Prioridade", "Responsável", "Status"]
   const corpo = linhas.map((l) => [
     l.familiaNome ?? l.processoNome ?? "—",
+    l.geracao != null ? `G${l.geracao}` : "—",
     l.pessoaNome ?? "—",
     l.titulo,
     rotularFase(l.faseMacroKey) ?? "—",

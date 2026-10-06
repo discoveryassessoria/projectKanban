@@ -19,6 +19,7 @@
 // SÓ casa quem TEM o registro (registro antigo sem valor nunca entra em "Hoje/Esta semana/Há mais de 30 dias/Intervalo"); "Ainda não
 // iniciou" é o estado real NAO_INICIADA. A dimensão antiga "Quando" (criada/atribuída) segue válida na URL e em visão salva.
 // ============================================================================
+import { ordenarLinhasDeCertidao } from './ordem-certidoes'
 import { diasAtePrazo } from './torre-kpis'
 import { diaOperacional } from './tempo-operacional'
 import { ehCobravelVencido } from './torre-predicados'
@@ -53,7 +54,7 @@ export const ROTULO_RISCO_TORRE: Record<RiscoTorre, string> = { critico: 'Críti
 export const ROTULO_ACOMP_TORRE: Record<AcompTorre, string> = { vencido: 'Vencido', '3dias': 'Vence em até 3 dias', sem: 'Sem acompanhamento' }
 export const ROTULO_COBRANCA_TORRE: Record<CobrancaTorre, string> = { vencida: 'Cobrança vencida', semresposta: 'Cobrança sem resposta (escalada)' }
 export const ROTULO_ORDEM_TORRE: Record<OrdemTorre, string> = {
-  prazo: 'Prazo', risco: 'Risco', familia: 'Família', responsavel: 'Responsável', criacao: 'Criação (mais recentes primeiro)',
+  prazo: 'Prazo', risco: 'Risco', familia: 'Família (A–Z)', responsavel: 'Responsável', criacao: 'Criação (mais recentes primeiro)',
 }
 
 // ─── o estado ───────────────────────────────────────────────────────────────
@@ -126,6 +127,12 @@ export interface LinhaParaFiltro {
   cobravelVencida?: boolean
   estadoOperacao: 'FILA' | 'AGUARDANDO' | 'CONCLUIDA'
   linhaReta: boolean | null
+  /** Para a REGRA FIXA de ordem das certidões (`ordem-certidoes.ts`): geração calculada, nascimento da pessoa, pessoa, título e id. */
+  geracao?: number | null
+  pessoaNascimento?: string | null
+  pessoaId?: number | null
+  titulo?: string | null
+  taskId?: number | null
 }
 
 export interface ContextoDeFiltro { usuarioId: number | null; agora: Date }
@@ -337,9 +344,13 @@ const RANK_RISCO: Record<RiscoTorre, number> = { critico: 0, atencao: 1, ritmo: 
 const tempo = (iso: string | null): number => { const t = iso ? Date.parse(iso) : NaN; return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t }
 const txt = (a: string | null | undefined, b: string | null | undefined) => (a ?? '').localeCompare(b ?? '', 'pt-BR')
 
-/** Ordena uma CÓPIA, estável. `null` = mantém a ordem recebida. Sem prazo / sem responsável / sem data vão sempre para o fim. */
+/**
+ * A ORDEM DA LISTA. Dentro de uma família a ordem é SEMPRE a regra fixa das certidões (geração → linha reta → nascimento → pessoa → Nascimento,
+ * Casamento, Óbito, outros — `ordem-certidoes.ts`). "Ordenar por" (prazo, risco, família, responsável, criação) decide só a ordem ENTRE as
+ * famílias: a posição de cada família é a da PRIMEIRA linha dela sob esse critério. `null` = as famílias seguem a ordem do servidor (risco, prazo).
+ * Sem prazo / sem responsável / sem data vão sempre para o fim do critério.
+ */
 export function ordenarLinhas<T extends LinhaParaFiltro>(linhas: T[], ordem: OrdemTorre | null): T[] {
-  if (!ordem) return linhas
   const cmp: Record<OrdemTorre, (a: T, b: T) => number> = {
     prazo: (a, b) => tempo(a.dataPrazo) - tempo(b.dataPrazo),
     risco: (a, b) => RANK_RISCO[nivelDeRisco(a)] - RANK_RISCO[nivelDeRisco(b)] || tempo(a.dataPrazo) - tempo(b.dataPrazo),
@@ -350,7 +361,7 @@ export function ordenarLinhas<T extends LinhaParaFiltro>(linhas: T[], ordem: Ord
       return (Number.isNaN(ta) ? 1 : 0) - (Number.isNaN(tb) ? 1 : 0) || tb - ta || 0
     },
   }
-  return linhas.map((l, i) => ({ l, i })).sort((x, y) => cmp[ordem](x.l, y.l) || x.i - y.i).map((x) => x.l)
+  return ordenarLinhasDeCertidao(linhas, ordem ? cmp[ordem] : undefined)
 }
 
 // ─── a porta única: lista + "Mostrando N de M" ──────────────────────────────

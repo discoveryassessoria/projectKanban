@@ -357,13 +357,10 @@ export interface Recorte {
   estado: EstadoOperacionalDaLinha | "ATIVAS" | ""
   responsavelId: number | "" | "sem"
   etapa: string
-  ordem: OrdemDaTabela
 }
 
-export type OrdemDaTabela = "atencao" | "progresso" | "prazo" | "documento" | "etapa" | "responsavel" | "status"
-
 export const RECORTE_VAZIO: Recorte = {
-  rapido: "todos", busca: "", estado: "", responsavelId: "", etapa: "", ordem: "atencao",
+  rapido: "todos", busca: "", estado: "", responsavelId: "", etapa: "",
 }
 
 /**
@@ -439,54 +436,23 @@ function urgenciaDaLinha(doc: DocumentoDoIndice): number {
 }
 
 /**
- * A ORDEM É DETERMINÍSTICA — sempre desempatada por nascimento → casamento →
- * óbito (fonte única: lib/documentos/ordem-evento-vida.ts) e, dentro do mesmo
- * tipo, pelo título.
- *
- * O PADRÃO (sem coluna de ordenação escolhida) usa o evento de vida como
- * critério PRINCIPAL - decisão de negócio (05/09/2026): ler os documentos de
- * uma pessoa nasce->casa->morre importa mais do que ver primeiro o que está
- * "atrasado". Urgência só desempata dentro do MESMO tipo (duas certidões de
- * nascimento, uma bloqueada e outra não). As ordens EXPLÍCITAS do cabeçalho
- * (progresso, prazo, etapa...) continuam como o nome diz - escolha deliberada
- * de quem clicou - e usam o evento de vida só como desempate, como sempre foi.
+ * A ORDEM DOS DOCUMENTOS DA PESSOA É A REGRA FIXA (`lib/operacional/ordem-certidoes.ts`, item 3): Nascimento, Casamento, Óbito, depois os outros
+ * (fonte única: lib/documentos/ordem-evento-vida.ts, que delega à regra). Não há ordem escolhida: progresso, prazo, etapa, responsável e status
+ * NUNCA reordenam documentos da pessoa. Desempate estável pela chave.
  */
-function ordenarPorCriterio(docs: DocumentoDoIndice[], ordem: OrdemDaTabela): DocumentoDoIndice[] {
-  const desempate = (a: DocumentoDoIndice, b: DocumentoDoIndice) => compararPorEventoDeVida(a.titulo, b.titulo)
-  const copia = [...docs]
-  switch (ordem) {
-    case "progresso":
-      return copia.sort((a, b) => a.naFase.progresso.pct - b.naFase.progresso.pct || desempate(a, b))
-    case "prazo":
-      // Sem prazo vai para o fim: ausência de prazo não é urgência.
-      return copia.sort((a, b) => {
-        const pa = a.naFase.prazo ? Date.parse(a.naFase.prazo) : Number.POSITIVE_INFINITY
-        const pb = b.naFase.prazo ? Date.parse(b.naFase.prazo) : Number.POSITIVE_INFINITY
-        return pa - pb || desempate(a, b)
-      })
-    case "documento":
-      return copia.sort(desempate)
-    case "etapa":
-      return copia.sort((a, b) => (a.naFase.etapaAtual ?? "~").localeCompare(b.naFase.etapaAtual ?? "~", "pt-BR") || desempate(a, b))
-    case "responsavel":
-      return copia.sort((a, b) => (a.naFase.responsavelNome ?? "~").localeCompare(b.naFase.responsavelNome ?? "~", "pt-BR") || desempate(a, b))
-    case "status":
-      return copia.sort((a, b) => a.naFase.estadoLabel.localeCompare(b.naFase.estadoLabel, "pt-BR") || desempate(a, b))
-    default:
-      return copia.sort((a, b) => desempate(a, b) || urgenciaDaLinha(a) - urgenciaDaLinha(b))
-  }
+function ordenarPorCriterio(docs: DocumentoDoIndice[]): DocumentoDoIndice[] {
+  return [...docs].sort((a, b) => compararPorEventoDeVida(a.titulo, b.titulo) || a.chave.localeCompare(b.chave))
 }
 
 /** Certidão cancelada / substituída / não exigida: continua na pasta, mas não é trabalho. */
 export const estaEncerrada = (d: DocumentoDoIndice): boolean => d.naFase.estado === "CANCELADA" || d.naFase.estado === "SUPERSEDIDA" || d.naFase.estado === "NAO_EXIGIDA"
 
 /**
- * CANCELAR NUNCA ESCONDE, SÓ MARCA: as encerradas vão para o FIM da lista da pessoa (esmaecidas), em qualquer ordem
- * escolhida — o trabalho vem primeiro. Dentro de cada grupo vale a ordem do critério.
+ * CANCELAR NUNCA ESCONDE, SÓ MARCA: a certidão encerrada continua na lista, esmaecida, NO LUGAR que a regra fixa manda — o status nunca a leva
+ * para o fim.
  */
-export function ordenarDocumentos(docs: DocumentoDoIndice[], ordem: OrdemDaTabela): DocumentoDoIndice[] {
-  const ordenados = ordenarPorCriterio(docs, ordem)
-  return [...ordenados.filter((d) => !estaEncerrada(d)), ...ordenados.filter(estaEncerrada)]
+export function ordenarDocumentos(docs: DocumentoDoIndice[]): DocumentoDoIndice[] {
+  return ordenarPorCriterio(docs)
 }
 
 /**
@@ -562,7 +528,7 @@ function IndiceView({
             (documentoDestacadoId != null && d.documentoId === documentoDestacadoId)
             || passaNoRecorte(d, recorte, p.pessoa.nome))
         : p.documentos
-      return { ...p, documentos: ordenarDocumentos(docs, recorte.ordem) }
+      return { ...p, documentos: ordenarDocumentos(docs) }
     }
     const manterComTrabalho = (p: PessoaDoIndice) => !ativo || p.documentos.length > 0
     return {
@@ -576,7 +542,6 @@ function IndiceView({
               (documentoDestacadoId != null && d.documentoId === documentoDestacadoId)
               || passaNoRecorte(d, recorte, ""))
           : indiceBruto.semDono,
-        recorte.ordem,
       ),
     }
   }, [indiceBruto, recorte, documentoDestacadoId])
@@ -723,21 +688,6 @@ function IndiceView({
           {etapas.map((e) => <option key={e} value={e}>{e}</option>)}
         </select>
       )}
-
-      <select
-        value={recorte.ordem}
-        onChange={(e) => setRecorte((r) => ({ ...r, ordem: e.target.value as OrdemDaTabela }))}
-        className={campo}
-        aria-label="Ordenar"
-      >
-        <option value="atencao">Ordem: o que precisa de atenção</option>
-        <option value="progresso">Ordem: menor progresso</option>
-        <option value="prazo">Ordem: prazo mais próximo</option>
-        <option value="documento">Ordem: documento (A–Z)</option>
-        <option value="etapa">Ordem: etapa atual</option>
-        <option value="responsavel">Ordem: responsável</option>
-        <option value="status">Ordem: status</option>
-      </select>
 
       {recortando && (
         <button
@@ -909,15 +859,17 @@ function PessoaCard({
         <span className="min-w-0 flex-1">
           <b className="text-[14.5px] font-extrabold block leading-tight truncate text-white/95">{p.nome}</b>
           <span className="text-[11.5px] text-[var(--text-muted)] font-semibold flex items-center gap-1.5 mt-0.5 flex-wrap">
-            {/* O selo "G" é o Nº Linhagem (pasta documental) — 1 no ancestral mais
-                antigo, crescendo em direção aos descendentes. NÃO é o grau a partir
-                do requerente (esse é `posicao`: "pai", "avô", "bisavô"...). */}
-            {p.numeroLinhagem != null && (
+            {/* O selo "G" é a GERAÇÃO de verdade (G1 = o ancestral que origina o direito, filhos G2…, cônjuge na geração do parceiro),
+                calculada pela filiação — NÃO é o Nº Linhagem (número de sequência) nem o grau a partir do requerente (`posicao`). */}
+            {p.geracaoNaArvore != null && (
               <span className="text-[10px] font-extrabold bg-[var(--surface-tertiary)] border border-[var(--border-default)] rounded px-1.5 py-px">
-                G{p.numeroLinhagem}
+                G{p.geracaoNaArvore}
               </span>
             )}
-            <span className="truncate">{p.requerente ? "Requerente" : p.posicao}</span>
+            <span className="truncate">{p.requerente ? "Requerente" : `${p.posicao}${p.posicaoEm ? ` de ${p.posicaoEm}` : ""}`}</span>
+            {p.linhaDe.length > 0 && !p.requerente && (
+              <span className="text-[10px] text-[var(--text-muted)]" title="O caminho de filiação desta pessoa chega a estes requerentes">linha de {p.linhaDe.join(" e ")}</span>
+            )}
             <span className={`flex items-center gap-1 ${transmissao.cor}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${transmissao.dot}`} />
               {transmissao.label}

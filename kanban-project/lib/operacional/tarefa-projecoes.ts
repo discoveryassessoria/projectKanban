@@ -39,6 +39,7 @@ import { STATUS_ATIVOS, STATUS_TERMINAIS, STATUS_EM_ESPERA, executavelAgora as t
 import { resolveWorkflowStepEditor } from '@/src/lib/process-stage/step-editor-registry'
 import { phaseKeyToFaseCode, faseCodeToPhaseKey, rotuloDoPasso, labelDaFasePorPhaseKey, getOrdemFase } from '@/src/lib/process-stage/fases-catalog'
 import { fasesAnterioresA } from '@/src/services/regularizacao-historica'
+import { geracoesDasArvores } from '@/src/services/genealogia/geracoes-da-arvore'
 import { proximaFaseDoCaminho, type FaseOrdenada } from '@/src/lib/motor/phase-advance-helpers'
 
 /** Estados concluídos — fora deles, "atrasada"/"sem movimentação"/etc. deixam de fazer sentido. */
@@ -218,6 +219,13 @@ export interface LinhaDeFila {
    * cônjuges). `null` = pessoa sem registro (mesmo caso de `numeroLinhagem`).
    */
   linhaReta: boolean | null
+  /** Data de nascimento da PESSOA (ISO) — entra na regra fixa de ordem das certidões (`lib/operacional/ordem-certidoes.ts`). `null` = sem data. */
+  pessoaNascimento: string | null
+  /**
+   * A GERAÇÃO de verdade (G1 = ancestral que origina o direito, filhos G2…, cônjuge na geração do parceiro), calculada pela filiação
+   * (`src/lib/genealogia/geracao.ts`). É o "G" da tela e a chave de geração da ordem das certidões. NÃO é `numeroLinhagem`. `null` = sem geração.
+   */
+  geracao: number | null
   /**
    * OS DOIS NOMES, quando a obrigação é de uma UNIÃO (certidão de casamento) —
    * "Fulano e Fulana". `null` para obrigação de PESSOA (a coluna usa
@@ -426,8 +434,8 @@ const SELECT = {
       // então lê os dois cônjuges direto daqui (mandato "Operação/Antão",
       // 29/09/2026: "Edison Nás Antão e Evanir Teixeira da Silva").
       uniao: { select: {
-        pessoa1: { select: { id: true, nome: true, sobrenome: true, linhaReta: true, numeroLinhagem: true } },
-        pessoa2: { select: { id: true, nome: true, sobrenome: true, linhaReta: true, numeroLinhagem: true } },
+        pessoa1: { select: { id: true, nome: true, sobrenome: true, linhaReta: true, numeroLinhagem: true, data_nasc: true } },
+        pessoa2: { select: { id: true, nome: true, sobrenome: true, linhaReta: true, numeroLinhagem: true, data_nasc: true } },
       } },
     },
   },
@@ -494,7 +502,8 @@ function projetar(
   rotulosDePasso?: Map<number, string>,
   totaisDePassos?: Map<string, number>,
   progressoSubtarefa?: Map<number, ResumoSubtarefasDoPasso>,
-  linhagem?: Map<number, { numeroLinhagem: number | null; linhaReta: boolean }>,
+  linhagem?: Map<number, { numeroLinhagem: number | null; linhaReta: boolean; dataNasc: Date | null }>,
+  geracoes?: Map<number, number | null>,
 ): LinhaDeFila {
   // A RÉGUA CANÔNICA — a mesma da Central, do Kanban e da notificação.
   const tempo = estadoTemporal({
@@ -539,6 +548,8 @@ function projetar(
     linhaReta: t.pessoaId != null
       ? linhagem?.get(t.pessoaId)?.linhaReta ?? null
       : uniao ? conjugeLinhaReta != null : null,
+    pessoaNascimento: ((t.pessoaId != null ? linhagem?.get(t.pessoaId)?.dataNasc : conjugeLinhaReta?.data_nasc) ?? null)?.toISOString() ?? null,
+    geracao: (t.pessoaId != null ? geracoes?.get(t.pessoaId) : conjugeLinhaReta ? geracoes?.get(conjugeLinhaReta.id) : null) ?? null,
     casalNomes: uniao ? `${nomeCompleto(uniao.pessoa1)} e ${nomeCompleto(uniao.pessoa2)}` : null,
     conjugeNome: outroConjuge ? nomeCompleto(outroConjuge) : null,
     faseAnteriorAFaseAtual: faseEhAnteriorA(t.faseMacroKey, t.processo?.faseAtualKey),
@@ -1003,13 +1014,38 @@ async function nomesDasPessoas(linhas: Array<{ pessoaId: number | null }>, db: L
  * sozinho NUNCA distingue "linha reta" de "cônjuge". Quem decide isso é
  * `linhaReta`, nunca a presença do número.
  */
+const geracoesMemo = new WeakMap<CacheDeLeitura, Map<number, Map<number, number | null>>>()
+
+/**
+ * A GERAÇÃO de verdade de cada pessoa (`calcularGeracoes`), calculada AGORA pela filiação da ÁRVORE da pessoa (todas as pessoas ativas dela +
+ * uniões) — nunca lida de `numeroLinhagem`. Uma leitura por árvore, memorizada no cache da requisição.
+ */
+async function geracoesDasPessoas(
+  ids: Array<number | null | undefined>, db: Leitor = prisma, cache: CacheDeLeitura = criarCacheDeLeitura(db),
+): Promise<Map<number, number | null>> {
+  const unicosIds = [...new Set(ids.filter((x): x is number => x != null))]
+  if (unicosIds.length === 0) return new Map()
+  const pessoas = await cache.pessoas(unicosIds)
+  const arvores = [...new Set(pessoas.map((p) => p.arvoreId).filter((x): x is number => x != null))]
+  const memo = geracoesMemo.get(cache) ?? new Map<number, Map<number, number | null>>()
+  geracoesMemo.set(cache, memo)
+  const faltam = arvores.filter((a) => !memo.has(a))
+  if (faltam.length > 0) {
+    const calculadas = await geracoesDasArvores(faltam, db)
+    for (const a of faltam) memo.set(a, calculadas.get(a) ?? new Map())
+  }
+  const r = new Map<number, number | null>()
+  for (const p of pessoas) r.set(p.id, p.arvoreId != null ? memo.get(p.arvoreId)?.get(p.id) ?? null : null)
+  return r
+}
+
 async function linhagemDasPessoas(
   linhas: Array<{ pessoaId: number | null }>, db: Leitor = prisma, cache: CacheDeLeitura = criarCacheDeLeitura(db),
-): Promise<Map<number, { numeroLinhagem: number | null; linhaReta: boolean }>> {
+): Promise<Map<number, { numeroLinhagem: number | null; linhaReta: boolean; dataNasc: Date | null }>> {
   const ids = [...new Set(linhas.map((l) => l.pessoaId).filter((x): x is number => x != null))]
   if (ids.length === 0) return new Map()
   const pessoas = await cache.pessoas(ids)
-  return new Map(pessoas.map((p) => [p.id, { numeroLinhagem: p.numeroLinhagem ?? null, linhaReta: p.linhaReta }]))
+  return new Map(pessoas.map((p) => [p.id, { numeroLinhagem: p.numeroLinhagem ?? null, linhaReta: p.linhaReta, dataNasc: p.data_nasc ?? null }]))
 }
 
 /**
@@ -2520,7 +2556,7 @@ async function carregarBrutas(
   }
   const dadosDaPessoa = (id: number) => {
     const p = pessoaPorId.get(id)!
-    return { id: p.id, nome: p.nome, sobrenome: p.sobrenome, linhaReta: p.linhaReta, numeroLinhagem: p.numeroLinhagem }
+    return { id: p.id, nome: p.nome, sobrenome: p.sobrenome, linhaReta: p.linhaReta, numeroLinhagem: p.numeroLinhagem, data_nasc: p.data_nasc }
   }
 
   // A PRÓXIMA FASE do caminho de cada processo: a fase seguinte do Workflow Macro dele (tipo + modalidade), pulando
@@ -2601,12 +2637,15 @@ async function enriquecerEscalares(
     repactuacoesDePrazo(esc.map((t) => t.id), db),
   ])
   const { brutas, ordensPorTipo, extras, proximaFasePorProcesso } = carga
-  const [rotulos, subtarefas] = await Promise.all([rotulosDosPassos(brutas, db, cache), progressoPorSubtarefa(brutas, db, cache)])
+  const [rotulos, subtarefas, geracoes] = await Promise.all([
+    rotulosDosPassos(brutas, db, cache), progressoPorSubtarefa(brutas, db, cache),
+    geracoesDasPessoas(unicos([...esc.map((t) => t.pessoaId), ...brutas.flatMap((t) => [t.necessidade?.uniao?.pessoa1.id, t.necessidade?.uniao?.pessoa2.id])]), db, cache),
+  ])
   const hoje = diaOperacional(agora)
   const iniciouEmPorTarefa = new Map(esc.map((t) => [t.id, t.dataInicio?.toISOString() ?? null]))
 
   const linhas = brutas.map((t): LinhaGerencial => {
-    const base = projetar(t, agora, nomes, rotulos, totais, subtarefas, linhagem)
+    const base = projetar(t, agora, nomes, rotulos, totais, subtarefas, linhagem, geracoes)
     base.faseFutura = ehFaseFutura(
       t.faseMacroKey, t.processo?.faseAtualKey,
       t.processo?.tipoProcessoMotorId != null ? ordensPorTipo.get(t.processo.tipoProcessoMotorId) : null,

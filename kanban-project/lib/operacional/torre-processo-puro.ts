@@ -11,6 +11,7 @@ import { FUSO_OPERACIONAL, diaOperacional, diasEntreDiasOperacionais } from './t
 import { ROTULO_STATUS } from '@/src/lib/home/rotulo-status-tarefa'
 import { diaMesDoPrazo, textoPrazoDaTarefa } from '@/src/lib/tarefa/texto-prazo'
 import { BOLA_NOSSA, type BolaCom } from './torre-bola'
+import { ordenarCertidoesDaFamilia, type ChaveDaCertidao } from './ordem-certidoes'
 
 // ─── DATAS ───────────────────────────────────────────────────────────────────
 
@@ -95,12 +96,7 @@ export const OPCOES_DE_STATUS: ReadonlyArray<{ valor: FiltroDeStatusDaTabela; ro
   { valor: 'CONCLUIDA', rotulo: 'Concluída' },
   { valor: 'ENCERRADAS', rotulo: ROTULO_ENCERRADAS },
 ]
-export const OPCOES_DE_ORDEM = [
-  { valor: 'arvore', rotulo: 'Ordem: geração na árvore' },
-  { valor: 'prazo', rotulo: 'Ordem: prazo' },
-  { valor: 'status', rotulo: 'Ordem: status' },
-] as const
-export type OrdemDaTabela = (typeof OPCOES_DE_ORDEM)[number]['valor']
+// A ORDEM da tabela NÃO é opção: é a regra fixa das certidões (`ordem-certidoes.ts`). Prazo e status nunca reordenam certidões da família.
 
 // ─── A LINHA DA TABELA "CERTIDÕES DA FASE ATUAL" ─────────────────────────────
 
@@ -114,12 +110,14 @@ export interface LinhaDaTabela {
   titulo: string
   pessoaId: number | null
   pessoa: string | null
-  /** "G1 bisavó" (Nº de linhagem + posição na árvore); `null` = a pessoa não tem posição derivável. */
+  /** "G1 bisavó" (geração calculada + posição na árvore); `null` = a pessoa não tem posição derivável. */
   geracao: string | null
-  /** Ordem do Nº Linhagem na árvore (`null` vai para o fim). */
-  ordemArvore: number | null
-  /** Ordem do tipo da certidão: nascimento 0 · casamento 1 · óbito 2 · outro 3. */
-  ordemTipo: number
+  /** A GERAÇÃO calculada (G1 = ancestral que origina o direito) — a chave de geração da regra fixa de ordem. `null` vai para o fim. */
+  geracaoNum: number | null
+  /** A pessoa está na linha reta? (`null`/`false` = fora da linha). */
+  linhaReta: boolean | null
+  /** Data de nascimento da pessoa (ISO). `null` vai depois de quem tem. */
+  pessoaNascimento: string | null
   passo: { rotulo: string; ordem: number; total: number } | null
   status: ChaveDeStatus | 'CANCELADA' | 'NAO_EXIGIDA'
   statusRotulo: string
@@ -142,33 +140,17 @@ export interface LinhaDaTabela {
   podeAtribuir: boolean
 }
 
-const ORDEM_DE_STATUS: Record<LinhaDaTabela['status'], number> = {
-  BLOQUEADA: 0, A_INICIAR: 1, EM_ANDAMENTO: 2, AGUARDANDO_CLIENTE: 3, AGUARDANDO_TERCEIROS: 4, CONCLUIDA: 5, CANCELADA: 6, NAO_EXIGIDA: 7,
-}
+/** A chave da regra fixa de ordem das certidões para uma linha desta tabela. */
+export const chaveDaLinhaDaTabela = (l: LinhaDaTabela): ChaveDaCertidao => ({
+  geracao: l.geracaoNum, linhaReta: l.linhaReta, pessoaNascimento: l.pessoaNascimento, pessoaId: l.pessoaId,
+  titulo: l.titulo, desempate: l.tarefaId ?? l.documentoId ?? 0,
+})
 
-/** As pessoas que aparecem na tabela, para o select "Pessoa" (distintas, por ordem da árvore). */
+/** As pessoas que aparecem na tabela, para o select "Pessoa" (distintas, na ordem da regra fixa: geração, linha reta, nascimento). */
 export function pessoasDaTabela(linhas: LinhaDaTabela[]): Array<{ id: number; nome: string }> {
-  const vistos = new Map<number, { id: number; nome: string; ordem: number | null }>()
-  for (const l of linhas) if (l.pessoaId != null && l.pessoa && !vistos.has(l.pessoaId)) vistos.set(l.pessoaId, { id: l.pessoaId, nome: l.pessoa, ordem: l.ordemArvore })
-  return [...vistos.values()].sort((a, b) => (a.ordem ?? 1e9) - (b.ordem ?? 1e9) || a.nome.localeCompare(b.nome, 'pt-BR')).map(({ id, nome }) => ({ id, nome }))
-}
-
-const GRUPO = (l: LinhaDaTabela): number => (l.tipo === 'ABERTA' ? 0 : l.tipo === 'CONCLUIDA' ? 1 : 2) // abertas, concluídas e, por último, canceladas / não exigidas
-
-function comparar(a: LinhaDaTabela, b: LinhaDaTabela, ordem: OrdemDaTabela): number {
-  const g = GRUPO(a) - GRUPO(b)
-  if (g !== 0) return g
-  const arvore = (a.ordemArvore ?? 1e9) - (b.ordemArvore ?? 1e9) || a.ordemTipo - b.ordemTipo || (a.tarefaId ?? a.documentoId ?? 0) - (b.tarefaId ?? b.documentoId ?? 0)
-  if (ordem === 'prazo') {
-    const pa = a.dataPrazo ? Date.parse(a.dataPrazo) : Number.POSITIVE_INFINITY
-    const pb = b.dataPrazo ? Date.parse(b.dataPrazo) : Number.POSITIVE_INFINITY
-    return pa === pb ? arvore : pa - pb
-  }
-  if (ordem === 'status') {
-    const d = ORDEM_DE_STATUS[a.status] - ORDEM_DE_STATUS[b.status]
-    return d !== 0 ? d : arvore
-  }
-  return arvore
+  const primeira = new Map<number, LinhaDaTabela>()
+  for (const l of linhas) if (l.pessoaId != null && l.pessoa && !primeira.has(l.pessoaId)) primeira.set(l.pessoaId, l)
+  return ordenarCertidoesDaFamilia([...primeira.values()], chaveDaLinhaDaTabela).map((l) => ({ id: l.pessoaId!, nome: l.pessoa! }))
 }
 
 /**
@@ -176,9 +158,9 @@ function comparar(a: LinhaDaTabela, b: LinhaDaTabela, ordem: OrdemDaTabela): num
  * "Ativas + canceladas / não exigidas" (no fim, riscadas) e em "Cancelada / não exigida" (só elas).
  */
 export function filtrarEOrdenar(
-  linhas: LinhaDaTabela[], f: { pessoaId: number | null; status: FiltroDeStatusDaTabela; ordem: OrdemDaTabela },
+  linhas: LinhaDaTabela[], f: { pessoaId: number | null; status: FiltroDeStatusDaTabela },
 ): LinhaDaTabela[] {
-  return linhas
+  const filtradas = linhas
     .filter((l) => (f.pessoaId == null ? true : l.pessoaId === f.pessoaId))
     .filter((l) => {
       if (f.status === 'TODOS') return true
@@ -186,7 +168,8 @@ export function filtrarEOrdenar(
       if (f.status === 'ENCERRADAS') return l.tipo === 'CANCELADA' || l.tipo === 'NAO_EXIGIDA'
       return l.status === f.status
     })
-    .sort((a, b) => comparar(a, b, f.ordem))
+  // UMA família (o processo): a regra fixa e nada mais — nem o status (cancelada no fim) nem o prazo reordenam.
+  return ordenarCertidoesDaFamilia(filtradas, chaveDaLinhaDaTabela)
 }
 
 /** Quantas linhas contam por padrão: as que são trabalho (abertas + concluídas). Canceladas / não exigidas não contam. */

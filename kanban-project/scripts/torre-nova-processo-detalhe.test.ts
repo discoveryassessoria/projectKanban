@@ -21,7 +21,7 @@ const secao = (t: string) => console.log(`\n${t}`)
 const AGORA = new Date("2026-10-01T15:00:00.000Z") // 12:00 em São Paulo
 
 const linha = (o: Partial<LinhaDaTabela>): LinhaDaTabela => ({
-  chave: "t1", tarefaId: 1, documentoId: 1, tipo: "ABERTA", titulo: "Certidão de nascimento", pessoaId: 1, pessoa: "Maria", geracao: "G1 bisavó", ordemArvore: 1, ordemTipo: 0,
+  chave: "t1", tarefaId: 1, documentoId: 1, tipo: "ABERTA", titulo: "Certidão de nascimento", pessoaId: 1, pessoa: "Maria", geracao: "G1 bisavó", geracaoNum: 1, linhaReta: true, pessoaNascimento: null,
   passo: { rotulo: "Solicitar certidão", ordem: 1, total: 4 }, status: "A_INICIAR", statusRotulo: "A iniciar", responsavelId: null, responsavelNome: null, iniciouEm: null, concluidaEm: null,
   dataPrazo: "2026-10-10T15:00:00.000Z", rotuloDoPrazo: "Iniciar até 10/10", risco: "atencao", atrasada: false, bola: null, encerramentoTexto: null, motivoTexto: null, reabrivel: false, podeAtribuir: true, ...o,
 })
@@ -43,31 +43,31 @@ async function main() {
 
   secao("tabela — filtros e ordens funcionam (o protótipo tinha selects sem efeito)")
   const l = [
-    linha({ chave: "a", tarefaId: 1, pessoaId: 1, pessoa: "Maria", ordemArvore: 3, dataPrazo: "2026-10-12T15:00:00Z" }),
-    linha({ chave: "b", tarefaId: 2, pessoaId: 2, pessoa: "Helena", ordemArvore: 2, status: "EM_ANDAMENTO", statusRotulo: "Em andamento", dataPrazo: "2026-10-05T15:00:00Z" }),
-    linha({ chave: "c", tarefaId: 3, pessoaId: 1, pessoa: "Maria", ordemArvore: 3, ordemTipo: 2, tipo: "CONCLUIDA", status: "CONCLUIDA", statusRotulo: "Concluída", dataPrazo: null }),
-    linha({ chave: "d", tarefaId: null, documentoId: 9, tipo: "CANCELADA", status: "CANCELADA", statusRotulo: "Cancelada", pessoaId: 2, pessoa: "Helena", ordemArvore: 2, reabrivel: true }),
-    linha({ chave: "e", tarefaId: null, documentoId: 10, tipo: "NAO_EXIGIDA", status: "NAO_EXIGIDA", statusRotulo: "Não exigida", pessoaId: 3, pessoa: "Edison", ordemArvore: 1 }),
+    linha({ chave: "a", tarefaId: 1, pessoaId: 1, pessoa: "Maria", geracaoNum: 3, dataPrazo: "2026-10-12T15:00:00Z" }),
+    linha({ chave: "b", tarefaId: 2, pessoaId: 2, pessoa: "Helena", geracaoNum: 2, status: "EM_ANDAMENTO", statusRotulo: "Em andamento", dataPrazo: "2026-10-05T15:00:00Z" }),
+    linha({ chave: "c", tarefaId: 3, pessoaId: 1, pessoa: "Maria", geracaoNum: 3, titulo: "Certidão de óbito", tipo: "CONCLUIDA", status: "CONCLUIDA", statusRotulo: "Concluída", dataPrazo: null }),
+    linha({ chave: "d", tarefaId: null, documentoId: 9, tipo: "CANCELADA", status: "CANCELADA", statusRotulo: "Cancelada", pessoaId: 2, pessoa: "Helena", geracaoNum: 2, reabrivel: true }),
+    linha({ chave: "e", tarefaId: null, documentoId: 10, tipo: "NAO_EXIGIDA", status: "NAO_EXIGIDA", statusRotulo: "Não exigida", pessoaId: 3, pessoa: "Edison", geracaoNum: 1 }),
   ]
   const ids = (xs: LinhaDaTabela[]) => xs.map((x) => x.chave).join("")
-  ok("árvore (com canceladas / não exigidas): abertas, concluídas, depois canceladas / não exigidas", ids(filtrarEOrdenar(l, { pessoaId: null, status: "TODOS", ordem: "arvore" })) === "baced", ids(filtrarEOrdenar(l, { pessoaId: null, status: "TODOS", ordem: "arvore" })))
-  ok("prazo: mais cedo primeiro", ids(filtrarEOrdenar(l, { pessoaId: null, status: "TODOS", ordem: "prazo" })).startsWith("ba"))
-  ok("status: em andamento depois de a iniciar", ids(filtrarEOrdenar(l, { pessoaId: null, status: "TODOS", ordem: "status" })).startsWith("ab"))
-  ok("filtro pessoa", ids(filtrarEOrdenar(l, { pessoaId: 1, status: "TODOS", ordem: "arvore" })) === "ac")
-  ok("filtro Concluída", ids(filtrarEOrdenar(l, { pessoaId: null, status: "CONCLUIDA", ordem: "arvore" })) === "c")
-  ok("filtro Cancelada / não exigida", ids(filtrarEOrdenar(l, { pessoaId: null, status: "ENCERRADAS", ordem: "arvore" })) === "ed")
-  ok("canceladas / não exigidas somem nos demais filtros", !ids(filtrarEOrdenar(l, { pessoaId: null, status: "A_INICIAR", ordem: "arvore" })).match(/[de]/))
+  ok("ORDEM FIXA (com canceladas / não exigidas): geração (G1 Edison, G2 Helena, G3 Maria) → pessoa → Nascimento, Casamento, Óbito — a cancelada NÃO vai para o fim", ids(filtrarEOrdenar(l, { pessoaId: null, status: "TODOS" })) === "ebdac", ids(filtrarEOrdenar(l, { pessoaId: null, status: "TODOS" })))
+  const mudados = l.map((x, i) => ({ ...x, dataPrazo: `2026-10-${String(20 - i).padStart(2, "0")}T15:00:00Z`, status: (i % 2 ? "BLOQUEADA" : "A_INICIAR") as LinhaDaTabela["status"], risco: (i % 2 ? "critico" : "ritmo") as LinhaDaTabela["risco"] }))
+  ok("prazo, status e risco NUNCA reordenam as certidões da família", ids(filtrarEOrdenar(mudados, { pessoaId: null, status: "TODOS" })) === "ebdac")
+  ok("filtro pessoa", ids(filtrarEOrdenar(l, { pessoaId: 1, status: "TODOS" })) === "ac")
+  ok("filtro Concluída", ids(filtrarEOrdenar(l, { pessoaId: null, status: "CONCLUIDA" })) === "c")
+  ok("filtro Cancelada / não exigida", ids(filtrarEOrdenar(l, { pessoaId: null, status: "ENCERRADAS" })) === "ed")
+  ok("canceladas / não exigidas somem nos demais filtros", !ids(filtrarEOrdenar(l, { pessoaId: null, status: "A_INICIAR" })).match(/[de]/))
   ok("pessoas do select, na ordem da árvore", pessoasDaTabela(l).map((p) => p.nome).join() === "Edison,Helena,Maria")
   ok("título: tarefas quando não é tudo certidão", tituloDaTabela(l, (x) => x.documentoId != null && x.chave !== "b") === "Tarefas da fase atual · 3")
   ok("título: certidões · N (canceladas / não exigidas não contam por padrão)", tituloDaTabela(l, () => true) === "Certidões da fase atual · 3")
-  const ativasPadrao = filtrarEOrdenar(l, { pessoaId: null, status: "ATIVAS", ordem: "arvore" })
+  const ativasPadrao = filtrarEOrdenar(l, { pessoaId: null, status: "ATIVAS" })
   ok("PADRÃO 'ATIVAS': só abertas e concluídas, sem canceladas nem não exigidas", ids(ativasPadrao) === "bac")
   ok("título = linhas da lista, sempre (padrão)", tituloDaTabela(l, () => true, ativasPadrao) === `Certidões da fase atual · ${ativasPadrao.length}`)
-  const comEnc = filtrarEOrdenar(l, { pessoaId: null, status: "TODOS", ordem: "arvore" })
+  const comEnc = filtrarEOrdenar(l, { pessoaId: null, status: "TODOS" })
   ok("com canceladas / não exigidas: título diz quantas são e bate com as linhas", tituloDaTabela(l, () => true, comEnc) === "Certidões da fase atual · 5 (3 ativas + 2 cancelada / não exigida)" && comEnc.length === 5, tituloDaTabela(l, () => true, comEnc))
-  const soEnc = filtrarEOrdenar(l, { pessoaId: null, status: "ENCERRADAS", ordem: "arvore" })
+  const soEnc = filtrarEOrdenar(l, { pessoaId: null, status: "ENCERRADAS" })
   ok("filtro só canceladas / não exigidas: título bate", tituloDaTabela(l, () => true, soEnc) === "Certidões da fase atual · 2 (cancelada / não exigida)")
-  ok("filtro de pessoa: o número do título acompanha a lista", tituloDaTabela(l, () => true, filtrarEOrdenar(l, { pessoaId: 1, status: "ATIVAS", ordem: "arvore" })) === "Certidões da fase atual · 2")
+  ok("filtro de pessoa: o número do título acompanha a lista", tituloDaTabela(l, () => true, filtrarEOrdenar(l, { pessoaId: 1, status: "ATIVAS" })) === "Certidões da fase atual · 2")
   ok("o filtro de status oferece 'Ativas' (padrão) e 'Cancelada / não exigida'", OPCOES_DE_STATUS[0].valor === "ATIVAS" && OPCOES_DE_STATUS.some((o) => o.valor === "ENCERRADAS" && o.rotulo === ROTULO_ENCERRADAS) && ROTULO_ENCERRADAS === "Cancelada / não exigida")
 
   secao("linha-resumo '+ N certidões iguais a estas'")

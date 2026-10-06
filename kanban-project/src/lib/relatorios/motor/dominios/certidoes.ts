@@ -29,6 +29,8 @@ import {
 import { documentoTemDadosPreenchidos } from "@/src/lib/documentos/dados-preenchidos"
 import { documentoAtivo } from "@/src/lib/documentos/status-inativos"
 import { titularDaUniao } from "@/src/services/genealogia/titular-uniao"
+import { geracoesDasArvores } from "@/src/services/genealogia/geracoes-da-arvore"
+import { ordenarItensDoRelatorio, type ItemDoRelatorio } from "./certidoes-ordem"
 import type { ContextoDoFiltro, CorDeCelula, DominioDef, FiltroDef, ValorDeFiltro } from "../tipos"
 import { cadastro, contem, dataBR, diasEntre, emLista, emListaId, igualId, periodo, porCampo } from "./_comuns"
 
@@ -324,6 +326,35 @@ export const FILTROS_DO_CONTROLE: FiltroDef[] = [
     paraWhere: (v, c) => (v.tipo === "entidade" ? idsDoControle(c, (l) => (pessoaDaLinha(l) as any)?.id === v.id) : null) },
 ]
 
+// ─── A ORDEM FIXA DAS CERTIDÕES NO RELATÓRIO (06/10/2026) ─────────────────────────────────────────────────────────────────
+// Todas as ordenações do relatório de certidões passam por AQUI: dentro da família vale a regra (geração → linha reta → nascimento → pessoa →
+// Nascimento, Casamento, Óbito, outros — `ordem-certidoes.ts`); a ordenação escolhida (criação, situação, família e geração) só ordena as FAMÍLIAS.
+// O banco não ordena certidão: devolve o recorte, a regra ordena, o motor pagina a lista de ids.
+async function idsDasCertidoesNaOrdemFixa(where: any, ordenarPor: string, direcao: "asc" | "desc"): Promise<number[]> {
+  const pessoaSel = { select: { id: true, arvoreId: true, linhaReta: true, data_nasc: true } } as const
+  const linhas = await prisma.necessidadeDocumental.findMany({
+    where: { AND: [where, SO_CERTIDAO, { supersedePorId: null }] },
+    select: {
+      id: true, createdAt: true, status: true,
+      itemCatalogo: { select: { name: true } },
+      pessoa: pessoaSel,
+      uniao: { select: { pessoa1Id: true, pessoa2Id: true, pessoa1: pessoaSel, pessoa2: pessoaSel } },
+      processo: { select: { nome: true, familia: { select: { nome: true } } } },
+    },
+  })
+  const geracoes = await geracoesDasArvores(linhas.flatMap((l) => [l.pessoa?.arvoreId, l.uniao?.pessoa1.arvoreId, l.uniao?.pessoa2.arvoreId]))
+  const nomeDaFamilia = (l: (typeof linhas)[number]) => l.processo?.familia?.nome ?? l.processo?.nome ?? "—"
+  const itens: ItemDoRelatorio[] = linhas.map((l) => {
+    const p = pessoaDaLinha(l)
+    return {
+      id: l.id, createdAt: l.createdAt.getTime(), status: String(l.status), familia: nomeDaFamilia(l),
+      geracao: p && p.arvoreId != null ? geracoes.get(p.arvoreId)?.get(p.id) ?? null : null,
+      linhaReta: (p as any)?.linhaReta === true, nascimento: (p as any)?.data_nasc ?? null, pessoaId: p?.id ?? null, titulo: l.itemCatalogo?.name ?? null,
+    }
+  })
+  return ordenarItensDoRelatorio(itens, ordenarPor, direcao).map((i) => i.id)
+}
+
 export const DOMINIO_CERTIDOES: DominioDef = {
   key: "certidoes",
   rotulo: "Certidões",
@@ -491,20 +522,20 @@ export const DOMINIO_CERTIDOES: DominioDef = {
     { key: "passo", rotulo: "Passo", valor: (l) => l.__passo ?? "—" },
     { key: "iniciou", rotulo: "Iniciou",
       valor: (l) => { const d = tarefaDoDoc(l)?.dataInicio; return d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: FUSO_OPERACIONAL }) : "—" } },
-    { key: "geracao", rotulo: "Geração", valor: (l) => { const p = pessoaDaLinha(l); return p?.numeroLinhagem != null ? `G${p.numeroLinhagem}` : null } },
+    { key: "geracao", rotulo: "Geração", valor: (l) => (l.__geracao != null ? `G${l.__geracao}` : null) },
     { key: "orgao_municipio_uf", rotulo: "Município/UF do órgão",
       valor: (l) => { const o = doc(l)?.orgao; const t = [o?.city, o?.state].filter(Boolean).join("/"); return t || null } },
   ],
 
   ordenacoes: [
-    { key: "criacao", rotulo: "Criação da necessidade", orderBy: (d) => [{ createdAt: d }, { id: d }] },
+    { key: "criacao", rotulo: "Famílias pela criação da necessidade (dentro da família, ordem fixa)", orderBy: (d) => [{ createdAt: d }, { id: d }] },
     // LIMITAÇÃO CONHECIDA (mesma família da de "confirmado_em" logo abaixo):
     // ordena pelo status BRUTO de NecessidadeDocumental, não pelo bucket
     // derivado que a coluna "Situação" exibe — a ordem alfabética do enum não
     // bate com Não localizada→Não solicitada→Pendente→Solicitado→Recebida→
     // Dispensada. Ordenar pelo bucket certo exigiria SQL bruto (CASE WHEN
     // sobre 2 relações aninhadas); registrado como limitação, não escondido.
-    { key: "status", rotulo: "Situação", orderBy: (d) => [{ status: d }, { id: "desc" as const }] },
+    { key: "status", rotulo: "Famílias pela situação (dentro da família, ordem fixa)", orderBy: (d) => [{ status: d }, { id: "desc" as const }] },
     // FAMÍLIA → GERAÇÃO: os dois primeiros níveis pedidos pela visão "Certidões
     // solicitadas no período". "Confirmado em" como 3º critério NÃO é possível
     // aqui: vive 2 relações "muitos" abaixo (Documento → StepInstance →
@@ -512,7 +543,7 @@ export const DOMINIO_CERTIDOES: DominioDef = {
     // to-many aninhada duas vezes — só por `_count`. Com a confirmação ainda
     // zerada em toda a produção (verificado 27/09/2026), o impacto prático
     // hoje é nulo; registrado como limitação, não escondido.
-    { key: "familia_geracao", rotulo: "Família e geração",
+    { key: "familia_geracao", rotulo: "Família (A–Z) e, dentro dela, a ordem fixa das certidões",
       orderBy: (d) => [{ processo: { familia: { nome: d } } }, { pessoa: { numeroLinhagem: d } }, { id: "asc" as const }] },
   ],
 
@@ -541,8 +572,16 @@ export const DOMINIO_CERTIDOES: DominioDef = {
         ? rotuloDoPasso({ stepKey: wsi.stepKey, snapshot: wsi.snapshot, labelPublicado: wsi.stepDefinitionId != null ? rotuloDaDefinicao.get(wsi.stepDefinitionId) ?? null : null, faseCode: phaseKeyToFaseCode(t.faseMacroKey) })
         : null
     }
+    // A GERAÇÃO de verdade (G1 = ancestral que origina o direito), calculada pela filiação da árvore — nunca `numeroLinhagem`.
+    const geracoes = await geracoesDasArvores((linhas as any[]).map((l) => pessoaDaLinha(l)?.arvoreId))
+    for (const l of linhas as any[]) {
+      const p = pessoaDaLinha(l)
+      l.__geracao = p && p.arvoreId != null ? geracoes.get(p.arvoreId)?.get(p.id) ?? null : null
+    }
     return linhas
   },
+
+  idsEmOrdemFixa: idsDasCertidoesNaOrdemFixa,
 
   // GETTER (não array estático): "Certidões solicitadas no período" precisa do
   // mês ATUAL, recalculado a cada consulta a /api/relatorios/meta — um array

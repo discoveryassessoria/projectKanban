@@ -16,6 +16,7 @@
 // ============================================================================
 "use client"
 
+import { ordenarLinhasDeCertidao } from "@/lib/operacional/ordem-certidoes"
 import { LinkDeAnexo } from "@/src/lib/anexos/cliente"
 import { useEffect, useState } from "react"
 import Link from "next/link"
@@ -173,10 +174,9 @@ export function ProcessoExpandido({
   const documentosDoProcesso = documentos?.chave === recarga ? documentos.d : null
   const listaAtividades = atividades?.chave === recarga ? atividades.d : null
 
-  const proximasTarefas = (listaTarefas ?? [])
-    .filter((t) => t.statusTarefa === "NAO_INICIADA")
-    .sort((a, b) => (a.dataPrazo ?? "9999").localeCompare(b.dataPrazo ?? "9999"))
-    .slice(0, 5)
+  // As próximas a iniciar, na REGRA FIXA de ordem das certidões (geração → linha reta → nascimento → pessoa → Nascimento, Casamento, Óbito): o prazo
+  // não reordena certidões dentro da família.
+  const proximasTarefas = ordenarLinhasDeCertidao((listaTarefas ?? []).filter((t) => t.statusTarefa === "NAO_INICIADA")).slice(0, 5)
 
   const atribuirFaseAtual = async (novoResponsavelId: number) => {
     if (!processo.faseAtualKey) return

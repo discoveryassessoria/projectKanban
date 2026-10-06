@@ -363,7 +363,7 @@ export async function GET(
               sobrenome: true,
               sexo: true,
               publicCode: true,
-              numeroLinhagem: true,
+              numeroLinhagem: true, data_nasc: true,
               requerente: true,
               linhaReta: true,
               paiId: true,

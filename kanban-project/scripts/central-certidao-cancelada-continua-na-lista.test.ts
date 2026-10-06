@@ -21,6 +21,7 @@ import { controlarOperacaoV2 } from "../src/services/documento-operacao"
 import { documentacaoRequeridaDoProcesso } from "../src/lib/process-stage/documentacao-requerida"
 import { focoDaFamilia } from "../lib/operacional/torre-foco"
 import { listarTarefasDaTorre } from "../src/services/torre-tarefas"
+import { prioridadeDoEventoDeVida } from '../src/lib/documentos/ordem-evento-vida'
 import { passaNoRecorte, ordenarDocumentos, recorteDoKpi, estaEncerrada, RECORTE_VAZIO, type Recorte } from "../src/components/kanban/PainelDaFase"
 import type { DocumentoDoIndice } from "../src/lib/process-stage/estrutura-operacional-core"
 import { GET as getDocumentos } from "../src/app/api/processos/[processoId]/documentos/route"
@@ -85,8 +86,9 @@ async function main() {
     ok("'Só ativas' esconde a cancelada e deixa o trabalho", !passa({ estado: "ATIVAS" }, linha!) && depois.filter((d) => d.documentoId !== nasc.id).every((d) => passa({ estado: "ATIVAS" }, d)))
     ok("o cartão 'Cancelados' do topo é o MESMO recorte (lista = contador)", recorteDoKpi("Cancelados") === "cancelados" && depois.filter((d) => passa({ rapido: "cancelados" }, d)).length === i1.resumo.cancelados)
     ok("'Sem responsável' não conta a cancelada", !passa({ rapido: "sem_responsavel" }, linha!))
-    const ordem = ordenarDocumentos(depois, "atencao")
-    ok("na lista a cancelada vai para o FIM (esmaecida), em qualquer ordem escolhida", ordem[ordem.length - 1].documentoId === nasc.id && (["progresso", "prazo", "documento", "etapa", "responsavel", "status"] as const).every((o) => { const x = ordenarDocumentos(depois, o); return x[x.length - 1].documentoId === nasc.id }))
+    const ordem = ordenarDocumentos(depois)
+    const prio = (d: { titulo: string }) => prioridadeDoEventoDeVida(d.titulo)
+    ok("na lista a cancelada fica NO LUGAR que a regra fixa manda (Nascimento, Casamento, Óbito, outros) — o status não a leva para o fim", ordem.some((d) => d.documentoId === nasc.id) && ordem.every((d, i) => i === 0 || prio(d) >= prio(ordem[i - 1])) && ordem.length === depois.length && ordenarDocumentos([...depois].reverse()).map((d) => d.chave).join() === ordem.map((d) => d.chave).join())
 
     // ════════════ NÃO EXIGIDA — a árvore deixou de exigir ════════════
     secao("Não exigida: a árvore mudou (desmarcar 'casado') — o documento fica, não conta, e diz por quê")

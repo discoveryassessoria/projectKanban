@@ -207,11 +207,11 @@ function mapearBiblioteca(data: ProcessoDocumentosData) {
     // em requeridas, pendentes nem prontas (os contadores saem só dos ativos).
     const aplicaveis = row.docs.filter((d) => d.status.toLowerCase() !== "invalido")
     const ativos = aplicaveis.filter((d) => documentoAtivo(d.status))
-    const encerrados = aplicaveis.filter((d) => !documentoAtivo(d.status))
     // Nasce, casa, morre — nunca alfabética (fonte única: ordem-evento-vida.ts).
     const porEventoDeVida = (a: DocCompact, b: DocCompact) =>
       compararPorEventoDeVida(NOME_COMPLETO[a.tipoShort] ?? a.tipoShort, NOME_COMPLETO[b.tipoShort] ?? b.tipoShort)
-    const docsOrdenados = [...[...ativos].sort(porEventoDeVida), ...[...encerrados].sort(porEventoDeVida)]
+    // ORDEM FIXA: o status (cancelado/não exigido) NUNCA reordena — a certidão encerrada fica no lugar que a regra manda, só esmaecida.
+    const docsOrdenados = [...aplicaveis].sort(porEventoDeVida)
     const docs: BibDocItem[] = docsOrdenados.map((d) => {
       const encerrado = !documentoAtivo(d.status)
       const certSt = certStatusFromDoc(d.status, d.isRecebido)

@@ -117,7 +117,7 @@ secao("Gaveta — passos reais, resumo do grupo, agrupar/paginar, Feito")
 
   const L = (id: number, fam: string, st = "NAO_INICIADA", resp: string | null = "A") => ({ taskId: id, statusTarefa: st, familiaNome: fam, processoNome: fam, responsavelNome: resp, faseAtualDoProcessoLabel: "Emissão documental", faseMacroKey: "e", terceiroNome: null })
   const g = agruparParaTela([L(1, "Antão"), L(2, "Antão", "CANCELADA"), L(3, "Antão"), L(4, "Bertolucci")], "fam")
-  ok("grupos na ordem de primeira aparição; a CANCELADA vai para o FIM do grupo (riscada, nunca no meio)", g.map(([k]) => k).join() === "Antão,Bertolucci" && g[0][1].map((l) => l.taskId).join() === "1,3,2")
+  ok("grupos na ordem de primeira aparição; a CANCELADA NÃO vai para o fim: fica onde a regra fixa das certidões manda (aqui, empate → id)", g.map(([k]) => k).join() === "Antão,Bertolucci" && g[0][1].map((l) => l.taskId).join() === "1,2,3")
   ok("agrupar por responsável / fase / sem agrupamento", agruparParaTela([L(1, "A", "X", "Ana"), L(2, "B", "X", null)], "resp").map(([k]) => k).join() === "Ana,Sem responsável" && agruparParaTela([L(1, "A")], "fase")[0][0] === "Emissão documental" && agruparParaTela([L(1, "A"), L(2, "B")], "none").length === 1)
   const gr = Array.from({ length: 5 }, (_, i): [string, number[]] => [`F${i}`, Array.from({ length: i === 2 ? 70 : 20 }, (_, k) => k)])
   const pag = paginarGrupos(gr, 50)

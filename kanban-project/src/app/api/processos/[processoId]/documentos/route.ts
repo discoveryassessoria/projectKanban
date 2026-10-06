@@ -1,3 +1,5 @@
+import { geracoesDasArvores } from "@/src/services/genealogia/geracoes-da-arvore"
+import { ordenarCertidoesDaFamilia } from "@/lib/operacional/ordem-certidoes"
 // src/app/api/processos/[processoId]/documentos/route.ts
 
 import { documentacaoRequeridaDoProcesso, type DocumentacaoRequerida } from "@/src/lib/process-stage/documentacao-requerida"
@@ -206,9 +208,14 @@ export async function GET(
             numeroLinhagem: true,
             requerente: true,
             linhaReta: true,
+            data_nasc: true,
           },
         })
       : []
+
+    // A GERAÇÃO de verdade (G1 = ancestral que origina o direito; cônjuge na geração do parceiro), calculada pela filiação — nunca `numeroLinhagem`.
+    const geracoesDaArvore = (await geracoesDasArvores([processo.arvoreId])).get(processo.arvoreId ?? -1) ?? new Map<number, number | null>()
+    const nascimentoPorPessoa = new Map(pessoas.map((p) => [p.id, p.data_nasc ? p.data_nasc.toISOString() : null]))
 
     const pessoasIds = pessoas.map((p) => p.id)
     const allDocs =
@@ -358,13 +365,13 @@ export async function GET(
       const nome = `${p.nome}${p.sobrenome ? " " + p.sobrenome : ""}`
       const docs = docsByPessoa.get(p.id) ?? []
       const isDirectLine = p.linhaReta
-      const geracao = isDirectLine ? p.numeroLinhagem : null
+      const geracao = geracoesDaArvore.get(p.id) ?? null
 
       // Papel
         let papel = "—"
         if (geracao === 0) papel = "Requerente"
         else if (isDirectLine) papel = geracao != null ? `Geração ${geracao}` : "Linha reta"
-        else papel = "Cônjuge"  // sem numeroLinhagem → assumimos que é cônjuge
+        else papel = "Cônjuge"  // fora da linha reta → cônjuge/apoio (a geração dele é a do parceiro)
 
       // Documentos compactos
       const docsCompact: DocCompact[] = docs.map((d) => {
@@ -597,13 +604,15 @@ export async function GET(
 
     const rows = pessoas.map(buildRow)
 
-    const linhaPrincipal = rows
-      .filter((r) => r.isDirectLine)
-      .sort((a, b) => (a.geracao ?? 99) - (b.geracao ?? 99))
+    // REGRA FIXA DE ORDEM (`lib/operacional/ordem-certidoes.ts`): geração → linha reta → nascimento da pessoa → pessoa. Vale nos três blocos.
+    const ordenarPessoas = (lista: PersonRow[]) => ordenarCertidoesDaFamilia(lista, (r) => ({
+      geracao: r.geracao, linhaReta: r.isDirectLine, pessoaNascimento: nascimentoPorPessoa.get(r.pessoaId) ?? null, pessoaId: r.pessoaId,
+    }))
+    const linhaPrincipal = ordenarPessoas(rows.filter((r) => r.isDirectLine))
 
-    const conjuges = rows.filter((r) => !r.isDirectLine && r.papel === "Cônjuge")
+    const conjuges = ordenarPessoas(rows.filter((r) => !r.isDirectLine && r.papel === "Cônjuge"))
 
-    const outros = rows.filter((r) => !r.isDirectLine && r.papel !== "Cônjuge")
+    const outros = ordenarPessoas(rows.filter((r) => !r.isDirectLine && r.papel !== "Cônjuge"))
 
     // -- Stats (mesma fonte da linha: Tarefa viva, nunca `Documento.status`)
     const todosOsDocs = [...allDocs, ...placeholders]

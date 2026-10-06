@@ -164,7 +164,7 @@ secao("3.16 Ordenar por — prazo · risco · família · responsável · criaç
   ok("família: A→Z", ord("familia").join() === [b, d, c, a].map((l) => l.id).join())
   ok("responsável: A→Z, sem responsável por último", ord("responsavel").join() === [b, a, d, c].map((l) => l.id).join())
   ok("criação: mais recentes primeiro, sem data por último", ord("criacao").join() === [d, b, a, c].map((l) => l.id).join())
-  ok("ordenar não muda o conjunto e não altera o array de entrada; null mantém a ordem recebida", ordenarLinhas(x, null) === x && x[0] === a && ord("prazo").length === 4)
+  ok("ordenar não muda o conjunto e não altera o array de entrada; null mantém a ordem das FAMÍLIAS recebida (cada linha aqui é uma família)", ordenarLinhas(x, null).map((l) => l.id).join() === x.map((l) => l.id).join() && x[0] === a && ord("prazo").length === 4)
   ok("a ordenação entra no aplicarFiltros (a tabela e o Fazer agora leem a mesma ordem)", aplicarFiltros(x, F({ ordenar: "prazo" }), CTX).linhas.map((l) => l.id).join() === ord("prazo").join())
 }
 

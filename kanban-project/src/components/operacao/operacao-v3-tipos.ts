@@ -31,6 +31,10 @@ export interface LinhaOperacaoV3 {
   pessoaNome: string | null
   numeroLinhagem: number | null
   linhaReta: boolean | null
+  /** A GERAÇÃO de verdade (G1 = ancestral que origina o direito) — o "G" da tela e a chave da regra fixa de ordem. NÃO é `numeroLinhagem`. */
+  geracao: number | null
+  /** Data de nascimento da pessoa (ISO) — a ordem de nascimento da regra fixa. */
+  pessoaNascimento: string | null
   /** Os dois nomes, quando a obrigação é de uma UNIÃO (certidão de casamento) — "Fulano e Fulana". `null` para obrigação de pessoa. */
   casalNomes: string | null
   /** O cônjuge (quando a obrigação é de UNIÃO) — "com <cônjuge>". `pessoaId`/`pessoaNome` já são os da pessoa da linha reta. */

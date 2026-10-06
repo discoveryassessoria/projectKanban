@@ -21,6 +21,8 @@
 
 import { construirGrafo } from "@/src/lib/genealogia/motor/grafo"
 import { calcularParentesco } from "@/src/lib/genealogia/motor/parentesco"
+import { calcularGeracoes } from "@/src/lib/genealogia/geracao"
+import { ordenarCertidoesDaFamilia } from "@/lib/operacional/ordem-certidoes"
 import type { PessoaEntrada, UniaoEntrada } from "@/src/lib/genealogia/motor/tipos"
 import { ehRequerente } from "@/lib/genealogia/requerente-flag"
 
@@ -57,10 +59,24 @@ export interface PessoaDoProcesso {
   posicao: string
   /** Pendência ADMINISTRATIVA real (cadastro inconsistente). null = sem pendência. */
   pendencia: string | null
+  /**
+   * A GERAÇÃO DE VERDADE (G1 = o ancestral que origina o direito; filhos G2…; cônjuge na geração do parceiro), calculada pela filiação —
+   * `src/lib/genealogia/geracao.ts`. É ESTE o "G" que a tela mostra e que a ordem das certidões usa (nunca `numeroLinhagem`). `null` = sem geração derivável.
+   */
+  geracaoNaArvore: number | null
+  /** Nomes dos requerentes de cuja LINHA esta pessoa faz parte (ela está no caminho de filiação até eles). Vazio fora da linha. */
+  linhaDe: string[]
+  /**
+   * Nome do requerente em relação a quem `posicao` foi escrita — preenchido só quando o processo tem requerentes de RAMOS diferentes
+   * ("tia-avó" + posicaoEm "Maria Carolina" = "tia-avó de Maria Carolina"). `null` = um só ramo: a posição é em relação ao requerente.
+   */
+  posicaoEm: string | null
   /** Nº Linhagem (Pessoa.numeroLinhagem) — ordena a pasta documental. Fonte da ORDEM
    *  de exibição desta lista; `geracao` é outro eixo (grau a partir do requerente),
    *  usado só para o rótulo, nunca para ordenar. */
   numeroLinhagem: number | null
+  /** Nascimento (ISO) — chave de ordem. */
+  nascimento: string | null
 }
 
 export interface PessoaBruta {
@@ -72,6 +88,8 @@ export interface PessoaBruta {
   requerente: string | null
   linhaReta: boolean
   numeroLinhagem?: number | null
+  /** Nascimento da pessoa — entra na regra fixa de ordem (geração → linha reta → nascimento). Ausente = sem data. */
+  data_nasc?: Date | string | null
   paiId: number | null
   maeId: number | null
 }
@@ -127,10 +145,34 @@ export function montarPessoasDoProcesso(
   }))
   const grafo = construirGrafo(entradas, unioesEntrada)
 
-  // Âncora da linhagem = requerente da árvore. Sem âncora nada pode ser posicionado,
-  // e isso é uma pendência REAL de cadastro — não um motivo para esconder pessoas.
+  // Requerentes da árvore: PODE haver vários, de ramos diferentes (Salvarani: Maria Carolina; José Roberto Junior e Alessandra, filhos de Silvia Helena).
+  // Sem requerente nada pode ser posicionado — pendência REAL de cadastro, não motivo para esconder pessoas.
   const requerentes = pessoas.filter((p) => ehRequerente(p.requerente))
   const ancora = requerentes[0] ?? null
+  const porIdPessoa = new Map(pessoas.map((p) => [p.id, p]))
+
+  // LINHA RETA = o caminho de filiação entre o ancestral que origina o direito e PELO MENOS UM requerente. Para cada requerente, o conjunto dos
+  // seus ascendentes; a pessoa está na linha quando está no de algum — não só no do primeiro requerente.
+  const ascendentesDe = (id: number): Set<number> => {
+    const vistos = new Set<number>(), fila = [id]
+    while (fila.length) {
+      const x = porIdPessoa.get(fila.pop()!)
+      if (!x) continue
+      for (const pai of [x.paiId, x.maeId]) if (pai != null && porIdPessoa.has(pai) && !vistos.has(pai)) { vistos.add(pai); fila.push(pai) }
+    }
+    return vistos
+  }
+  const ascendentesPorRequerente = new Map(requerentes.map((r) => [r.id, ascendentesDe(r.id)]))
+  const nomeCurtoDoRequerente = (r: PessoaBruta): string => {
+    const homonimo = requerentes.some((o) => o.id !== r.id && o.nome === r.nome)
+    return homonimo ? nomeCompletoPessoa(r) : r.nome
+  }
+  // Ramos diferentes: algum requerente NÃO está na linha de outro (nem é ascendente dele).
+  const variosRamos = requerentes.length > 1 && requerentes.some((r) => requerentes.some((o) => o.id !== r.id && !ascendentesPorRequerente.get(o.id)!.has(r.id) && !ascendentesPorRequerente.get(r.id)!.has(o.id)))
+  const geracoes = calcularGeracoes(
+    pessoas.map((p) => ({ id: p.id, paiId: p.paiId, maeId: p.maeId, linhaReta: p.linhaReta, requerente: p.requerente })),
+    unioes,
+  )
 
   const linhas: PessoaDoProcesso[] = pessoas.map((p) => {
     const nome = nomeCompletoPessoa(p)
@@ -138,28 +180,38 @@ export function montarPessoasDoProcesso(
 
     let geracao: number | null = null
     let posicao = "—"
-    let ascendenteDireto = false
+    let posicaoEm: string | null = null
+    // Os requerentes de cuja linha esta pessoa faz parte (ela é o requerente ou está acima dele).
+    const linhaDe = requerentes.filter((r) => r.id === p.id || ascendentesPorRequerente.get(r.id)!.has(p.id)).map(nomeCurtoDoRequerente)
+    const ascendenteDireto = linhaDe.length > 0
 
     if (ancora && p.id === ancora.id) {
       geracao = 0
       posicao = "Requerente"
-      ascendenteDireto = true
     } else if (ancora) {
-      const par = calcularParentesco(grafo, ancora.id, p.id)
-      if (par) {
-        posicao = par.rotulo
-        // Ascendente DIRETO do requerente: sobe N gerações e não desce nenhuma.
-        if (!par.porAfinidade && par.abaixo === 0 && par.acima >= 1) {
-          geracao = par.acima
-          ascendenteDireto = true
-        }
+      // `posicao`/`geracao` (grau a partir do requerente) em relação ao requerente MAIS PRÓXIMO: o de menor distância de parentesco.
+      let melhor: { par: NonNullable<ReturnType<typeof calcularParentesco>>; ref: PessoaBruta } | null = null
+      for (const r of requerentes) {
+        if (r.id === p.id) continue
+        const par = calcularParentesco(grafo, r.id, p.id)
+        if (!par) continue
+        const dist = par.acima + par.abaixo + (par.porAfinidade ? 0.5 : 0)
+        const distMelhor = melhor ? melhor.par.acima + melhor.par.abaixo + (melhor.par.porAfinidade ? 0.5 : 0) : Infinity
+        if (dist < distMelhor) melhor = { par, ref: r }
       }
+      if (eRequerente && !melhor) { posicao = "Requerente" }
+      if (melhor) {
+        posicao = melhor.par.rotulo
+        if (variosRamos) posicaoEm = nomeCurtoDoRequerente(melhor.ref)
+        if (!melhor.par.porAfinidade && melhor.par.abaixo === 0 && melhor.par.acima >= 1) geracao = melhor.par.acima
+      }
+      if (eRequerente && posicao === "—") posicao = "Requerente"
     }
 
     // CLASSIFICAÇÃO
-    //  • Requerente e ascendentes diretos declarados na linha reta → linha principal.
+    //  • Requerente e ascendentes (de QUALQUER requerente) declarados na linha reta → linha principal.
     //  • Declarado FORA da linha reta (cônjuge/apoio) → fora da linhagem, sempre.
-    //  • Declarado NA linha reta mas sem filiação que chegue ao requerente →
+    //  • Declarado NA linha reta mas sem filiação que chegue a NENHUM requerente →
     //    inconsistência real de cadastro: fica visível, em pendência.
     let classificacao: ClassificacaoPessoa
     let pendencia: string | null = null
@@ -176,7 +228,7 @@ export function montarPessoasDoProcesso(
     } else {
       classificacao = "PENDENTE_CLASSIFICACAO"
       pendencia = ancora
-        ? "Marcada na linha reta, mas sem filiação que chegue ao requerente."
+        ? "Marcada na linha reta, mas sem filiação que chegue a nenhum requerente."
         : "Nenhum requerente marcado na árvore — posição na linhagem não pode ser determinada."
     }
 
@@ -189,22 +241,21 @@ export function montarPessoasDoProcesso(
       linhaReta: p.linhaReta,
       classificacao,
       geracao,
+      geracaoNaArvore: geracoes.get(p.id) ?? null,
+      linhaDe,
+      posicaoEm,
       posicao,
       pendencia,
       numeroLinhagem: p.numeroLinhagem ?? null,
+      nascimento: p.data_nasc ? (p.data_nasc instanceof Date ? p.data_nasc.toISOString() : String(p.data_nasc)) : null,
     }
   })
 
-  // ORDEM DE EXIBIÇÃO = Nº Linhagem (pasta documental — a mesma régua em toda
-  // tela que lista a "linha reta"). `geracao` continua existindo só para o
-  // rótulo (G1/G2/…); quem não tem numeroLinhagem calculado ainda vai ao fim,
-  // por nome — nunca some.
-  const ordem = (l: PessoaDoProcesso) => (l.numeroLinhagem == null ? Number.MAX_SAFE_INTEGER : l.numeroLinhagem)
-  return linhas.sort((a, b) => {
-    const d = ordem(a) - ordem(b)
-    if (d !== 0) return d
-    return a.nome.localeCompare(b.nome, "pt-BR")
-  })
+  // ORDEM DE EXIBIÇÃO = a REGRA FIXA (`lib/operacional/ordem-certidoes.ts`): geração calculada (G1…) → linha reta → nascimento → pessoa. Nunca
+  // `numeroLinhagem` (número de sequência: irmãos diferem). Quem não tem geração vai ao fim, por nome — nunca some.
+  return ordenarCertidoesDaFamilia(linhas, (l) => ({
+    geracao: l.geracaoNaArvore, linhaReta: l.linhaReta, pessoaNascimento: l.nascimento, pessoaId: l.pessoaId, desempate: l.nome,
+  }))
 }
 
 // ============================================================

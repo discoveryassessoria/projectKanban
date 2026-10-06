@@ -170,17 +170,17 @@ export interface DetalheDoProcesso extends FocoDaFamilia {
   geradoEm: string
 }
 
-const ORDEM_DO_TIPO: Record<string, number> = { NASCIMENTO: 0, CASAMENTO: 1, OBITO: 2 }
+/** O que a tabela precisa saber de cada PESSOA: a geração calculada, a linha reta e o nascimento (regra fixa de ordem das certidões). */
+interface InfoDaPessoa { rotulo: string | null; geracao: number | null; linhaReta: boolean | null; nascimento: string | null }
 const tipoDoTitulo = (titulo: string): string => titulo.split(' · ')[0].replace(/\s*-\s*Inteiro Teor\s*$/i, '').trim()
 
 /** A linha aberta da Torre → linha da tabela. */
-function linhaAberta(l: LinhaDaTorre, geracaoDe: Map<number, string>): LinhaDaTabela {
+function linhaAberta(l: LinhaDaTorre, info: Map<number, InfoDaPessoa>): LinhaDaTabela {
   const risco = nivelDeRisco(l)
   return {
     chave: `t${l.taskId}`, tarefaId: l.taskId, documentoId: l.documentoId, tipo: 'ABERTA',
     titulo: tipoDoTitulo(l.titulo), pessoaId: l.pessoaId, pessoa: l.pessoaNome ?? l.casalNomes ?? null,
-    geracao: l.pessoaId != null ? geracaoDe.get(l.pessoaId) ?? null : null, ordemArvore: l.numeroLinhagem,
-    ordemTipo: l.categoriaDoc ? ORDEM_DO_TIPO[l.categoriaDoc] ?? 3 : 3,
+    geracao: l.pessoaId != null ? info.get(l.pessoaId)?.rotulo ?? null : null, geracaoNum: l.geracao, linhaReta: l.linhaReta, pessoaNascimento: l.pessoaNascimento,
     // `passoAtual.ordem` = passos já concluídos; a coluna mostra o passo EM QUE ESTÁ ("1/4" = o primeiro de 4), como o protótipo.
     passo: l.passoCorrente ? { rotulo: l.passoCorrente.label, ordem: l.passoAtual ? Math.min(l.passoAtual.ordem + 1, l.passoAtual.total) : 0, total: l.passoAtual?.total ?? 0 } : null,
     status: chaveDoStatus(l.statusTarefa), statusRotulo: rotuloDoStatus(l.statusTarefa),
@@ -191,12 +191,11 @@ function linhaAberta(l: LinhaDaTorre, geracaoDe: Map<number, string>): LinhaDaTa
   }
 }
 
-function linhaConcluida(l: LinhaGerencial, geracaoDe: Map<number, string>): LinhaDaTabela {
+function linhaConcluida(l: LinhaGerencial, info: Map<number, InfoDaPessoa>): LinhaDaTabela {
   return {
     chave: `t${l.taskId}`, tarefaId: l.taskId, documentoId: l.documentoId, tipo: 'CONCLUIDA',
     titulo: tipoDoTitulo(l.titulo), pessoaId: l.pessoaId, pessoa: l.pessoaNome ?? l.casalNomes ?? null,
-    geracao: l.pessoaId != null ? geracaoDe.get(l.pessoaId) ?? null : null, ordemArvore: l.numeroLinhagem,
-    ordemTipo: l.categoriaDoc ? ORDEM_DO_TIPO[l.categoriaDoc] ?? 3 : 3,
+    geracao: l.pessoaId != null ? info.get(l.pessoaId)?.rotulo ?? null : null, geracaoNum: l.geracao, linhaReta: l.linhaReta, pessoaNascimento: l.pessoaNascimento,
     passo: null, status: 'CONCLUIDA', statusRotulo: rotuloDoStatus(l.statusTarefa),
     responsavelId: l.responsavelId, responsavelNome: l.responsavelNome,
     iniciouEm: l.iniciouEm, concluidaEm: l.concluidaEm, dataPrazo: null, rotuloDoPrazo: '',
@@ -204,7 +203,7 @@ function linhaConcluida(l: LinhaGerencial, geracaoDe: Map<number, string>): Linh
   }
 }
 
-function linhaEncerrada(e: CertidaoEncerradaDoFoco, geracaoDe: Map<number, string>, agora: Date): LinhaDaTabela {
+function linhaEncerrada(e: CertidaoEncerradaDoFoco, info: Map<number, InfoDaPessoa>, agora: Date): LinhaDaTabela {
   const enc = e.encerramento
   const cancelada = e.tipo === 'CANCELADA'
   const encerramentoTexto = cancelada
@@ -216,8 +215,10 @@ function linhaEncerrada(e: CertidaoEncerradaDoFoco, geracaoDe: Map<number, strin
   return {
     chave: `d${e.documentoId}`, tarefaId: enc?.tarefaReabrivelId ?? e.tarefaId ?? null, documentoId: e.documentoId, tipo: e.tipo,
     titulo: e.titulo, pessoaId: e.pessoaId ?? null, pessoa: e.pessoa,
-    geracao: e.pessoaId != null ? geracaoDe.get(e.pessoaId) ?? null : null, ordemArvore: e.ordemArvore ?? null,
-    ordemTipo: /nasc/i.test(e.titulo) ? 0 : /casam/i.test(e.titulo) ? 1 : /[óo]bito/i.test(e.titulo) ? 2 : 3,
+    geracao: e.pessoaId != null ? info.get(e.pessoaId)?.rotulo ?? null : null,
+    geracaoNum: e.pessoaId != null ? info.get(e.pessoaId)?.geracao ?? null : null,
+    linhaReta: e.pessoaId != null ? info.get(e.pessoaId)?.linhaReta ?? null : null,
+    pessoaNascimento: e.pessoaId != null ? info.get(e.pessoaId)?.nascimento ?? null : null,
     passo: null, status: e.tipo, statusRotulo: cancelada ? 'Cancelada' : 'Não exigida',
     responsavelId: null, responsavelNome: null, iniciouEm: null, concluidaEm: null, dataPrazo: null, rotuloDoPrazo: '',
     risco: null, atrasada: false, bola: null, encerramentoTexto, motivoTexto,
@@ -290,7 +291,7 @@ export async function detalheDoProcesso(processoId: number, agora = new Date()):
     proc.arvoreId
       ? prisma.pessoa.findMany({
           where: pessoasAtivasDaArvore(proc.arvoreId),
-          select: { id: true, nome: true, sobrenome: true, sexo: true, publicCode: true, numeroLinhagem: true, requerente: true, linhaReta: true, paiId: true, maeId: true },
+          select: { id: true, nome: true, sobrenome: true, sexo: true, publicCode: true, numeroLinhagem: true, requerente: true, linhaReta: true, paiId: true, maeId: true, data_nasc: true },
         })
       : Promise.resolve([]),
     proc.arvoreId
@@ -305,10 +306,16 @@ export async function detalheDoProcesso(processoId: number, agora = new Date()):
   ])
   const cam: CaminhoDoProcesso = caminho ?? { fases: [], numeroDaFaseAtual: null, total: 0, proximaFaseLabel: null }
 
-  // A posição de cada pessoa na árvore ("G1 bisavó") — o motor de parentesco oficial, o mesmo da Central.
-  const geracaoDe = new Map<number, string>()
+  // A posição de cada pessoa na árvore ("G1 bisavó") — a GERAÇÃO calculada pela filiação (nunca `numeroLinhagem`) + o motor de parentesco oficial.
+  const nascimentoDe = new Map(pessoas.map((p) => [p.id, p.data_nasc ? p.data_nasc.toISOString() : null]))
+  const info = new Map<number, InfoDaPessoa>()
   for (const p of montarPessoasDoProcesso(pessoas, unioes)) {
-    if (p.numeroLinhagem != null) geracaoDe.set(p.pessoaId, p.posicao && p.posicao !== '—' ? `G${p.numeroLinhagem} ${p.posicao}` : `G${p.numeroLinhagem}`)
+    const g = p.geracaoNaArvore
+    const posicao = p.posicao && p.posicao !== '—' ? `${p.posicao}${p.posicaoEm ? ` de ${p.posicaoEm}` : ''}` : null
+    info.set(p.pessoaId, {
+      rotulo: g != null ? (posicao ? `G${g} ${posicao}` : `G${g}`) : null,
+      geracao: g, linhaReta: p.linhaReta, nascimento: nascimentoDe.get(p.pessoaId) ?? null,
+    })
   }
 
   const itensDoProcesso = itens.filter((i) => i.processoId === processoId)
@@ -321,10 +328,10 @@ export async function detalheDoProcesso(processoId: number, agora = new Date()):
   // A tabela: abertas e concluídas DA FASE ATUAL + as certidões canceladas / não exigidas.
   const abertasDaFase = foco.tarefas.filter((l) => faseAtualKey == null || l.faseMacroKey === faseAtualKey)
   const deFasesAnteriores = foco.tarefas.filter((l) => faseAtualKey != null && l.faseMacroKey !== faseAtualKey)
-  const trabalho: LinhaDaTabela[] = [...abertasDaFase.map((l) => linhaAberta(l, geracaoDe)), ...concluidas.map((l) => linhaConcluida(l, geracaoDe))]
+  const trabalho: LinhaDaTabela[] = [...abertasDaFase.map((l) => linhaAberta(l, info)), ...concluidas.map((l) => linhaConcluida(l, info))]
   const faseEhDocumental = trabalho.some((l) => l.documentoId != null)
   const encerradasDaFase = foco.encerradas.filter((e) => (e.faseMacroKey ? e.faseMacroKey === faseAtualKey : faseEhDocumental))
-  const tabela = [...trabalho, ...encerradasDaFase.map((e) => linhaEncerrada(e, geracaoDe, agora))]
+  const tabela = [...trabalho, ...encerradasDaFase.map((e) => linhaEncerrada(e, info, agora))]
 
   const cartoes = cartoesDaFase({
     linhas: abertasDaFase,

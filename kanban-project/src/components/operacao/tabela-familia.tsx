@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { toast } from "@/src/hooks/use-toast"
+import { ordenarCertidoesDaFamilia } from "@/lib/operacional/ordem-certidoes"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import {
   auth, dataCurta, Estado, ROTULO_STATUS, ROTULO_PRIORIDADE, rotularFase,
@@ -102,10 +103,11 @@ function csvEscapar(v: string): string {
   return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
 }
 /** "Mais ações" da família — exportar, real e local, sem round-trip novo. */
-export function exportarFamiliaCsv(nome: string, linhas: LinhaOperacional[]) {
-  const cabecalho = ["Pessoa", "Documento/Tarefa", "Fase", "Etapa atual", "Prazo", "Prioridade", "Situação", "Terceiro"]
+export function exportarFamiliaCsv(nome: string, linhasEntrada: LinhaOperacional[]) {
+  const linhas = ordenarCertidoesDaTabela(linhasEntrada) // a exportação segue a MESMA regra fixa da tela
+  const cabecalho = ["Geração", "Pessoa", "Documento/Tarefa", "Fase", "Etapa atual", "Prazo", "Prioridade", "Situação", "Terceiro"]
   const corpo = linhas.map((l) => [
-    l.pessoaNome ?? "—", l.titulo, rotularFase(l.faseMacroKey) ?? "—", l.etapaAtual ?? "—",
+    l.geracao != null ? `G${l.geracao}` : "—", l.pessoaNome ?? "—", l.titulo, rotularFase(l.faseMacroKey) ?? "—", l.etapaAtual ?? "—",
     dataCurta(l.dataPrazo), ROTULO_PRIORIDADE[l.prioridade] ?? l.prioridade, textoDaSituacao(l), l.terceiroNome ?? "—",
   ].map((c) => csvEscapar(String(c))).join(","))
   const csv = [cabecalho.join(","), ...corpo].join("\n")
@@ -124,71 +126,15 @@ const COR_PRIORIDADE: Record<string, string> = {
   MEDIA: "bg-[var(--warning)]",
   BAIXA: "bg-[var(--success)]",
 }
-const ORDEM_PRIORIDADE: Record<string, number> = { URGENTE: 0, ALTA: 1, MEDIA: 2, BAIXA: 3 }
-const ORDEM_CATEGORIA_DOC: Record<string, number> = { NASCIMENTO: 0, CASAMENTO: 1, OBITO: 2 }
-
 /**
- * ORDEM PADRÃO (nenhuma coluna clicada) — pedido explícito do usuário
- * 25/09/2026: sempre agrupada por PESSOA, sequência nascimento → casamento →
- * óbito dentro da pessoa, e as pessoas na ordem da ÁRVORE (ancestral mais
- * antigo primeiro, descendo até o requerente) — a MESMA régua de "Nº
- * Linhagem" que a pasta documental/Central Operacional já usa
- * (`l.numeroLinhagem`, nunca uma conta de geração nova aqui).
+ * A ORDEM DAS CERTIDÕES DA FAMÍLIA é a REGRA FIXA (`lib/operacional/ordem-certidoes.ts`): geração (G1…) → linha reta → nascimento da pessoa →
+ * Nascimento, Casamento, Óbito, outros. Não há ordenação por coluna: prazo, prioridade, fase e pessoa NUNCA reordenam certidões dentro da família.
  */
-function agruparPorPessoaEGeracao(linhas: LinhaOperacional[]): LinhaOperacional[] {
-  const grupos = new Map<string, LinhaOperacional[]>()
-  for (const l of linhas) {
-    const chave = l.pessoaId != null ? `p:${l.pessoaId}` : `n:${l.pessoaNome ?? "—"}`
-    const g = grupos.get(chave)
-    if (g) g.push(l); else grupos.set(chave, [l])
-  }
-  const ordemGrupo = (g: LinhaOperacional[]) => g[0]?.numeroLinhagem ?? Number.MAX_SAFE_INTEGER
-  const gruposOrdenados = [...grupos.values()].sort((a, b) => {
-    const d = ordemGrupo(a) - ordemGrupo(b)
-    return d !== 0 ? d : (a[0]?.pessoaNome ?? "").localeCompare(b[0]?.pessoaNome ?? "", "pt-BR")
-  })
-  return gruposOrdenados.flatMap((g) =>
-    [...g].sort((a, b) => {
-      const d = (ORDEM_CATEGORIA_DOC[a.categoriaDoc ?? ""] ?? 9) - (ORDEM_CATEGORIA_DOC[b.categoriaDoc ?? ""] ?? 9)
-      return d !== 0 ? d : (a.titulo ?? "").localeCompare(b.titulo ?? "", "pt-BR")
-    }),
-  )
-}
-
-type Coluna = "prazo" | "prioridade" | "pessoa" | "fase" | null
-
-/** Ordenação manual das LINHAS visíveis — nunca mexe no agrupamento por família, só na ordem dentro dele. */
-function ordenarPorColuna(linhas: LinhaOperacional[], coluna: Coluna, asc: boolean): LinhaOperacional[] {
-  if (!coluna) return agruparPorPessoaEGeracao(linhas)
-  const cmp = (a: LinhaOperacional, b: LinhaOperacional): number => {
-    if (coluna === "prazo") {
-      const pa = a.dataPrazo ? Date.parse(a.dataPrazo) : Number.POSITIVE_INFINITY
-      const pb = b.dataPrazo ? Date.parse(b.dataPrazo) : Number.POSITIVE_INFINITY
-      return pa - pb
-    }
-    if (coluna === "prioridade") return (ORDEM_PRIORIDADE[a.prioridade] ?? 9) - (ORDEM_PRIORIDADE[b.prioridade] ?? 9)
-    if (coluna === "pessoa") return (a.pessoaNome ?? "").localeCompare(b.pessoaNome ?? "", "pt-BR")
-    return (rotularFase(a.faseMacroKey) ?? "").localeCompare(rotularFase(b.faseMacroKey) ?? "", "pt-BR")
-  }
-  return [...linhas].sort((a, b) => (asc ? cmp(a, b) : -cmp(a, b)))
-}
-
-/** O cabeçalho clicável — seta indica coluna ativa e sentido, nunca decorativa. */
-function ThOrdenavel({ label, ativo, asc, aoClicar, className = "" }: {
-  label: string
-  ativo: boolean
-  asc: boolean
-  aoClicar: () => void
-  className?: string
-}) {
-  return (
-    <th className={className}>
-      <button onClick={aoClicar} className="flex items-center gap-1 hover:text-[var(--text-primary)]">
-        {label}
-        <span className={`text-[9px] transition-transform ${ativo ? "opacity-100" : "opacity-30"} ${ativo && !asc ? "rotate-180" : ""}`}>▲</span>
-      </button>
-    </th>
-  )
+function ordenarCertidoesDaTabela(linhas: LinhaOperacional[]): LinhaOperacional[] {
+  return ordenarCertidoesDaFamilia(linhas, (l) => ({
+    geracao: l.geracao, linhaReta: l.linhaReta, pessoaNascimento: l.pessoaNascimento, pessoaId: l.pessoaId,
+    categoria: l.categoriaDoc, titulo: l.titulo, desempate: l.taskId,
+  }))
 }
 
 function iniciaisDe(nome: string): string {
@@ -461,8 +407,6 @@ export function FamiliaTabelaExpandida({
   const [recarga, setRecarga] = useState(0)
   const [ocupado, setOcupado] = useState(false)
   const [erroComando, setErroComando] = useState<string | null>(null)
-  const [sortColuna, setSortColuna] = useState<Coluna>(null)
-  const [sortAsc, setSortAsc] = useState(true)
   const [verTodas, setVerTodas] = useState(false)
   const [acaoComMotivo, setAcaoComMotivo] = useState<{ tarefaId: number; acao: "aguardar_terceiro" | "bloquear"; titulo: string } | null>(null)
   const [selecionadosLote, setSelecionadosLote] = useState<Set<number>>(new Set())
@@ -609,11 +553,6 @@ export function FamiliaTabelaExpandida({
     aoContatarTerceiro: (l.terceiroEmail || l.terceiroTelefone) ? () => contatarTerceiro(l) : undefined,
   })
 
-  const alternarSortColuna = (coluna: NonNullable<Coluna>) => {
-    if (sortColuna === coluna) setSortAsc((v) => !v)
-    else { setSortColuna(coluna); setSortAsc(true) }
-  }
-
   const alternarSelecaoLote = (taskId: number) => setSelecionadosLote((prev) => {
     const novo = new Set(prev)
     if (novo.has(taskId)) novo.delete(taskId); else novo.add(taskId)
@@ -661,7 +600,7 @@ export function FamiliaTabelaExpandida({
     toast({ description: `${total} tarefa${total === 1 ? "" : "s"} atribuída${total === 1 ? "" : "s"}.`, variant: "success" })
   }
 
-  const linhasOrdenadas = useMemo(() => ordenarPorColuna(linhas ?? [], sortColuna, sortAsc), [linhas, sortColuna, sortAsc])
+  const linhasOrdenadas = useMemo(() => ordenarCertidoesDaTabela(linhas ?? []), [linhas])
   const linhasVisiveis = verTodas ? linhasOrdenadas : linhasOrdenadas.slice(0, LINHAS_VISIVEIS_POR_FAMILIA)
 
   const miniLadrilhos = useMemo(() => {
@@ -708,12 +647,12 @@ export function FamiliaTabelaExpandida({
         <thead className="sticky top-0 z-10 bg-[var(--surface-overlay)]">
           <tr className="border-b border-[var(--border-subtle)] [&>th]:px-3 [&>th]:py-2 [&>th]:text-[10px] [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-[var(--text-muted)]">
             {podeAtribuirLote && <th className="w-8" />}
-            <ThOrdenavel label="Pessoa" ativo={sortColuna === "pessoa"} asc={sortAsc} aoClicar={() => alternarSortColuna("pessoa")} />
+            <th>Pessoa</th>
             <th>Documento / Tarefa</th>
-            <ThOrdenavel label="Fase" ativo={sortColuna === "fase"} asc={sortAsc} aoClicar={() => alternarSortColuna("fase")} />
+            <th>Fase</th>
             <th>Etapa atual</th>
-            <ThOrdenavel label="Prazo" ativo={sortColuna === "prazo"} asc={sortAsc} aoClicar={() => alternarSortColuna("prazo")} />
-            <ThOrdenavel label="Prioridade" ativo={sortColuna === "prioridade"} asc={sortAsc} aoClicar={() => alternarSortColuna("prioridade")} />
+            <th>Prazo</th>
+            <th>Prioridade</th>
             <th>Terceiro</th>
             <th className="w-24">Ações</th>
           </tr>
