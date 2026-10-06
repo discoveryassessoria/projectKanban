@@ -43,14 +43,18 @@ const ABA_DA_OPERACAO_NA_TORRE: Record<string, { aba: string; visao?: string }> 
 
 const inteiro = (v: string | null | undefined): string | null => (v && /^\d+$/.test(v) ? v : null)
 
+/** Todo link que antes abria a janela "Foco da família" leva à PÁGINA do processo. */
+const paginaDoProcesso = (processo: string): string => `/torre/processo/${processo}`
+
 /**
- * `/operacao?...` → `/torre?...` PARA O ADMIN. Preserva: `processo` (família → Foco), `aba` (traduzida), e a
+ * `/operacao?...` → `/torre?...` PARA O ADMIN. Preserva: `processo` (família → página do processo), `aba` (traduzida), e a
  * tarefa (`taskId` ou `tarefa` → drawer). Sem nada disso: a visão "Minhas tarefas".
  */
 export function destinoDaOperacaoParaAdmin(query: URLSearchParams | string): string {
   const q = typeof query === 'string' ? new URLSearchParams(query.replace(/^\?/, '')) : query
   const processo = inteiro(q.get('processo') ?? q.get('processoId'))
   const tarefa = inteiro(q.get('tarefa') ?? q.get('taskId'))
+  if (processo && !tarefa) return paginaDoProcesso(processo)
   const destino = new URLSearchParams()
   if (tarefa) {
     destino.set('aba', 'tarefas')
@@ -65,7 +69,7 @@ export function destinoDaOperacaoParaAdmin(query: URLSearchParams | string): str
 }
 
 /**
- * O LINK DE UM AVISO, para quem é ADMIN. Aviso de família → Foco da família; de tarefa → drawer da tarefa;
+ * O LINK DE UM AVISO, para quem é ADMIN. Aviso de família → página do processo; de tarefa → drawer da tarefa;
  * de distribuição → Sem responsável. Qualquer outro link (e TODO link de não-admin) volta como veio.
  */
 export function linkDoAvisoParaAdmin(link: string | null | undefined, tipoUsuario: string | null | undefined): string | null {
@@ -76,18 +80,18 @@ export function linkDoAvisoParaAdmin(link: string | null | undefined, tipoUsuari
   if (caminho === '/operacao') return destinoDaOperacaoParaAdmin(q)
   if (caminho === '/operacao/distribuicao') {
     const processo = inteiro(q.get('processo'))
-    return `/torre?aba=tarefas&visao=semdono${processo ? `&processo=${processo}` : ''}`
+    return processo ? paginaDoProcesso(processo) : '/torre?aba=tarefas&visao=semdono'
   }
   if (caminho === '/tarefas') {
     const processo = inteiro(q.get('processo'))
-    return `/torre?aba=tarefas${processo ? `&processo=${processo}` : ''}`
+    return processo ? paginaDoProcesso(processo) : '/torre?aba=tarefas'
   }
-  // Aviso de tarefa/fase que apontava para o Kanban do processo (Central): tarefa → drawer; fase → Foco da família.
+  // Aviso de tarefa/fase que apontava para o Kanban do processo (Central): tarefa → drawer; fase → página do processo.
   if (caminho === '/kanban' && q.get('tab') === 'central') {
     const processo = inteiro(q.get('processoId'))
     const tarefa = inteiro(q.get('taskId'))
     if (tarefa) return `/torre?aba=tarefas&tarefa=${tarefa}${processo ? `&processo=${processo}` : ''}`
-    if (processo) return `/torre?processo=${processo}`
+    if (processo) return paginaDoProcesso(processo)
   }
   return link
 }

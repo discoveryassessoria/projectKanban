@@ -1,7 +1,7 @@
 // scripts/torre-admin-absorve-operacao.test.ts
 // ============================================================================
 // TUDO DO ADMINISTRADOR MORA NA TORRE (30/09/2026).
-//   • Admin: menu sem "Operação"; /operacao → Torre (traduzindo família/aba/tarefa); aviso de família → Foco; aviso
+//   • Admin: menu sem "Operação"; /operacao → Torre (traduzindo família/aba/tarefa); aviso de família → página do processo; aviso
 //     de tarefa → drawer; aviso de distribuição → Sem responsável. Avisos JÁ GRAVADOS continuam funcionando.
 //   • Não-admin: menu, /operacao e links IDÊNTICOS aos de antes.
 //   • "Minhas tarefas" do admin = a mesma fila (ids e contagens) que a Operação mostrava.
@@ -37,21 +37,21 @@ async function main() {
   ok("?aba=acompanhamento → Acompanhamentos vencidos", destinoDaOperacaoParaAdmin("aba=acompanhamento") === "/torre?aba=tarefas&visao=acompvenc")
   ok("?aba=feito → Feito", destinoDaOperacaoParaAdmin("aba=feito") === "/torre?aba=tarefas&visao=feito")
   ok("?aba=familias → Radar; ?aba=radar → Precisa de você", destinoDaOperacaoParaAdmin("aba=familias") === "/torre?aba=radar" && destinoDaOperacaoParaAdmin("aba=radar") === "/torre?aba=precisa")
-  ok("aviso de família (?processo=&aba=) → Foco da família + a visão equivalente", destinoDaOperacaoParaAdmin("processo=651&aba=acompanhamento") === "/torre?aba=tarefas&visao=acompvenc&processo=651")
+  ok("aviso de família (?processo=&aba=) → página do processo", destinoDaOperacaoParaAdmin("processo=651&aba=acompanhamento") === "/torre/processo/651")
   ok("?taskId= → drawer da tarefa", destinoDaOperacaoParaAdmin("taskId=3834") === "/torre?aba=tarefas&tarefa=3834")
   ok("parâmetro não numérico é ignorado (nada de injeção na URL)", destinoDaOperacaoParaAdmin("processo=1%26aba%3Dx&taskId=abc") === "/torre?aba=tarefas&visao=minhas")
 
   console.log("\nAvisos JÁ GRAVADOS (as formas reais geradas pelo sistema)")
   const admin = (l: string) => linkDoAvisoParaAdmin(l, "admin")
-  ok("CHEGOU_TRABALHO (/operacao?processo=&aba=fila) → Foco + Minhas tarefas", admin(urlOperacaoDaFamilia(651, "fila")) === "/torre?aba=tarefas&visao=minhas&processo=651")
-  ok("PRECISA_AGIR (aba acompanhamento) → Foco + Acompanhamentos vencidos", admin(urlOperacaoDaFamilia(651, "acompanhamento")) === "/torre?aba=tarefas&visao=acompvenc&processo=651")
-  ok("MUDOU_DE_MAO (/operacao?processo=) → Foco", admin(urlOperacaoDaFamilia(651)) === "/torre?aba=tarefas&visao=minhas&processo=651")
-  ok("atribuição em lote (urlMinhaOperacaoDoProcesso) → Foco", admin(urlMinhaOperacaoDoProcesso(675)) === "/torre?aba=tarefas&visao=minhas&processo=675")
+  ok("CHEGOU_TRABALHO (/operacao?processo=&aba=fila) → página do processo", admin(urlOperacaoDaFamilia(651, "fila")) === "/torre/processo/651")
+  ok("PRECISA_AGIR (aba acompanhamento) → página do processo", admin(urlOperacaoDaFamilia(651, "acompanhamento")) === "/torre/processo/651")
+  ok("MUDOU_DE_MAO (/operacao?processo=) → página do processo", admin(urlOperacaoDaFamilia(651)) === "/torre/processo/651")
+  ok("atribuição em lote (urlMinhaOperacaoDoProcesso) → página do processo", admin(urlMinhaOperacaoDoProcesso(675)) === "/torre/processo/675")
   ok("aviso de TAREFA (/kanban?…tab=central&taskId=) → drawer da tarefa", admin(urlOperacionalDaTarefa({ taskId: 3834, processoId: 651 })) === "/torre?aba=tarefas&tarefa=3834&processo=651")
   ok("aviso de tarefa sem processo (/operacao?taskId=) → drawer", admin(urlOperacionalDaTarefa({ taskId: 9, processoId: null })) === "/torre?aba=tarefas&tarefa=9")
-  ok("FASE_CONCLUIDA (/kanban?…tab=central, sem tarefa) → Foco da família", admin(urlOperacionalDoProcesso(651)) === "/torre?processo=651")
-  ok("distribuição da família → Sem responsável (+ Foco)", admin(urlDistribuicaoDoProcesso(676)) === "/torre?aba=tarefas&visao=semdono&processo=676")
-  ok("visão global da família (/tarefas?processo=) → Tarefas + Foco", admin(urlVisaoGlobalDaFamilia(676)) === "/torre?aba=tarefas&processo=676")
+  ok("FASE_CONCLUIDA (/kanban?…tab=central, sem tarefa) → página do processo", admin(urlOperacionalDoProcesso(651)) === "/torre/processo/651")
+  ok("distribuição da família → página do processo", admin(urlDistribuicaoDoProcesso(676)) === "/torre/processo/676")
+  ok("visão global da família (/tarefas?processo=) → página do processo", admin(urlVisaoGlobalDaFamilia(676)) === "/torre/processo/676")
   ok("SEM_RESPONSAVEL (novo link) já é da Torre e não muda", admin(LINK_SEM_RESPONSAVEL_NA_TORRE) === LINK_SEM_RESPONSAVEL_NA_TORRE)
   ok("link de outra tela (Árvore, Saúde) NÃO é tocado", admin(urlArvoreDoProcesso(651, 2862)) === urlArvoreDoProcesso(651, 2862) && admin("/administrator?screen=syshealth") === "/administrator?screen=syshealth")
   ok("nenhum link traduzido do admin cai em /operacao (nada quica)", [urlOperacaoDaFamilia(1, "fila"), urlMinhaOperacaoDoProcesso(1), urlDistribuicaoDoProcesso(1), urlOperacionalDaTarefa({ taskId: 1, processoId: null })].every((l) => !String(admin(l)).startsWith("/operacao")))

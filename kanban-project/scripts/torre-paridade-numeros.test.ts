@@ -32,7 +32,7 @@ console.log("aguardando terceiros: partição")
 const sem = { ...base, responsavelId: null }
 ok("aguardando sem responsável conta em 'sem responsável', não em 'aguardando terceiros'", situacaoDaTarefa(sem) === "ninguem" && situacaoDaTarefa(base) === "cartorio")
 const fonte = (p: string) => readFileSync(p, "utf8")
-ok("Terceiros e Foco dizem 'com ou sem responsável' (contam todo AGUARDANDO, como o filtro da aba Tarefas)", fonte("src/components/torre/TorreTerceiros.tsx").includes("aguardando terceiros (com ou sem responsável)") && fonte("src/components/torre/FocoFamilia.tsx").includes("com ou sem responsável"))
+ok("Terceiros e Foco dizem 'com ou sem responsável' (contam todo AGUARDANDO, como o filtro da aba Tarefas)", fonte("src/components/torre/TorreTerceiros.tsx").includes("aguardando terceiros (com ou sem responsável)") && fonte("src/components/torre/ProcessoCabecalho.tsx").includes("com ou sem responsável"))
 
 console.log("Processos: o botão e a Saúde da fase dizem o que contam")
 ok("o botão e a Saúde da fase se chamam 'parados ou sem dono' (pa + sd) — não repetem o nome 'parado' do funil, que conta outra coisa",

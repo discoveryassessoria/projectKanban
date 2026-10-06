@@ -2,7 +2,7 @@
 // ============================================================================
 // ABA "HISTÓRICO" DO PROCESSO — a linha do tempo de FATOS (um registro por fato real).
 // É só a casca da aba: a tela, os filtros, os contadores e as exportações são do componente
-// compartilhado `HistoricoDoProcesso`, que o Foco da família na Torre usa igual — mesma
+// compartilhado `HistoricoDoProcesso`, que a página do processo na Torre usa igual — mesma
 // fonte (`src/services/historico-processo.ts`), duas rotas com a permissão de cada casa.
 // (A versão anterior listava LogAuditoria cru por `entidade`; foi aposentada: era a causa de
 // "Documentos 0 / Alterações 2" e de códigos técnicos aparecendo na tela.)

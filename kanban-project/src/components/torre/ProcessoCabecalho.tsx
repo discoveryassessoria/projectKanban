@@ -46,6 +46,14 @@ export function ProcessoCabecalho({ d, agora, perm, ocupado, onDistribuir, onRel
           <div className="tpr-13 tpr-mut">
             {fase} · {faseLabel ?? "—"} · {desde}{d.faseAtual.desde && textoTempoNaFase(d.faseAtual) !== "—" ? ` (${textoTempoNaFase(d.faseAtual)})` : ""} · {d.certidoes.recebidas} de {d.certidoes.requeridas} certidões recebidas
           </div>
+          {/* Os mesmos quatro números e a mesma conta do antigo "Foco da família" (`d.numeros`, vindo de `torre-foco.ts`). */}
+          <div className="tpr-nums" aria-label="Números do processo">
+            {([["Abertas", d.numeros.abertas], ["Vencidas", d.numeros.vencidas], ["Aguardando terceiros", d.numeros.comCartorio], ["Sem responsável", d.numeros.semResponsavel]] as const).map(([rotulo, valor]) => (
+              <span key={rotulo} className="tpr-num" title={rotulo === "Aguardando terceiros" ? "Toda tarefa aberta esperando resposta de fora, com ou sem responsável (o filtro da aba Tarefas). Na Visão geral, as sem responsável contam em 'Sem responsável'." : undefined}>
+                <b>{valor}</b>{rotulo}
+              </span>
+            ))}
+          </div>
         </div>
         <div className="tpr-acoes">
           <button type="button" className="tpr-btn pri" disabled={ocupado || !perm.editar || n === 0} onClick={onDistribuir}

@@ -3,7 +3,7 @@
 // HISTÓRICO DO PROCESSO — a linha do tempo de FATOS (protótipo aprovado:
 // docs/referencias-torre/Histórico do Processo.html). UM componente, duas casas:
 //   • a aba "Histórico" do processo (`ProcessoHistorico`) → /api/processos/{id}/historico
-//   • o Foco da família na Torre (`FocoFamilia`)           → /api/torre/foco/{id}/historico
+//   • a página do processo na Torre (`TorreProcessoPagina`)  → /api/torre/foco/{id}/historico
 // As duas rotas chamam o MESMO serviço; este componente só desenha e filtra o que veio
 // (filtros/dia/contadores em `lib/operacional/historico-filtros.ts`, puro e testado).
 //
@@ -41,8 +41,6 @@ export interface HistoricoDoProcessoProps {
   onAbrirPessoa?: (pessoaId: number) => void
   /** Depois de reabrir uma certidão (o processo mudou). */
   onMudou?: () => void
-  /** Dentro de um modal estreito (Foco da família). */
-  compacto?: boolean
 }
 
 const CAMPO = "h-9 rounded-lg border border-[var(--border-default)] bg-[var(--surface-input)] px-3 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
@@ -200,7 +198,7 @@ function Seletor<V extends string | number>({ rotulo, valor, opcoes, aoMudar, id
   )
 }
 
-export function HistoricoDoProcesso({ processoId, url, onAbrirCertidao, onAbrirPessoa, onMudou, compacto = false }: HistoricoDoProcessoProps) {
+export function HistoricoDoProcesso({ processoId, url, onAbrirCertidao, onAbrirPessoa, onMudou }: HistoricoDoProcessoProps) {
   const consulta = useApi<RespostaDoHistorico>(url)
   const dados = consulta.dados
   const [filtros, setFiltros] = useState<FiltrosDoHistorico>(FILTROS_PADRAO)
@@ -282,7 +280,7 @@ export function HistoricoDoProcesso({ processoId, url, onAbrirCertidao, onAbrirP
 
   const { rodape } = visao
   return (
-    <div className={`flex flex-col gap-4 text-[var(--text-primary)] ${compacto ? "" : "min-h-full"}`} data-processo={processoId}>
+    <div className="flex flex-col gap-4 text-[var(--text-primary)] min-h-full" data-processo={processoId}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h2 className="text-[18px] font-bold">Histórico do processo</h2>

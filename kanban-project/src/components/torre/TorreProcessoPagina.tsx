@@ -15,6 +15,7 @@ import { ProcessoRelatorio } from "./ProcessoRelatorio"
 import { ProcessoCabecalho } from "./ProcessoCabecalho"
 import { ProcessoCaminho } from "./ProcessoCaminho"
 import { ProcessoCertidoes } from "./ProcessoCertidoes"
+import { VoltarDaTorre } from "./VoltarDaTorre"
 import { ProcessoFatos } from "./ProcessoFatos"
 import { ProcessoComentarios } from "./ProcessoComentarios"
 import "./torre.css"
@@ -140,8 +141,8 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
     return { ok: true }
   }
 
-  if (erro) return <div className="tor"><div className="tor-card pad">{erro}</div></div>
-  if (!d || carregandoPerm) return <div className="tor"><div className="tor-card pad small">Carregando o processo…</div></div>
+  if (erro) return <div className="tor"><div className="tpr"><VoltarDaTorre /><div className="tor-card pad">{erro}</div></div></div>
+  if (!d || carregandoPerm) return <div className="tor"><div className="tpr"><VoltarDaTorre /><div className="tor-card pad small">Carregando o processo…</div></div></div>
 
   const agora = new Date(d.geradoEm)
 
@@ -149,6 +150,7 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
     <>
       <div className="tor">
         <div className="tpr">
+          <VoltarDaTorre />
           <ProcessoCabecalho
             d={d} agora={agora} perm={perm} ocupado={ocupado}
             onDistribuir={() => void distribuir()} onRelatorio={() => setModal({ tipo: "relatorio" })} onHistorico={() => setModal({ tipo: "historico" })}

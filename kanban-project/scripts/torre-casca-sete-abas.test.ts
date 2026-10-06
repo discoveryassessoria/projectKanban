@@ -86,8 +86,8 @@ async function main() {
   ok("nada é renderizado antes do portão (cabeçalho e página do processo)", pag.indexOf("<HeaderBarApp") > pag.indexOf("if (!mounted") && pag.indexOf("<TorreProcessoPagina") > pag.indexOf("if (!mounted"))
   const detalhe = ler("src/components/torre/TorreProcessoPagina.tsx") + ler("src/components/torre/ProcessoCabecalho.tsx")
   ok("o Detalhe mostra dados reais (/api/torre/foco/{id}?detalhe=1), a trilha, o selo 'Pausado' e a página completa (a casca da Etapa A foi preenchida pela frente H)", /\/api\/torre\/foco\/\$\{processoId\}\?detalhe=1/.test(detalhe) && /href="\/torre\?aba=processos"|\/torre\?aba=processos/.test(detalhe) && /Pausado/.test(detalhe) && /<ProcessoCabecalho/.test(detalhe) && /<ProcessoCertidoes/.test(detalhe))
-  ok("o Foco (modal) continua funcionando e mostra 'Pausado' quando o processo está pausado", /Pausado/.test(ler("src/components/torre/FocoFamilia.tsx")) && existsSync("src/components/torre/FocoFamilia.tsx"))
-  ok("a aba Processos continua abrindo o Foco por 'abrirFoco' (nada quebrou)", /abrirFoco=\{setFoco\}/.test(torre) && /\{foco != null && <FocoFamilia/.test(torre))
+  ok("o Foco é a PÁGINA do processo: mostra 'Pausado' e os 4 números (Abertas, Vencidas, Aguardando terceiros, Sem responsável)", /Pausado/.test(ler("src/components/torre/ProcessoCabecalho.tsx")) && /"Aguardando terceiros", d\.numeros\.comCartorio/.test(ler("src/components/torre/ProcessoCabecalho.tsx")))
+  ok("a janela 'Foco da família' foi removida: nem o arquivo, nem o 'abrirFoco', e '?processo=' sozinho redireciona à página", !existsSync("src/components/torre/FocoFamilia.tsx") && !/FocoFamilia|abrirFoco/.test(torre) && /router\.replace\(`\/torre\/processo\/\$\{paraPaginaDoProcesso\}`\)/.test(torre))
 
   secao("8 — aba Terceiros: SEM placar por cartório (nem ranking, nem média por órgão)")
   const terc = ler("src/components/torre/TorreTerceiros.tsx")

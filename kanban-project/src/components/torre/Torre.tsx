@@ -2,7 +2,7 @@
 // src/components/torre/Torre.tsx — o CASCO da Torre de Controle (Bloco J; reorganizado na Torre nova, Etapa A, 01/10/2026).
 // Cabeçalho (nacionalidade, busca, Briefing do dia MANUAL, Revisar o dia) · 7 abas, na ordem do protótipo, com contadores:
 // Visão geral · Precisa de você · Radar · Processos · Tarefas · Equipe · Terceiros. O Processo (detalhe) é uma PÁGINA
-// (`/torre/processo/[id]`); o Foco (modal) segue funcionando até a página ser preenchida.
+// (`/torre/processo/[id]`).
 // O topo (frase + faixas Situação e Agenda) agora mora na Visão geral (`TorreVisaoGeral`), não acima das abas.
 // Regras, Integridade e Auditoria NÃO são da Torre (ela serve só à gestão de processo): moram em Gerenciamento › Saúde do sistema.
 // Uma fonte por dado: as linhas de tarefa vêm de UMA leitura (`/api/torre/tarefas`, a projeção da Operação) e alimentam os KPIs,
@@ -36,7 +36,6 @@ import { pedirFaseDeProcessos } from "./torre-fase-memoria"
 import { TorreTarefas, CHAVES_DE_VISAO } from "./TorreTarefas"
 import { TorreTerceiros } from "./TorreTerceiros"
 import { TorreEquipe } from "./TorreEquipe"
-import { FocoFamilia } from "./FocoFamilia"
 import { RelatorioControle } from "./RelatorioControle"
 import "./torre.css"
 
@@ -56,7 +55,7 @@ const numeroDaUrl = (v: string | null): number | null => {
   return v != null && Number.isInteger(n) && n > 0 ? n : null
 }
 /**
- * O CONTRATO DE URL da Torre: `?aba=` · `?kpi=` · `?visao=` (aba Tarefas) · `?processo=` (Foco da família) · `?tarefa=` (drawer da tarefa)
+ * O CONTRATO DE URL da Torre: `?aba=` · `?kpi=` · `?visao=` (aba Tarefas) · `?processo=` (só com `?tarefa=`: marca as novas; sozinho redireciona à página do processo) · `?tarefa=` (drawer da tarefa)
  * · `?pais=` (nacionalidade) · `?q=` (busca) · `?agrupar=` · `?dentro=` · e os filtros da barra (`resp`, `prazo`, `prazo_de`, `prazo_ate`,
  * `quando`, `quando_de`, `quando_ate`, `familia`, `status`, `certidao`, `fase`, `passo`, `orgao`, `prio`, `risco`, `linha_reta`, `acomp`,
  * `cobranca`, `ordem` — lib/operacional/torre-filtros.ts). O ESTADO INICIAL vem da URL e a URL acompanha o estado: o endereço é compartilhável.
@@ -135,7 +134,6 @@ export function Torre() {
   const [erroProcs, setErroProcs] = useState<string | null>(null)
   const [nEquipe, setNEquipe] = useState<number | null>(null)
 
-  const [foco, setFoco] = useState<number | null>(urlInicial.processo)
   const [relatorio, setRelatorio] = useState<AlvoDoRelatorio | null>(null)
   const [briefingAberto, setBriefingAberto] = useState(false)
   const [revisao, setRevisao] = useState<ItemPrecisa[] | null>(null)
@@ -143,6 +141,12 @@ export function Torre() {
   // Endereço antigo de aba que saiu da Torre (`?aba=regras|integridade|auditoria`): leva ao Gerenciamento equivalente.
   const destinoAntigo = destinoDaAbaAntigaDaTorre(params.get("aba"))
   useEffect(() => { if (destinoAntigo) router.replace(destinoAntigo) }, [destinoAntigo, router])
+
+  // Endereço antigo da janela "Foco da família" (`/torre?processo=N`, `?aba=tarefas&processo=N`): leva à PÁGINA do processo. Com `?tarefa=` o pedido é
+  // o drawer da tarefa e fica como está (o `processo` só marca as "novas" da família).
+  const processoPedido = lerUrl(params)
+  const paraPaginaDoProcesso = processoPedido.processo != null && processoPedido.tarefa == null ? processoPedido.processo : null
+  useEffect(() => { if (paraPaginaDoProcesso != null) router.replace(`/torre/processo/${paraPaginaDoProcesso}`) }, [paraPaginaDoProcesso, router])
 
   // A URL pode mudar depois de montada (link do sino, do Foco…): o que ela pede entra no estado (ajuste durante a renderização, sem efeito).
   const paramsChave = params.toString()
@@ -155,7 +159,6 @@ export function Torre() {
       if (u.faseProcessos) { pedirFaseDeProcessos(u.faseProcessos); setPedidoFase((p) => ({ n: p.n + 1 })) }
       setEstadoTarefas((e) => (e.visao === u.visao && e.agrupar === u.agrupar && e.dentro === u.dentro ? e : { visao: u.visao, agrupar: u.agrupar, dentro: u.dentro }))
       setTarefaPedida(u.tarefa); setProcessoDaUrl(u.processo)
-      if (u.processo != null) setFoco(u.processo)
       setKpi(u.kpi); setPais(u.pais); setBusca(u.busca)
       setFiltros((f) => { const novos = preservarFaseDeTarefas(u.aba ?? aba, u.filtros, f); return filtrosIguais(f, novos) ? f : novos })
     }
@@ -310,7 +313,7 @@ export function Torre() {
   return (
     <TorreProvider
       permissoes={permissoes} recarregar={recarregar} fixo
-      abrirFoco={setFoco} abrirRelatorio={setRelatorio}
+      abrirRelatorio={setRelatorio}
     >
       <div className="tor">
         <TorreCabecalho
@@ -361,7 +364,7 @@ export function Torre() {
           <TorreTarefas
             linhas={linhasPais} carregando={linhas == null && !erro} erro={!!erro} kpi={kpi} busca={busca} paisChave={pais} paisRotulo={paisRotulo}
             visaoPedida={visaoPedida} tarefaPedida={tarefaPedida} onTarefaAtendida={() => setTarefaPedida(null)}
-            processos={procs?.processos} processoFoco={foco ?? processoDaUrl} versao={versao} agora={agora}
+            processos={procs?.processos} processoFoco={processoDaUrl} versao={versao} agora={agora}
             onAplicarSpec={(s) => { setKpi(s.kpi); setPais(s.pais); setBusca(s.busca) }}
             filtros={filtros} onFiltros={setFiltros} onLimparPais={() => setPais("")} onLimparBusca={() => setBusca("")}
             agruparPedido={estadoTarefas.agrupar} dentroPedido={estadoTarefas.dentro} onEstadoUrl={onEstadoUrl}
@@ -379,7 +382,6 @@ export function Torre() {
           />
         )}
         {revisao && <TorreRevisao itens={revisao} irParaAba={(a) => { setRevisao(null); irParaAba(a) }} onSair={() => setRevisao(null)} />}
-        {foco != null && <FocoFamilia processoId={foco} onFechar={() => setFoco(null)} />}
         {relatorio && <RelatorioControle processoId={relatorio.processoId} processoRotulo={relatorio.codigo ?? relatorio.familiaNome} familiaId={relatorio.familiaId} familiaNome={relatorio.familiaNome} onFechar={() => setRelatorio(null)} />}
       </div>
     </TorreProvider>
