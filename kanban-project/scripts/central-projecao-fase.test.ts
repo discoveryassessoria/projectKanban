@@ -19,6 +19,7 @@
 // precisar escrever passo, tarefa ou status, é sinal de que a tela invadiu o
 // motor e o teste está certo em não conseguir.
 // ============================================================================
+import { prioridadeDoEventoDeVida } from '../src/lib/documentos/ordem-evento-vida'
 import {
   montarEstruturaOperacional,
   montarIndiceOperacional,
@@ -476,20 +477,13 @@ function main() {
   secao('§17) A ORDEM É DETERMINÍSTICA')
   // ══════════════════════════════════════════════════════════════════════════
   const baralho = [completo, emAndamento, bloqueada, atrasada, esperando, semDono]
-  const porAtencao = ordenarDocumentos(baralho, 'atencao')
-  ok('§17) o padrão põe o bloqueio na frente', porAtencao[0] === bloqueada)
-  ok('§17) depois o atraso', porAtencao[1] === atrasada)
-  ok('§17) e o concluído por último', porAtencao[porAtencao.length - 1] === completo)
+  const ordenado = ordenarDocumentos(baralho)
+  const prio = (d: { titulo: string }) => prioridadeDoEventoDeVida(d.titulo)
+  ok('§17) a ordem é a REGRA FIXA: Nascimento, Casamento, Óbito, outros — nunca urgência, prazo, progresso ou status',
+    ordenado.length === baralho.length && ordenado.every((d, i) => i === 0 || prio(d) >= prio(ordenado[i - 1])))
   ok('§17) e a mesma entrada dá sempre a mesma saída',
-    JSON.stringify(ordenarDocumentos(baralho, 'atencao').map((d) => d.chave))
-    === JSON.stringify(ordenarDocumentos([...baralho].reverse(), 'atencao').map((d) => d.chave)),
-    'desempate por título, nunca pela ordem de chegada')
-  const porProgresso = ordenarDocumentos(baralho, 'progresso')
-  ok('§17) por progresso, o mais atrasado no trabalho vem primeiro',
-    porProgresso[0].naFase.progresso.pct <= porProgresso[porProgresso.length - 1].naFase.progresso.pct)
-  const porPrazo = ordenarDocumentos(baralho, 'prazo')
-  ok('§17) por prazo, quem não tem prazo vai para o fim',
-    porPrazo[porPrazo.length - 1].naFase.prazo === null)
+    JSON.stringify(ordenarDocumentos(baralho).map((d) => d.chave)) === JSON.stringify(ordenarDocumentos([...baralho].reverse()).map((d) => d.chave)),
+    'desempate pela chave, nunca pela ordem de chegada')
 
   // ══════════════════════════════════════════════════════════════════════════
   secao('§16/§42) QUINHENTOS DOCUMENTOS')
@@ -545,7 +539,7 @@ function main() {
       .every((d) => d.naFase.responsavelId === 12))
 
   const t1 = process.hrtime.bigint()
-  ordenarDocumentos(todos, 'atencao')
+  ordenarDocumentos(todos)
   todos.filter((d) => passaNoRecorte(d, rec({ busca: 'nascimento' }), 'Pessoa 01'))
   const msRecorte = Number(process.hrtime.bigint() - t1) / 1e6
   ok('§16) ordenar e filtrar 500 é instantâneo', msRecorte < 300, `${msRecorte.toFixed(0)}ms`)

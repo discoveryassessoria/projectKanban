@@ -36,6 +36,7 @@
 // ============================================================================
 "use client"
 
+import { ordenarLinhasDeCertidao } from "@/lib/operacional/ordem-certidoes"
 import { diaOperacional } from "@/lib/operacional/tempo-operacional"
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -463,7 +464,9 @@ export function VisaoGlobal() {
   const linhas = useMemo(() => dados?.linhas ?? [], [dados])
   const ordenadas = useMemo(() => {
     const { campo, asc } = ordem
-    return [...linhas].sort((a, b) => {
+    // A coluna escolhida decide a ordem ENTRE FAMÍLIAS (posição = a da primeira linha da família sob esse critério); DENTRO da família vale a
+    // regra fixa das certidões (geração → linha reta → nascimento → pessoa → Nascimento, Casamento, Óbito).
+    return ordenarLinhasDeCertidao(linhas, (a, b) => {
       const va = a[campo], vb = b[campo]
       if (va == null && vb == null) return 0
       if (va == null) return 1

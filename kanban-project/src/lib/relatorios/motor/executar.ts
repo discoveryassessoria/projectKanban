@@ -137,7 +137,18 @@ export async function executar(
     : null
   if (spec.agruparPor && !agrupamento) ignorados.push(spec.agruparPor)
 
-  const cruas = await dominio.carregar(where, orderBy, (pagina - 1) * porPagina, porPagina)
+  // CERTIDÃO: a ordem é a REGRA FIXA (o domínio devolve os ids já ordenados); a ordenação escolhida só ordena as famílias. A página é uma fatia
+  // desses ids e as linhas voltam NA ORDEM dos ids.
+  let cruas: any[]
+  if (dominio.idsEmOrdemFixa) {
+    const todosIds = await dominio.idsEmOrdemFixa(where, ordDef.key, direcao)
+    const idsDaPagina = todosIds.slice((pagina - 1) * porPagina, pagina * porPagina)
+    const lidas = idsDaPagina.length ? await dominio.carregar({ id: { in: idsDaPagina } }, [{ id: "asc" }], 0, idsDaPagina.length) : []
+    const porId = new Map(lidas.map((l: any) => [l.id, l]))
+    cruas = idsDaPagina.map((id) => porId.get(id)).filter(Boolean)
+  } else {
+    cruas = await dominio.carregar(where, orderBy, (pagina - 1) * porPagina, porPagina)
+  }
 
   const montar = (l: any): LinhaResultado => ({
     id: l.id,

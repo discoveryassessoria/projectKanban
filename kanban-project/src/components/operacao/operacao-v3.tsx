@@ -729,7 +729,7 @@ function GrupoFila({ grupo, col, setCol, sel, toggleLinha, toggleGrupo, onAbrir,
                     t.pessoaNome ?? t.casalNomes ?? "—"
                   )}
                   <div style={{ fontSize: 11, color: "#7a8296" }}>
-                    {t.numeroLinhagem != null ? `${t.linhaReta === false ? "Cônjuge" : "Linha reta"} · G${t.numeroLinhagem}` : ""}
+                    {t.geracao != null ? `${t.linhaReta === false ? "Cônjuge" : "Linha reta"} · G${t.geracao}` : ""}
                   </div>
                 </div>
                 <div><span className={`opv3-pill ${fase.cls}`}>{fase.texto}</span></div>

@@ -8,6 +8,7 @@
 // computadas do servidor (`rotuloDoPrazo`, `acompanhamentoPasso`, etc.) —
 // aqui só se formata e agrupa, nunca se recalcula.
 // ============================================================================
+import { ordenarLinhasDeCertidao } from "@/lib/operacional/ordem-certidoes"
 import type { LinhaOperacaoV3, EstadoTemporalApi } from "./operacao-v3-tipos"
 import { ROTULO_STATUS as ROTULO_STATUS_TAREFA } from "@/src/lib/home/rotulo-status-tarefa"
 import { FUSO_OPERACIONAL } from "@/lib/operacional/tempo-operacional"
@@ -243,12 +244,6 @@ export interface GrupoDeLinhas {
   lote: boolean
 }
 
-/** A ORDEM É POR EVENTO DA VIDA: NASCIMENTO → CASAMENTO → ÓBITO → (sem categoria). Sempre — dentro do grupo da pessoa e em qualquer
- *  agrupamento (a regra anterior, "nascimento, óbito, casamento", estava ERRADA e foi corrigida a pedido do dono em 06/10/2026). É a mesma
- *  ordem da Torre (`ORDEM_DO_TIPO` em `torre-foco.ts`) e da árvore. */
-const ORDEM_CATEGORIA: Record<string, number> = { NASCIMENTO: 0, CASAMENTO: 1, OBITO: 2 }
-const ordemCategoria = (l: LinhaOperacaoV3): number => (l.categoriaDoc ? ORDEM_CATEGORIA[l.categoriaDoc] ?? 3 : 3)
-
 /** Agrupa (dentro de uma família) por pessoa/órgão/passo — mesma régua do seletor "Por família, depois por".
  *  ORDENADO por G1→Gn (`numeroLinhagem` crescente — mandato "Operação/Antão",
  *  29/09/2026): quem não tem número calculado (ainda) vai ao fim, nunca some.
@@ -258,17 +253,15 @@ const ordemCategoria = (l: LinhaOperacaoV3): number => (l.categoriaDoc ? ORDEM_C
  *  linha reta (`tarefa-projecoes.ts::projetar`) — agrupar por `pessoaId` funde
  *  a certidão de casamento no MESMO grupo do nascimento/óbito dessa pessoa,
  *  nunca um grupo "Fulano e Fulana" à parte. */
-/** A ORDEM DE QUALQUER LISTA DE CERTIDÕES: G1→Gn, a mesma pessoa junta, e dentro dela nascimento → casamento → óbito. Estável. */
+/** A ORDEM DE QUALQUER LISTA DE CERTIDÕES: família → geração (G1…) → linha reta → nascimento → pessoa → Nascimento, Casamento, Óbito, outros.
+ *  A ordem ENTRE famílias é a de primeira aparição na lista recebida (é o critério risco/prazo do servidor); dentro da família, só a regra. */
 export function ordenarPorEvento(linhas: LinhaOperacaoV3[]): LinhaOperacaoV3[] {
-  return [...linhas].sort((a, b) =>
-    (a.numeroLinhagem ?? Infinity) - (b.numeroLinhagem ?? Infinity)
-    || String(a.pessoaNome ?? "").localeCompare(String(b.pessoaNome ?? ""), "pt-BR")
-    || ordemCategoria(a) - ordemCategoria(b))
+  return ordenarLinhasDeCertidao(linhas)
 }
 
 export function agruparDentroDaFamilia(linhasEntrada: LinhaOperacaoV3[], por: "pessoa" | "orgao" | "passo"): GrupoDeLinhas[] {
   // G1→Gn e, na mesma geração, a ORDEM DO EVENTO (nascimento → casamento → óbito) — vale para qualquer agrupamento (pessoa, órgão, passo).
-  const linhas = [...linhasEntrada].sort((a, b) => (a.numeroLinhagem ?? Infinity) - (b.numeroLinhagem ?? Infinity) || ordemCategoria(a) - ordemCategoria(b))
+  const linhas = ordenarPorEvento(linhasEntrada)
   const ordem: string[] = []
   const mapa = new Map<string, LinhaOperacaoV3[]>()
   const chaveDe = (l: LinhaOperacaoV3): string => {
@@ -283,7 +276,7 @@ export function agruparDentroDaFamilia(linhasEntrada: LinhaOperacaoV3[], por: "p
   }
   return ordem.map((k) => {
     const rsBrutas = mapa.get(k)!
-    const rs = por === "pessoa" ? [...rsBrutas].sort((a, b) => ordemCategoria(a) - ordemCategoria(b)) : rsBrutas
+    const rs = rsBrutas // já na ordem canônica (a entrada foi ordenada por `ordenarPorEvento`)
     const f = rs[0]
     let titulo = k, sub = "", pill = "", pillCls = "opv3-p-blu"
     if (por === "pessoa") {

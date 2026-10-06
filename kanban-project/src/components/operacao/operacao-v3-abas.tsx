@@ -335,7 +335,7 @@ export function AbaFamilias({
                   return (
                     <div key={t.taskId} className="opv3-row" style={{ gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1.1fr) minmax(0,1.1fr) minmax(0,0.9fr) minmax(0,1fr) minmax(0,0.9fr) minmax(0,0.8fr) 90px", boxShadow: `inset 4px 0 0 ${t.atrasada ? "#b3261e" : "transparent"}` }}>
                       <div style={{ fontWeight: 600 }}>{docTipoTxt(t)}</div>
-                      <div>{t.pessoaNome ?? "—"}<div style={{ fontSize: 11, color: "#7a8296" }}>{t.numeroLinhagem != null ? `G${t.numeroLinhagem}` : ""}</div></div>
+                      <div>{t.pessoaNome ?? "—"}<div style={{ fontSize: 11, color: "#7a8296" }}>{t.geracao != null ? `G${t.geracao}` : ""}</div></div>
                       <div>{passo.label}</div>
                       <div><span className={`opv3-pill ${statusTarefaCls(t)}`}>{statusTarefaTxt(t)}</span></div>
                       <div><span className={`opv3-pill ${relCls(t.acompanhamentoPasso)}`}>{acompTxtCompleto(t.acompanhamentoPasso)}</span></div>
@@ -488,7 +488,7 @@ export function AbaFeito({ linhas, col, setCol, onAbrir }: {
                     {p.linhas.map((t) => (
                       <div key={t.taskId} className="opv3-row" style={{ gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1.3fr) minmax(0,0.8fr) minmax(0,1.1fr) minmax(0,1.6fr) 90px" }}>
                         <div style={{ fontWeight: 600 }}>{docTipoTxt(t)}</div>
-                        <div>{t.pessoaNome ?? "—"}<div style={{ fontSize: 11, color: "#7a8296" }}>{t.numeroLinhagem != null ? `G${t.numeroLinhagem}` : ""}</div></div>
+                        <div>{t.pessoaNome ?? "—"}<div style={{ fontSize: 11, color: "#7a8296" }}>{t.geracao != null ? `G${t.geracao}` : ""}</div></div>
                         <div><span className="opv3-pill opv3-p-grn">{fmtData(t.concluidaEm)}</span></div>
                         <div><span className={`opv3-pill ${prazoTarefaCls(t)}`}>{textoPrazoDaTarefa(t)}</span></div>
                         <div><span className="opv3-pill opv3-p-gry">{orgaoTxt(t)}</span><AtalhoVincularOrgao t={t} onAbrir={onAbrir} /></div>

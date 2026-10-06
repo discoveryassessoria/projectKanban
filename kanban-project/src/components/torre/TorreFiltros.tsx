@@ -1,7 +1,7 @@
 "use client"
 // src/components/torre/TorreFiltros.tsx — o PAINEL DE FILTROS da aba Tarefas, igual ao protótipo (Torre nova, 01/10/2026).
 // Linha 1 (8 campos): Família · Responsável · Prazo · Iniciou · Nacionalidade · Fase · Certidão · Risco.
-// Linha 2: Agrupar por · Dentro da família · "Mais filtros · 6" · Ordenar por · "Mostrando N de M · 50 por página" · Limpar filtros.
+// Linha 2: Agrupar por · Dentro da família · "Mais filtros · 6" · Ordenar famílias por · "Mostrando N de M · 50 por página" · Limpar filtros.
 // "Mais filtros": Passo atual · Cartório · Prioridade · Cobrança · Status · Só linha reta.
 // SEM DUPLICAR O QUE AS VISÕES JÁ FAZEM: Responsável não tem "Eu" nem "Sem responsável" (são as visões Minhas / Sem responsável),
 // Prazo não tem "Vencidas" (é a visão Vencidas) e Status só tem A iniciar · Em andamento · Cancelada (o resto é Aguardando/Bloqueadas).
@@ -180,8 +180,8 @@ export function TorreFiltros({
         </label>
         <span className="tf-sep" />
         <button type="button" className="tf-mini" aria-expanded={mais} onClick={() => setMais((m) => !m)}>{mais ? "Menos filtros" : "Mais filtros · 6"}</button>
-        <span>Ordenar por</span>
-        <select className="tf-in peq" aria-label="Ordenar por" value={filtros.ordenar ?? ""} onChange={(e) => set("ordenar", (e.target.value || null) as OrdemTorre | null)}>
+        <span title="A ordem das certidões DENTRO de cada família é fixa: geração, linha reta, nascimento, e Nascimento · Casamento · Óbito. Este critério só decide qual família vem primeiro.">Ordenar famílias por</span>
+        <select className="tf-in peq" aria-label="Ordenar famílias por" value={filtros.ordenar ?? ""} onChange={(e) => set("ordenar", (e.target.value || null) as OrdemTorre | null)}>
           <option value="">Ordem padrão (risco, prazo)</option>
           <option value="prazo">Prazo</option><option value="familia">Família</option><option value="responsavel">Responsável</option><option value="criacao">Criação</option>
           {filtros.ordenar === "risco" && <option value="risco">Risco</option>}

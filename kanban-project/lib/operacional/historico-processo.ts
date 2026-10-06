@@ -30,6 +30,7 @@
 //   • O prazo NUNCA pausa por causa de terceiro: nenhuma frase daqui diz o
 //     contrário — esperar o cartório é um estado da tarefa, não uma pausa.
 // ============================================================================
+import { ordenarCertidoesDaFamilia, type ChaveDaCertidao } from './ordem-certidoes'
 import { ROTULO_STATUS } from '@/src/lib/home/rotulo-status-tarefa'
 import { apresentarTextoDoHistorico } from './historico-apresentacao'
 import {
@@ -101,6 +102,8 @@ export interface ContextoDoHistorico {
   processo: { id: number; nome: string; pais: string | null; requerentes: number | null; familiaId: number | null }
   usuarios: Record<number, string>
   pessoas: Record<number, string>
+  /** Geração calculada, linha reta e nascimento de cada pessoa da árvore — a regra fixa de ordem das certidões (`ordem-certidoes.ts`). */
+  ordemDasPessoas?: Record<number, { geracao: number | null; linhaReta: boolean; nascimento: string | null }>
   tarefas: Record<number, { titulo: string; documentoId: number | null; necessidadeId: number | null; pessoaId: number | null; faseMacroKey: string | null; statusTarefa: string; responsavelId: number | null }>
   documentos: Record<number, { rotulo: string | null; pessoaId: number | null; necessidadeId: number | null; status: string }>
   necessidades: Record<number, { rotulo: string; pessoaId: number | null }>
@@ -842,6 +845,12 @@ function apresentavel(ctx: ContextoDoHistorico, a: Atomo): Atomo {
   return { ...a, motivo: t(a.motivo), justificativa: t(a.justificativa), efeito: t(a.efeito), complemento: t(a.complemento), fraseLivre: t(a.fraseLivre) }
 }
 
+/** A certidão de um fato agrupado na REGRA FIXA de ordem (`ordem-certidoes.ts`): geração calculada → linha reta → nascimento → pessoa → Nascimento, Casamento, Óbito. */
+export function chaveDoAtomo(ctx: ContextoDoHistorico, x: { pessoaId: number | null; certidao: string | null; t: number }): ChaveDaCertidao {
+  const o = x.pessoaId != null ? ctx.ordemDasPessoas?.[x.pessoaId] : undefined
+  return { geracao: o?.geracao ?? null, linhaReta: o?.linhaReta ?? null, pessoaNascimento: o?.nascimento ?? null, pessoaId: x.pessoaId, titulo: x.certidao, desempate: -x.t }
+}
+
 function montarFato(ctx: ContextoDoHistorico, membrosBrutos: Atomo[], reabriveis: Set<string>): FatoDoHistorico {
   const membros = membrosBrutos.map((m) => apresentavel(ctx, m))
   const ordenados = [...membros].sort((x, y) => y.t - x.t || (x.id < y.id ? 1 : -1))
@@ -930,7 +939,7 @@ function montarFato(ctx: ContextoDoHistorico, membrosBrutos: Atomo[], reabriveis
     pessoa: n > 1 ? pessoaUnica : nomeDaPessoa(ctx, a.pessoaId),
     pessoaId: n > 1 ? (pessoasDistintas.size === 1 ? a.pessoaId : null) : a.pessoaId,
     fase, passo: n > 1 ? null : a.passo, motivo, justificativa, efeito,
-    automatico, quantidade: n, agrupadoDe: n > 1 ? ordenados.map(itemDe) : [], links: linksDe(a), reabrivel,
+    automatico, quantidade: n, agrupadoDe: n > 1 ? ordenarCertidoesDaFamilia(ordenados, (x) => chaveDoAtomo(ctx, x)).map(itemDe) : [], links: linksDe(a), reabrivel,
     marco: membros.some((m) => m.marco), mudancas, lote: a.lote, faseDestino: a.faseDestino,
   }
 }

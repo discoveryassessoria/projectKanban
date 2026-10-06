@@ -218,6 +218,12 @@ export interface DominioDef {
   /** Conta e carrega. O motor cuida de where/paginação; o domínio, do include. */
   contar: (where: any) => Promise<number>
   carregar: (where: any, orderBy: any, pular: number, levar: number) => Promise<any[]>
+  /**
+   * ORDEM FIXA DAS CERTIDÕES (06/10/2026): domínios cujas linhas são certidões devolvem TODOS os ids do recorte já na regra (família → geração →
+   * linha reta → nascimento → pessoa → Nascimento, Casamento, Óbito, outros). A `ordenacao` escolhida só decide a ordem ENTRE famílias. O motor
+   * pagina esses ids; a ordenação por SQL não existe para certidão.
+   */
+  idsEmOrdemFixa?: (where: any, ordenarPor: string, direcao: "asc" | "desc") => Promise<number[]>
   /** Visões prontas — QuerySpecs pré-salvas, não relatórios separados. */
   visoesDoSistema: { key: string; nome: string; spec: Omit<QuerySpec, "dominio"> }[]
 }

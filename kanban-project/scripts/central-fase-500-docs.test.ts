@@ -257,7 +257,7 @@ async function main() {
     docs.some((d) => d.naFase.responsavelNome === 'Daniela Brait'))
 
   const t1 = Date.now()
-  ordenarDocumentos(docs, 'atencao')
+  ordenarDocumentos(docs)
   const msOrdem = Date.now() - t1
   ok('§17) ordenar os 500 é imperceptível', msOrdem < 200, `${msOrdem}ms`)
 

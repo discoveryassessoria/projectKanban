@@ -257,7 +257,7 @@ export async function getPhaseOperationalStructure(
           where: { arvoreId: proc.arvoreId },
           select: {
             id: true, nome: true, sobrenome: true, sexo: true, publicCode: true,
-            numeroLinhagem: true, requerente: true, linhaReta: true, paiId: true, maeId: true,
+            numeroLinhagem: true, data_nasc: true, requerente: true, linhaReta: true, paiId: true, maeId: true,
           },
         }),
         db.uniao.findMany({

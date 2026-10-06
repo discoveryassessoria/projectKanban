@@ -6,6 +6,7 @@
 // A MESMA projeção da Operação (/api/torre/tarefas). Nenhuma regra nova: cada botão chama a porta que já existe (tarefa-comandos,
 // tarefa-ciclo, cobranca-terceiros, iniciar-envio, vincular-orgao-lote, atribuir). Toda regra de tela mora em
 // lib/operacional/torre-tarefas-tela.ts e torre-filtros.ts (puras, testadas). Nada de dado de exemplo.
+import { ordenarLinhasDeCertidao } from "@/lib/operacional/ordem-certidoes"
 import { motivoLegivel, porQuem } from "@/lib/operacional/motivos-legiveis"
 import { PRIORIDADES_DO_LOTE, PRIORIDADE_NORMAL, prioridadeValida, textoDoLotePrioridade, type PrioridadeDoModelo } from "@/lib/operacional/torre-prioridade-lote"
 import { useEffect, useMemo, useState } from "react"
@@ -164,8 +165,9 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
   const resumo = useMemo(() => aplicarFiltros(listaBase, filtros, ctxFiltro), [listaBase, filtros, ctxFiltro])
   const trabalhoVisivel = useMemo(() => {
     const l = resumo.linhas
-    // As NOVAS (último aviso "chegou trabalho") sobem ao topo — só quando a pessoa não escolheu uma ordenação; o resto mantém a ordem.
-    return novas.size && !filtros.ordenar ? [...l].sort((a, b) => Number(novas.has(b.taskId)) - Number(novas.has(a.taskId))) : l
+    // As NOVAS (último aviso "chegou trabalho"): a FAMÍLIA com trabalho novo sobe ao topo — só quando a pessoa não escolheu uma ordenação. Nunca
+    // reordena certidões DENTRO da família (a regra fixa de ordem manda).
+    return novas.size && !filtros.ordenar ? ordenarLinhasDeCertidao(l, (a, b) => Number(novas.has(b.taskId)) - Number(novas.has(a.taskId))) : l
   }, [resumo, filtros.ordenar, novas])
   // As canceladas aparecem na visão "Todas as abertas" (sem indicador do topo), passando pela busca e pelos filtros do painel.
   const canceladasVisiveis = useMemo<LinhaDaTela[]>(() => {

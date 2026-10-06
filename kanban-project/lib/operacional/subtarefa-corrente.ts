@@ -126,7 +126,7 @@ export type ExecucaoLida = {
   previstoPara: Date | null; proximoAcompanhamentoEm: Date | null; escalada: boolean
 }
 export type ContatoLido = { subtaskExecutionId: number; resultado: string }
-export type PessoaLida = { id: number; nome: string; sobrenome: string | null; numeroLinhagem: number | null; linhaReta: boolean }
+export type PessoaLida = { id: number; nome: string; sobrenome: string | null; numeroLinhagem: number | null; linhaReta: boolean; data_nasc: Date | null; arvoreId: number | null }
 
 export interface CacheDeLeitura {
   instancias(ids: number[]): Promise<InstanciaLida[]>
@@ -186,7 +186,7 @@ export function criarCacheDeLeitura(db: Leitor): CacheDeLeitura {
     (r) => r.id,
   )
   const pessoas = carregadorPorChave<number, PessoaLida>(
-    (ids) => db.pessoa.findMany({ where: { id: { in: ids } }, select: { id: true, nome: true, sobrenome: true, numeroLinhagem: true, linhaReta: true } }),
+    (ids) => db.pessoa.findMany({ where: { id: { in: ids } }, select: { id: true, nome: true, sobrenome: true, numeroLinhagem: true, linhaReta: true, data_nasc: true, arvoreId: true } }),
     (r) => r.id,
   )
   return {

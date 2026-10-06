@@ -3,12 +3,13 @@
 // Ordenar (funcionam de verdade, ao contrário do exemplo do protótipo), a tabela (por padrão só as ATIVAS: abertas e concluídas; as
 // CANCELADA / NÃO EXIGIDA, com "Motivo" e "Reabrir", entram quando o bloco ou o filtro de status as pedem), a linha-resumo "+ N certidões iguais a estas" e o "Atribuir" por linha.
 // Os dados são `d.tabela` (montados em `torre-foco.ts` a partir das MESMAS linhas da aba Tarefas); aqui só se filtra, ordena e desenha.
+import { TEXTO_DA_REGRA_DE_ORDEM } from "@/lib/operacional/ordem-certidoes"
 import { useMemo, useState } from "react"
 import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 import { diaMesDoPrazo } from "@/src/lib/tarefa/texto-prazo"
 import {
-  OPCOES_DE_ORDEM, OPCOES_DE_STATUS, filtrarEOrdenar, pessoasDaTabela, resumirIguais, rotuloQuando, rotuloDia, tituloDaTabela,
-  type FiltroDeStatusDaTabela, type LinhaDaTabela, type OrdemDaTabela,
+  OPCOES_DE_STATUS, filtrarEOrdenar, pessoasDaTabela, resumirIguais, rotuloQuando, rotuloDia, tituloDaTabela,
+  type FiltroDeStatusDaTabela, type LinhaDaTabela,
 } from "@/lib/operacional/torre-processo-puro"
 import type { DetalheDoProcesso } from "@/lib/operacional/torre-foco"
 
@@ -31,12 +32,11 @@ export function ProcessoCertidoes({ d, agora, status, onStatus, podeAtribuir, oc
   onHistorico: (l: LinhaDaTabela) => void
 }) {
   const [pessoaId, setPessoaId] = useState<number | null>(null)
-  const [ordem, setOrdem] = useState<OrdemDaTabela>("arvore")
   const [expandido, setExpandido] = useState(false)
   const [marcadas, setMarcadas] = useState<ReadonlySet<string>>(new Set())
 
   const pessoas = useMemo(() => pessoasDaTabela(d.tabela), [d.tabela])
-  const linhas = useMemo(() => filtrarEOrdenar(d.tabela, { pessoaId, status, ordem }), [d.tabela, pessoaId, status, ordem])
+  const linhas = useMemo(() => filtrarEOrdenar(d.tabela, { pessoaId, status }), [d.tabela, pessoaId, status])
   const trabalho = linhas.filter((l) => l.tipo === "ABERTA" || l.tipo === "CONCLUIDA")
   const fora = linhas.filter((l) => l.tipo === "CANCELADA" || l.tipo === "NAO_EXIGIDA")
   // A linha-resumo só vale na visão sem filtro (todas as pessoas; ativas, ou ativas + canceladas / não exigidas): filtrado, mostra tudo o que casou.
@@ -108,9 +108,7 @@ export function ProcessoCertidoes({ d, agora, status, onStatus, podeAtribuir, oc
           <select className="tpr-sel" aria-label="Status" value={status} onChange={(e) => onStatus(e.target.value as FiltroDeStatusDaTabela)}>
             {OPCOES_DE_STATUS.map((o) => <option key={o.valor} value={o.valor}>{o.rotulo}</option>)}
           </select>
-          <select className="tpr-sel" aria-label="Ordenar" value={ordem} onChange={(e) => setOrdem(e.target.value as OrdemDaTabela)}>
-            {OPCOES_DE_ORDEM.map((o) => <option key={o.valor} value={o.valor}>{o.rotulo}</option>)}
-          </select>
+          <span className="tpr-ordem-fixa" title={TEXTO_DA_REGRA_DE_ORDEM}>Ordem fixa: geração · linha reta · nascimento · Nascimento, Casamento, Óbito</span>
         </div>
       </div>
 

@@ -172,7 +172,7 @@ export async function resolverCompletudeDocumental(
     ? await Promise.all([
         prisma.pessoa.findMany({
           where: pessoasAtivasDaArvore(proc.arvoreId),
-          select: { id: true, nome: true, sobrenome: true, sexo: true, publicCode: true, numeroLinhagem: true, requerente: true, linhaReta: true, paiId: true, maeId: true },
+          select: { id: true, nome: true, sobrenome: true, sexo: true, publicCode: true, numeroLinhagem: true, data_nasc: true, requerente: true, linhaReta: true, paiId: true, maeId: true },
         }),
         prisma.uniao.findMany({
           where: { OR: [{ pessoa1: { arvoreId: proc.arvoreId } }, { pessoa2: { arvoreId: proc.arvoreId } }] },

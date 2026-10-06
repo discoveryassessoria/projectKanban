@@ -14,6 +14,7 @@
 // ESCOPO: por IDENTIDADE do processo — tarefas, passos, necessidades e
 // documentos DESTE processo; nunca por nome/texto.
 // ============================================================================
+import { geracoesDasArvores } from '@/src/services/genealogia/geracoes-da-arvore'
 import type { PrismaClient } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { VINCULO_PROCESSO_ATIVO } from '@/src/lib/genealogia/vinculo-ativo'
@@ -59,7 +60,7 @@ export async function historicoDoProcesso(processoId: number, opcoes: { agora?: 
     db.tarefa.findMany({ where: { processoId }, select: { id: true, titulo: true, documentoId: true, necessidadeId: true, pessoaId: true, faseMacroKey: true, statusTarefa: true, responsavelId: true } }),
     db.necessidadeDocumental.findMany({ where: { processoId }, select: { id: true, pessoaId: true, itemCatalogo: { select: { name: true } }, uniao: { select: SELECT_UNIAO_PARA_TITULAR } } }),
     db.phaseWorkflowStepInstance.findMany({ where: { processoId }, select: { id: true, stepKey: true, snapshot: true, faseMacroKey: true, documentoId: true, necessidadeId: true, pessoaId: true } }),
-    proc.arvoreId ? db.pessoa.findMany({ where: { arvoreId: proc.arvoreId }, select: { id: true, nome: true, sobrenome: true } }) : Promise.resolve([]),
+    proc.arvoreId ? db.pessoa.findMany({ where: { arvoreId: proc.arvoreId }, select: { id: true, nome: true, sobrenome: true, linhaReta: true, data_nasc: true } }) : Promise.resolve([]),
     db.processoRequerente.count({ where: { processoId, ...VINCULO_PROCESSO_ATIVO } }),
   ])
   const tarefaIds = tarefas.map((t) => t.id)
@@ -147,9 +148,14 @@ export async function historicoDoProcesso(processoId: number, opcoes: { agora?: 
   const nomeCompleto = (p: { nome: string; sobrenome: string | null }) => `${p.nome}${p.sobrenome ? ` ${p.sobrenome}` : ''}`
   const pessoas: Record<number, string> = {}
   for (const p of [...arvorePessoas, ...pessoasExtras]) pessoas[p.id] = nomeCompleto(p)
+  // A regra fixa de ordem das certidões também vale para as certidões listadas dentro de um fato agrupado: geração calculada, linha reta, nascimento.
+  const geracoesDaArvore = (await geracoesDasArvores([proc.arvoreId], db)).get(proc.arvoreId ?? -1) ?? new Map<number, number | null>()
+  const ordemDasPessoas: Record<number, { geracao: number | null; linhaReta: boolean; nascimento: string | null }> = {}
+  for (const p of arvorePessoas) ordemDasPessoas[p.id] = { geracao: geracoesDaArvore.get(p.id) ?? null, linhaReta: p.linhaReta === true, nascimento: p.data_nasc ? p.data_nasc.toISOString() : null }
 
   const ctx: ContextoDoHistorico = {
     processo: { id: proc.id, nome: proc.nome, pais: proc.paisCanonico?.countryLabel ?? null, requerentes, familiaId: proc.familiaId },
+    ordemDasPessoas,
     usuarios: Object.fromEntries(usuarios.map((u) => [u.id, u.nome])),
     pessoas,
     tarefas: Object.fromEntries(tarefas.map((t) => [t.id, { titulo: t.titulo, documentoId: t.documentoId, necessidadeId: t.necessidadeId, pessoaId: t.pessoaId, faseMacroKey: t.faseMacroKey, statusTarefa: t.statusTarefa, responsavelId: t.responsavelId }])),
