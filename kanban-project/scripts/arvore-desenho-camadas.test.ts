@@ -8,7 +8,7 @@
 import { readFileSync } from "node:fs"
 import { comandoResetarLayout } from "../src/lib/genealogia/vinculos-edicao"
 import {
-  desenharArvore, ladosDoCasal, caminhoDeFiliacao, FOLGAS,
+  desenharArvore, ladosDoCasal, FOLGAS,
   type Disposicao, type PessoaDoDesenho, type UniaoDoDesenho, type Retangulo,
 } from "../src/lib/genealogia/layout/arvore-camadas"
 
@@ -41,12 +41,6 @@ const ret = (d: Disposicao, pos: Map<number, { x: number; y: number }>, id: numb
 const u = (d: Disposicao, r: Retangulo) => (d === "retrato" ? r.x : r.y) // eixo transversal
 const linha = (d: Disposicao, r: Retangulo) => (d === "retrato" ? r.y : r.x) // eixo da geração
 const sobrepoe = (a: Retangulo, b: Retangulo) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
-const cruza = (p: { x: number; y: number }, q: { x: number; y: number }, r: Retangulo, folgaPx = 1) => {
-  const x0 = r.x + folgaPx, x1 = r.x + r.w - folgaPx, y0 = r.y + folgaPx, y1 = r.y + r.h - folgaPx
-  if (p.x === q.x) return p.x > x0 && p.x < x1 && Math.max(Math.min(p.y, q.y), y0) < Math.min(Math.max(p.y, q.y), y1)
-  if (p.y === q.y) return p.y > y0 && p.y < y1 && Math.max(Math.min(p.x, q.x), x0) < Math.min(Math.max(p.x, q.x), x1)
-  return false
-}
 
 for (const d of ["retrato", "paisagem"] as Disposicao[]) {
   secao(`Exemplo — ${d}`)
@@ -109,16 +103,6 @@ for (const d of ["retrato", "paisagem"] as Disposicao[]) {
   const acima = { ...R(ID.x), y: R(ID.x).y - 400 }
   ok("e se vai para cima/baixo, a linha passa para os lados de cima/baixo", ladosDoCasal(R(ID.x), acima).a === "top" && ladosDoCasal(R(ID.x), { ...R(ID.x), y: R(ID.x).y + 400 }).a === "bottom")
 
-  // 7) linhas de descendência não passam por cima de cartão
-  let atravessa = 0
-  const filiacoes: Array<[number[], number]> = [[[ID.avo, ID.avoa], ID.pai], [[ID.pai, ID.mae], ID.x], [[ID.pai, ID.mae], ID.y], [[ID.x, ID.w1], ID.n1], [[ID.x, ID.w2], ID.n2]]
-  for (const [ps, fi] of filiacoes) {
-    const c = caminhoDeFiliacao(d, ps.map(R), R(fi))
-    for (let k = 1; k < c.poligonal.length; k++) for (const t of todos) if (cruza(c.poligonal[k - 1], c.poligonal[k], t.r)) atravessa++
-  }
-  ok("nenhuma linha pai→filho passa por cima de cartão", atravessa === 0, `${atravessa} cruzamento(s)`)
-  const c0 = caminhoDeFiliacao(d, [R(ID.pai), R(ID.mae)].sort((a, b) => u(d, a) - u(d, b)), R(ID.x))
-  ok("a descendência desce do MEIO do casal e passa por uma barra", c0.poligonal.length === 4 && (d === "retrato" ? c0.poligonal[1].y === c0.poligonal[2].y : c0.poligonal[1].x === c0.poligonal[2].x))
 }
 
 // ─── Família do cônjuge e ramos colaterais ──────────────────────────────────
@@ -212,7 +196,8 @@ const fim = () => {
   if (falhou) { console.log(falhas.join("\n")); process.exit(1) }
 }
 ok("a linha de casamento tem pontos de ligação nos 4 lados e acompanha o arrasto (ajustarLadosDeCasamento a cada movimento)", /id=\{`ms-\$\{lado\}`\}/.test(tela) && /id=\{`mt-\$\{lado\}`\}/.test(tela) && /ajustarLadosDeCasamento\(nodes, edges, mode\)/.test(tela))
-ok("a filiação usa a linha própria (barra a partir do meio do casal)", /filiacao: LinhaDeFiliacao/.test(tela) && /type: 'filiacao'/.test(tela))
+ok("a filiação NÃO sai do meio do casal: é o fio de sempre, de baixo de cada genitor até o filho (sem aresta própria)", !/LinhaDeFiliacao|type: 'filiacao'|edgeTypes/.test(tela))
+ok("a linha de casamento só existe para casal SEM filhos em comum", /temFilhosEmComum/.test(tela) && /filter\(\(\{ a, b \}\) => !temFilhosEmComum\(a, b\)\)/.test(tela))
 
 void cmd.aplicar().then(() => cmd.desfazer()).then(() => {
   ok("desfazer devolve os ajustes que havia; refazer limpa de novo; não mexe em dado", chamadas.join("|") === 'resetar retrato|aplicar retrato {"5":{"x":1,"y":2}}' && cmd.afetaDados === false)
