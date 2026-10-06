@@ -5,6 +5,7 @@
 // API aceitava a chamada. Permissão de tela não é permissão de sistema.
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { camposDoRegistro as camposDoRegistroDaArvore } from "@/src/services/genealogia/sincronizar-com-registro"
 import { PESSOA_ATIVA } from "@/src/lib/genealogia/vinculo-ativo"
 import { analisarExclusaoArvore, removerPessoaDaArvore } from "@/src/services/pessoa-ciclo-vida"
 import { verificarPermissao, extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
@@ -75,7 +76,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       })),
     }
 
-    return NextResponse.json(arvoreComEstadoReal)
+    // Campos que vieram do REGISTRO localizado na Genealogia: a tela os marca "do registro" e não os edita (para corrigir, corrige-se nos Dados Registrais).
+    const camposDoRegistro = await camposDoRegistroDaArvore(id).catch(() => ({ pessoas: {}, unioes: {} }))
+
+    return NextResponse.json({ ...arvoreComEstadoReal, camposDoRegistro })
   } catch (error) {
     console.error("Erro ao buscar árvore:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })

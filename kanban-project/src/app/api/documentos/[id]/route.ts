@@ -6,7 +6,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Prisma, TipoDocumento, StatusDocumento } from "@prisma/client"
-import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
+import { sincronizarDocumento } from '@/src/services/genealogia/sincronizar-com-registro'
 import { reconciliarEconomicoDoProcesso } from '@/src/lib/motor/matriz-economica'
 import { notificarDocumentoAlterado } from '@/src/services/registral/gancho-documental'
 import { removerDocumento } from '@/src/services/documento-operacional'
@@ -342,6 +343,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     notificarDocumentoAlterado({ documentoId: documentoAtualizado.id, motivo: 'documento_alterado' }).catch((e) =>
       console.error('[doc alterado → gancho registral]', e),
     )
+
+    // SINCRONIZAÇÃO COM A ÁRVORE (06/10/2026): a cada edição dos Dados Registrais (data do evento, cidade, estado, país) de uma certidão cujo "Localizar
+    // registro" JÁ foi concluído, o dado do registro vale sobre a árvore (vazio preenche; diferente vence, com histórico). Antes da conclusão a edição é rascunho:
+    // quem sincroniza é a conclusão do passo. Nunca derruba o salvamento.
+    if (body.data_evento !== undefined || body.cidade_registro !== undefined || body.estado_registro !== undefined || body.pais_registro !== undefined) {
+      const autor = await extrairUsuarioComPermissoes(request).catch(() => null)
+      await sincronizarDocumento(documentoAtualizado.id, autor?.userId ?? null, "EDICAO_DOS_DADOS_REGISTRAIS")
+    }
 
     return NextResponse.json(documentoAtualizado)
   } catch (error) {

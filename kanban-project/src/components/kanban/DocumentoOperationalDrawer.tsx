@@ -14,6 +14,7 @@ import {
   UserCog, Paperclip, MessageSquare, Gavel, PlayCircle, Ban, Sparkles, DollarSign, CircleDot,
 } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { EditarDadosRegistrais } from "@/src/components/kanban/documento/EditarDadosRegistrais"
 import { WorkflowTab, type ContextoAntecipada } from "./workflow/WorkflowTab"
 import { InitOperationModal } from "./InitOperationModal"
 import { WorkflowControls } from "./WorkflowControls"
@@ -1020,10 +1021,20 @@ function ConteudoDrawer({
 // ============================================================
 function TabRegistry({ doc, tipoLabel, onSaved }: { doc: Documento; tipoLabel: string; onSaved?: () => void }) {
   const isCertidao = doc.tipo.startsWith("CERTIDAO")
+  const { pode } = usePermissoes()
+  const [editando, setEditando] = useState(false)
 
   if (isCertidao) {
     return (
       <div className="space-y-5">
+        {/* EDITAR — em QUALQUER fase, para quem pode editar processos: corrige evento, localidade e referência registral. Não reabre o passo nem muda a fase. */}
+        {pode("processos.editar") && (
+          <div className="flex justify-end">
+            <button type="button" data-testid="editar-dados-registrais" onClick={() => setEditando(true)}
+              className="px-3 py-1.5 rounded-md text-[12px] font-semibold border border-[var(--border-default)] text-[var(--text-primary)] hover:bg-[var(--surface-secondary)]">Editar</button>
+          </div>
+        )}
+        {editando && <EditarDadosRegistrais documentoId={doc.id} onFechar={() => setEditando(false)} onSaved={onSaved} />}
         <Section title="Identificação">
           <GridFields fields={[
             ["Pessoa (na árvore)", nomeCompleto(doc.pessoa)],

@@ -19,6 +19,7 @@
 //    fingir cobertura completa — e é assim que um conflito real passa batido.
 // ============================================================================
 
+import { DivergenciasResolvidas } from "./divergencias-resolvidas"
 import { useMemo, useState } from "react"
 import {
   X, AlertTriangle, TriangleAlert, Info, Target, Users, MessageCircleQuestion, ChevronDown, ChevronRight,
@@ -38,6 +39,10 @@ import type { RascunhoTarefa } from "@/src/lib/genealogia/operacional/tarefa-do-
 interface Props {
   analise: AnaliseArvore | null
   aberto: boolean
+  /** A árvore (para listar as divergências que a Genealogia já resolveu). */
+  arvoreId?: number | null
+  /** Uma sincronização foi desfeita: a tela recarrega a árvore. */
+  onDivergenciaDesfeita?: () => void
   onFechar: () => void
   /** Levar o usuário até a pessoa no canvas (não altera o layout, só navega). */
   onIrParaPessoa?: (pessoaId: number) => void
@@ -350,6 +355,8 @@ export function PainelInteligencia({
   onCriarTarefa,
   rascunhoDoPasso,
   onAbrirTarefa,
+  arvoreId,
+  onDivergenciaDesfeita,
 }: Props) {
   const [medidasAbertas, setMedidasAbertas] = useState<ReadonlySet<ChaveMedida>>(new Set())
   const alternarMedida = (chave: ChaveMedida) =>
@@ -503,6 +510,8 @@ export function PainelInteligencia({
                 </div>
               </section>
             )}
+
+            <DivergenciasResolvidas arvoreId={arvoreId} ativo={aberto} onDesfeito={onDivergenciaDesfeita} />
 
             <section>
               <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">

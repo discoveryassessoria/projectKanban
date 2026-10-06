@@ -1,5 +1,6 @@
 // src/app/api/pessoas/[id]/route.ts
 
+import { edicaoRecusadaPorRegistro } from "@/src/services/genealogia/sincronizar-com-registro"
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
@@ -79,6 +80,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const body = await request.json()
+
+    // SENTIDO ÚNICO (06/10/2026): campo que veio do REGISTRO localizado na Genealogia não se edita na árvore — corrige-se nos Dados Registrais da certidão.
+    const travados = await edicaoRecusadaPorRegistro("PESSOA", id, body)
+    if (travados) {
+      return NextResponse.json(
+        { error: `${travados.join(", ")}: veio do registro localizado na Genealogia. Para corrigir, altere nos Dados Registrais da certidão.`, codigo: "CAMPO_DO_REGISTRO", campos: travados },
+        { status: 409 },
+      )
+    }
 
     // Estado ANTERIOR do flag — para detectar a TRANSIÇÃO não→requerente (§1/§9).
     const antes = await prisma.pessoa.findUnique({ where: { id }, select: { requerente: true, documentacao: true, documentosExigidos: true } })
