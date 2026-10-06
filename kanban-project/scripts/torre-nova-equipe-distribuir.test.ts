@@ -108,7 +108,11 @@ async function main() {
     await sugestaoDeRedistribuicao(linhas0, await lerOrganizacao(), new Date())
     ok("calcular a SUGESTÃO não grava nada", antes === JSON.stringify((await prisma.tarefa.findMany({ orderBy: { id: "asc" }, select: { id: true, responsavelId: true, lockVersion: true } }))))
 
-    const rDist = await postDistribuir(req("/api/torre/equipe/distribuir-sem-responsavel", tAdmin))
+    // SUGESTÃO NUNCA ATRIBUI SOZINHA (06/10/2026): a 1ª chamada só devolve a prévia (428) e NÃO grava; a 2ª, com confirmação + assinatura, grava.
+    const r428 = await postDistribuir(req("/api/torre/equipe/distribuir-sem-responsavel", tAdmin))
+    const j428 = await r428.json()
+    ok("sem confirmação: 428 com a prévia 'Atribuir … a …?' e NADA gravado", r428.status === 428 && /Atribuir/.test(j428.confirmacao?.pergunta ?? "") && (await prisma.tarefa.count({ where: { id: { in: [...idsIt, ...idsEs] }, responsavelId: { not: null } } })) === 0, `${r428.status}`)
+    const rDist = await postDistribuir(req("/api/torre/equipe/distribuir-sem-responsavel", tAdmin, { confirmado: true, assinatura: j428.confirmacao?.assinatura }))
     const jDist = await rDist.json()
     const donos = new Map((await prisma.tarefa.findMany({ where: { id: { in: [...idsIt, ...idsEs] } }, select: { id: true, responsavelId: true } })).map((t) => [t.id, t.responsavelId]))
     ok("as 6 de Itália foram atribuídas — todas a quem é apto (Ana/Beto/Dora), NUNCA à Cris", rDist.status === 200 && idsIt.every((id) => [ana.id, beto.id, dora.id].includes(donos.get(id) as number)) && ![...donos.values()].includes(cris.id), JSON.stringify([...donos]))
@@ -117,7 +121,7 @@ async function main() {
     const dAna = idsIt.filter((id) => donos.get(id) === ana.id).length, dBeto = idsIt.filter((id) => donos.get(id) === beto.id).length
     ok("a carga decide: Ana (1 ativa) recebe mais que Beto (3 ativas)", dAna > dBeto, `Ana ${dAna} · Beto ${dBeto}`)
     const hist = await prisma.logAuditoria.count({ where: { entidade: "Tarefa", entidadeId: { in: idsIt }, acao: { in: ["TAREFA_ATRIBUIDA", "TAREFA_TRANSFERIDA"] }, usuarioId: admin.id } })
-    const comJustificativa = await prisma.logAuditoria.count({ where: { entidade: "Tarefa", entidadeId: { in: idsIt }, acao: "TAREFA_ATRIBUIDA", detalhes: { path: ["motivo"], string_contains: "distribuição por aptidão e carga" } } })
+    const comJustificativa = await prisma.logAuditoria.count({ where: { entidade: "Tarefa", entidadeId: { in: idsIt }, acao: "TAREFA_ATRIBUIDA", detalhes: { path: ["motivo"], string_contains: "Distribuir por aptidão e carga" } } })
     ok("cada atribuição ficou no histórico da tarefa (quem, o quê, quando)", hist === 6, `${hist}`)
     ok("…com a justificativa (critério: aptidão e menor carga) gravada no detalhe", comJustificativa === 6, `${comJustificativa}`)
     const resumo = await prisma.logAuditoria.findFirst({ where: { acao: "TORRE_EQUIPE_SEM_RESPONSAVEL_DISTRIBUIDAS", usuarioId: admin.id }, orderBy: { id: "desc" } })

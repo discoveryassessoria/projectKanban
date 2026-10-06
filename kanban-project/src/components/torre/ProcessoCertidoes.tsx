@@ -4,7 +4,7 @@
 // CANCELADA / NÃO EXIGIDA, com "Motivo" e "Reabrir", entram quando o bloco ou o filtro de status as pedem), a linha-resumo "+ N certidões iguais a estas" e o "Atribuir" por linha.
 // Os dados são `d.tabela` (montados em `torre-foco.ts` a partir das MESMAS linhas da aba Tarefas); aqui só se filtra, ordena e desenha.
 import { TEXTO_DA_REGRA_DE_ORDEM } from "@/lib/operacional/ordem-certidoes"
-import { useMemo, useState } from "react"
+import { Fragment, useMemo, useState } from "react"
 import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 import { diaMesDoPrazo } from "@/src/lib/tarefa/texto-prazo"
 import {
@@ -61,6 +61,7 @@ export function ProcessoCertidoes({ d, agora, status, onStatus, podeAtribuir, oc
           ? <input type="checkbox" className="tpr-chk" aria-label="Selecionar" checked={marcadas.has(l.chave)} onChange={() => alternar(l.chave)} />
           : null}</div>
         <div className="cert"><b>{l.titulo}</b><span>{nomePessoa}{l.geracao ? ` · ${l.geracao}` : ""}</span></div>
+        <div className="tpr-c-mut">{l.fase?.label ?? "—"}</div>
         <div>{l.passo ? <>{l.passo.rotulo}{l.passo.total ? <span className="tpr-c-mut"> · {l.passo.ordem}/{l.passo.total}</span> : null}</> : <span className="tpr-c-mut">—</span>}</div>
         <div><span className={`tpr-pill ${PILL[l.status] ?? ""}`}>{l.statusRotulo}</span></div>
         <div className={l.responsavelNome ? "" : aberta ? "tpr-c-verm" : "tpr-c-mut"}>{l.responsavelNome ?? (aberta ? "sem responsável" : "—")}</div>
@@ -85,6 +86,7 @@ export function ProcessoCertidoes({ d, agora, status, onStatus, podeAtribuir, oc
     <div key={l.chave} className="tpr-grade tpr-tr fora" data-linha={l.chave} data-fora={l.tipo === "NAO_EXIGIDA" ? "nao_exigida" : "cancelada"}>
       <div />
       <div className="cert"><b>{l.titulo}</b><span>{l.pessoa ?? "Processo inteiro"}{l.geracao ? ` · ${l.geracao}` : ""} · {l.encerramentoTexto}</span></div>
+      <div className="tpr-c-mut">{l.fase?.label ?? "—"}</div>
       <div>—</div>
       <div><span className="tpr-pill fora">{l.statusRotulo}</span></div>
       <div>—</div><div>—</div><div>—</div><div>—</div>
@@ -124,13 +126,23 @@ export function ProcessoCertidoes({ d, agora, status, onStatus, podeAtribuir, oc
         <div className="tpr-grade tpr-th">
           <div><input type="checkbox" className="tpr-chk" aria-label="Selecionar todas" disabled={marcaveis.length === 0} checked={todasMarcadas}
             onChange={() => setMarcadas(todasMarcadas ? new Set() : new Set(marcaveis.map((l) => l.chave)))} /></div>
-          <div>Certidão · pessoa</div><div>Passo atual</div><div>Status</div><div>Responsável</div><div>Iniciou em</div><div>Prazo</div><div>Aguardando</div><div>Ação</div>
+          <div>Certidão · pessoa</div><div>Fase</div><div>Passo atual</div><div>Status</div><div>Responsável</div><div>Iniciou em</div><div>Prazo</div><div>Aguardando</div><div>Ação</div>
         </div>
 
         {linhas.length === 0 && (
           <div className="tpr-vazio">{d.tabela.length === 0 ? "Nenhuma tarefa nesta fase ainda." : "Nada corresponde a este filtro."}</div>
         )}
-        {visiveis.map(linhaDeTrabalho)}
+        {visiveis.map((l, i) => {
+          // GRUPO POR FASE (a mais antiga primeiro): o cabeçalho aparece quando a fase muda.
+          const novaFase = i === 0 || (visiveis[i - 1].fase?.key ?? null) !== (l.fase?.key ?? null)
+          const n = novaFase ? visiveis.filter((x) => (x.fase?.key ?? null) === (l.fase?.key ?? null) && x.tipo === "ABERTA").length : 0
+          return (
+            <Fragment key={l.chave}>
+              {novaFase && <div className="tpr-grupo-fase" data-testid="grupo-fase">{l.fase?.label ?? "Sem fase"}<span>{n} {n === 1 ? "aberta" : "abertas"}</span></div>}
+              {linhaDeTrabalho(l)}
+            </Fragment>
+          )
+        })}
         {colapsa && (
           <div className="tpr-resumo">
             <span>+ {resumo.ocultas.length} {resumo.ocultas.every((l) => l.documentoId != null) ? (resumo.ocultas.length === 1 ? "certidão igual" : "certidões iguais") : (resumo.ocultas.length === 1 ? "tarefa igual" : "tarefas iguais")} a estas{resumo.nomes.length ? ` (${resumo.nomes.join(", ")})` : ""} · todas &ldquo;{resumo.descricao}&rdquo;</span>
@@ -143,12 +155,6 @@ export function ProcessoCertidoes({ d, agora, status, onStatus, podeAtribuir, oc
         {fora.map(linhaFora)}
       </div>
 
-      {d.deFasesAnteriores.n > 0 && (
-        <div className="tpr-resumo" style={{ borderTop: "1px solid var(--border-default)", borderBottom: 0 }}>
-          <span>Há também {d.deFasesAnteriores.n} {d.deFasesAnteriores.n === 1 ? "tarefa aberta" : "tarefas abertas"} de fase anterior ({d.deFasesAnteriores.fases.join(", ")}) — não entram nesta tabela, mas contam nos números do processo.</span>
-          <button type="button" onClick={onVerHistorico}>ver o histórico</button>
-        </div>
-      )}
     </div>
   )
 }

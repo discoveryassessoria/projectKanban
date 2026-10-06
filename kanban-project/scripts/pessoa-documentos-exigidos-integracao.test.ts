@@ -150,7 +150,7 @@ async function main() {
   secao("C) Tipo que já ANDOU fica e gera ARV-002")
   const necAndou = (await P.foto(B.processoId)).necDe("NAS", { pessoaId: B.conjugeId! })[0]
   await iniciarAtendimentoNecessidade(necAndou.id) // pelo serviço dono: a necessidade ANDOU (PENDENTE → EM_ATENDIMENTO)
-  await putDocs(B.conjugeId!, ["OBI"])
+  await putDocs(B.conjugeId!, ["OBI"], { confirmarRemocaoDeCertidao: true, motivoRemocaoDeCertidao: "decisão do operador no teste C" }) // certidão que já andou: decisão humana explícita
   d = await P.derivados(necAndou.id)
   ok("Nascimento EM_ATENDIMENTO NÃO é dispensado ao desmarcar (fato acontecido)", d.status === "EM_ATENDIMENTO", String(d.status))
   const arv = await verificacaoPorCodigo("ARV-002")!.executar({} as never)
@@ -200,7 +200,10 @@ async function main() {
   const necD3 = (await prisma.necessidadeDocumental.findMany({ where: { processoId: D3.processoId, pessoaId: D3.conjugeId!, supersedePorId: null, status: { not: "DISPENSADA" } }, select: { id: true } }))
   ok("PRÉ-CONDIÇÃO: a cônjuge tem exatamente 1 necessidade viva", necD3.length === 1, String(necD3.length))
   await atenderNecessidade(necD3[0].id)
-  await putDocs(D3.conjugeId!, [])
+  // REGRA FIXA (06/10/2026): tirar certidão que já andou é decisão humana explícita (confirmação + motivo).
+  const semConfirmar = await putDocs(D3.conjugeId!, [])
+  ok("D3: sem confirmação a remoção da certidão já atendida é recusada (409)", semConfirmar.status === 409)
+  await putDocs(D3.conjugeId!, [], { confirmarRemocaoDeCertidao: true, motivoRemocaoDeCertidao: "decisão do operador no teste D3" })
   const c3 = await calc(D3.processoId)
   ok("exigência zerou, a escolha removeu algo e a necessidade segue ATENDIDA (fato acontecido não se desfaz)", c3.exigencias.length === 0 && c3.removidasPorEscolha.length >= 1 && (await prisma.necessidadeDocumental.findUniqueOrThrow({ where: { id: necD3[0].id }, select: { status: true } })).status === "ATENDIDA")
   ok("genealogiaZeradaPorEscolhaManual = true mesmo com certidão concluída", (await genealogiaZeradaPorEscolhaManual(D3.processoId)).zerada)

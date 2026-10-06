@@ -23,7 +23,7 @@ const AGORA = new Date("2026-10-01T15:00:00.000Z") // 12:00 em São Paulo
 const linha = (o: Partial<LinhaDaTabela>): LinhaDaTabela => ({
   chave: "t1", tarefaId: 1, documentoId: 1, tipo: "ABERTA", titulo: "Certidão de nascimento", pessoaId: 1, pessoa: "Maria", geracao: "G1 bisavó", geracaoNum: 1, linhaReta: true, pessoaNascimento: null,
   passo: { rotulo: "Solicitar certidão", ordem: 1, total: 4 }, status: "A_INICIAR", statusRotulo: "A iniciar", responsavelId: null, responsavelNome: null, iniciouEm: null, concluidaEm: null,
-  dataPrazo: "2026-10-10T15:00:00.000Z", rotuloDoPrazo: "Iniciar até 10/10", risco: "atencao", atrasada: false, bola: null, encerramentoTexto: null, motivoTexto: null, reabrivel: false, podeAtribuir: true, ...o,
+  dataPrazo: "2026-10-10T15:00:00.000Z", rotuloDoPrazo: "Iniciar até 10/10", risco: "atencao", atrasada: false, bola: null, encerramentoTexto: null, motivoTexto: null, reabrivel: false, podeAtribuir: true, fase: { key: "emissao_documental", label: "Emissão", ordem: 2 }, ...o,
 })
 
 async function main() {
@@ -58,16 +58,16 @@ async function main() {
   ok("filtro Cancelada / não exigida", ids(filtrarEOrdenar(l, { pessoaId: null, status: "ENCERRADAS" })) === "ed")
   ok("canceladas / não exigidas somem nos demais filtros", !ids(filtrarEOrdenar(l, { pessoaId: null, status: "A_INICIAR" })).match(/[de]/))
   ok("pessoas do select, na ordem da árvore", pessoasDaTabela(l).map((p) => p.nome).join() === "Edison,Helena,Maria")
-  ok("título: tarefas quando não é tudo certidão", tituloDaTabela(l, (x) => x.documentoId != null && x.chave !== "b") === "Tarefas da fase atual · 3")
-  ok("título: certidões · N (canceladas / não exigidas não contam por padrão)", tituloDaTabela(l, () => true) === "Certidões da fase atual · 3")
+  ok("título: tarefas quando não é tudo certidão", tituloDaTabela(l, (x) => x.documentoId != null && x.chave !== "b") === "Tarefas abertas do processo · 3")
+  ok("título: certidões · N (canceladas / não exigidas não contam por padrão)", tituloDaTabela(l, () => true) === "Certidões abertas do processo · 3")
   const ativasPadrao = filtrarEOrdenar(l, { pessoaId: null, status: "ATIVAS" })
   ok("PADRÃO 'ATIVAS': só abertas e concluídas, sem canceladas nem não exigidas", ids(ativasPadrao) === "bac")
-  ok("título = linhas da lista, sempre (padrão)", tituloDaTabela(l, () => true, ativasPadrao) === `Certidões da fase atual · ${ativasPadrao.length}`)
+  ok("título = linhas da lista, sempre (padrão)", tituloDaTabela(l, () => true, ativasPadrao) === `Certidões abertas do processo · ${ativasPadrao.length}`)
   const comEnc = filtrarEOrdenar(l, { pessoaId: null, status: "TODOS" })
-  ok("com canceladas / não exigidas: título diz quantas são e bate com as linhas", tituloDaTabela(l, () => true, comEnc) === "Certidões da fase atual · 5 (3 ativas + 2 cancelada / não exigida)" && comEnc.length === 5, tituloDaTabela(l, () => true, comEnc))
+  ok("com canceladas / não exigidas: título diz quantas são e bate com as linhas", tituloDaTabela(l, () => true, comEnc) === "Certidões abertas do processo · 5 (3 ativas + 2 cancelada / não exigida)" && comEnc.length === 5, tituloDaTabela(l, () => true, comEnc))
   const soEnc = filtrarEOrdenar(l, { pessoaId: null, status: "ENCERRADAS" })
-  ok("filtro só canceladas / não exigidas: título bate", tituloDaTabela(l, () => true, soEnc) === "Certidões da fase atual · 2 (cancelada / não exigida)")
-  ok("filtro de pessoa: o número do título acompanha a lista", tituloDaTabela(l, () => true, filtrarEOrdenar(l, { pessoaId: 1, status: "ATIVAS" })) === "Certidões da fase atual · 2")
+  ok("filtro só canceladas / não exigidas: título bate", tituloDaTabela(l, () => true, soEnc) === "Certidões abertas do processo · 2 (cancelada / não exigida)")
+  ok("filtro de pessoa: o número do título acompanha a lista", tituloDaTabela(l, () => true, filtrarEOrdenar(l, { pessoaId: 1, status: "ATIVAS" })) === "Certidões abertas do processo · 2")
   ok("o filtro de status oferece 'Ativas' (padrão) e 'Cancelada / não exigida'", OPCOES_DE_STATUS[0].valor === "ATIVAS" && OPCOES_DE_STATUS.some((o) => o.valor === "ENCERRADAS" && o.rotulo === ROTULO_ENCERRADAS) && ROTULO_ENCERRADAS === "Cancelada / não exigida")
 
   secao("linha-resumo '+ N certidões iguais a estas'")

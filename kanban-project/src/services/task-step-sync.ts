@@ -203,6 +203,19 @@ async function aplicarPasso(
   if (step.status === alvo) return { changed: false, anterior: step.status, atual: step.status }
   if (!H.podeAplicarPasso(step.status, alvo)) return { changed: false, anterior: step.status, atual: step.status, code: "TRANSICAO_INVALIDA" as H.FailureCodeD }
 
+  // REGRA FIXA 1 (06/10/2026): certidão NUNCA anda na Emissão com "Localizar registro" aberto. Trava no ponto de escrita: abrir, iniciar,
+  // executar ou concluir o "Solicitar certidão" de uma necessidade cujo registro ainda não foi localizado é recusado (BLOQUEADO continua permitido:
+  // é o estado correto, aplicado pelo reconciliador `trava-emissao-por-genealogia`).
+  if (step.stepKey === "solicitar_certidao" && ["DISPONIVEL", "EM_ANDAMENTO", "AGUARDANDO", "EXECUTADO", "AGUARDANDO_APROVACAO", "CONCLUIDO"].includes(alvo)) {
+    const necId = step.necessidadeId ?? (step.documentoId != null ? (await tx.documento.findUnique({ where: { id: step.documentoId }, select: { necessidadeId: true } }))?.necessidadeId ?? null : null)
+    if (necId != null) {
+      const aberto = await tx.phaseWorkflowStepInstance.count({
+        where: { stepKey: "localizar_registro", necessidadeId: necId, status: { notIn: ["CONCLUIDO", "DISPENSADO", "CANCELADO", "SUPERSEDIDO"] } },
+      })
+      if (aberto > 0) return { changed: false, anterior: step.status, atual: step.status, code: "DEPENDENCIA_PENDENTE" as H.FailureCodeD }
+    }
+  }
+
   // A DEPENDÊNCIA É PRÉ-CONDIÇÃO, NÃO SUGESTÃO.
   //
   // A máquina validava PARA ONDE se pode ir a partir do estado atual, e só isso. Abrir

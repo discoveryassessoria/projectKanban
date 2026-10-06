@@ -152,6 +152,21 @@ export async function sugestaoDeRedistribuicao(linhas: LinhaDaTorre[], organizac
 
 // ─── EXECUÇÃO ───────────────────────────────────────────────────────────────
 
+/** A prévia da confirmação do "Distribuir as N por aptidão e carga" (mesmo plano da execução; nada é gravado). `null` = nada a atribuir. */
+export async function previaDeDistribuirSemResponsavel(agora = new Date()): Promise<import('@/src/lib/torre-confirmacao').PreviaDeConfirmacao | null> {
+  const linhas = (await listarTarefasDaTorre({}, agora)).linhas
+  const organizacao = await lerOrganizacao(agora)
+  const { plano } = await planejarSemResponsavel(linhas, organizacao, agora)
+  const atribui = plano.filter((p) => p.atribui && p.paraId != null)
+  if (atribui.length === 0) return null
+  const titulo = new Map(linhas.map((l) => [l.taskId, l.titulo]))
+  const por = new Map<number, { nome: string; ids: number[] }>()
+  for (const p of atribui) { const g = por.get(p.paraId!) ?? { nome: p.paraNome ?? '', ids: [] }; g.ids.push(p.tarefaId); por.set(p.paraId!, g) }
+  const itens = [...por.values()].map((g) => ({ pessoa: g.nome, quantidade: g.ids.length, tarefas: g.ids.map((id) => titulo.get(id) ?? `#${id}`) }))
+  const pares = [...por.entries()].flatMap(([u, g]) => g.ids.map((t) => [t, u] as [number, number])).sort((a, b) => a[0] - b[0] || a[1] - b[1])
+  return { pergunta: `Atribuir ${atribui.length} ${atribui.length === 1 ? 'tarefa' : 'tarefas'}: ${itens.map((i) => `${i.quantidade} a ${i.pessoa}`).join(', ')}?`, itens, assinatura: pares.map(([t, u]) => `${t}:${u}`).join(',') }
+}
+
 export interface ResultadoDaDistribuicao {
   total: number
   atribuidas: number
@@ -185,7 +200,7 @@ export async function distribuirSemResponsavel(args: { autorId: number; agora?: 
   for (const [usuarioId, g] of grupos) {
     const r = await redistribuirTarefas({
       tarefaIds: g.ids, novoResponsavelId: usuarioId, autorId: args.autorId,
-      motivo: `distribuição por aptidão e carga (Torre › Equipe): ${g.nome} é apto(a) e tem a menor carga entre os aptos; sem apto comprovado a tarefa não é atribuída`,
+      motivo: `via sugestão do Precisa de você (Distribuir por aptidão e carga, confirmada): ${g.nome} é apto(a) e tem a menor carga entre os aptos; sem apto comprovado a tarefa não é atribuída`,
     })
     itens.push(...r.itens.map((i) => ({ tarefaId: i.tarefaId, ok: i.ok, mensagem: i.mensagem })))
     if (r.sucesso > 0) porPessoa.push({ usuarioId, nome: g.nome, quantidade: r.sucesso })

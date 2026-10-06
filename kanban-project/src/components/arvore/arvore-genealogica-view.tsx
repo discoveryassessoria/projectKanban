@@ -2546,6 +2546,18 @@ function EditPersonModal({
   const [precisaDocumentacao, setPrecisaDocumentacao] = useState<boolean>((pessoa as any).documentacao ?? true)
   // Valor SALVO (NULL ⇒ os três marcados). O campo só vai ao servidor se o usuário mudou.
   const [docsMarcados, setDocsMarcados] = useState<CodigoDocumentoExigivel[]>(marcadosParaTela((pessoa as any).documentosExigidos))
+  // A TELA MOSTRA EXATAMENTE O QUE ESTÁ NO BANCO (06/10/2026, caso Attilio): o objeto `pessoa` vem do cache da árvore e pode estar
+  // defasado. Ao abrir, a lista é lida de novo do servidor e vira, ao mesmo tempo, o valor exibido e a base da comparação "mudou?".
+  const [docsGravado, setDocsGravado] = useState<unknown>((pessoa as any).documentosExigidos ?? null)
+  useEffect(() => {
+    let vivo = true
+    authFetch(`/api/pessoas/${pessoa.id}`).then((r) => (r.ok ? r.json() : null)).then((p) => {
+      if (!vivo || !p) return
+      setDocsGravado(p.documentosExigidos ?? null)
+      setDocsMarcados(marcadosParaTela(p.documentosExigidos))
+    }).catch(() => null)
+    return () => { vivo = false }
+  }, [pessoa.id])
 
   // Classes padrão
   // O Preflight do Tailwind aplica `color: inherit` em input/select/textarea.
@@ -2577,7 +2589,7 @@ function EditPersonModal({
   const linhaRetaMudou = ((pessoa as any).linhaReta ?? true) !== isLinhaReta
   const documentacaoMudou = ((pessoa as any).documentacao ?? true) !== precisaDocumentacao
   // Filtro de certidões: vale para QUALQUER pessoa (requerente, linha reta ou não) com a caixa ligada — vai só quando MUDOU.
-  const documentosExigidosMudou = deveEnviarDocumentosExigidos({ precisaDocumentacao, gravado: (pessoa as any).documentosExigidos, marcados: docsMarcados })
+  const documentosExigidosMudou = deveEnviarDocumentosExigidos({ precisaDocumentacao, gravado: docsGravado, marcados: docsMarcados })
   // O que a árvore sabe agora desta pessoa: decide se Casamento/Óbito marcados serão gerados (aviso na tela e prévia).
   const fatosDocs = { falecida: isFalecido, temCasamento: isCasado && conjugeSelecionadoId != null }
   const paiMudou = ((pessoa as any).paiId ?? null) !== (paiSelecionadoId || null)
@@ -2609,7 +2621,7 @@ function EditPersonModal({
       lista.push({ campo: 'Precisa de documentação', de: precisaDocumentacao ? 'Não' : 'Sim', para: precisaDocumentacao ? 'Sim' : 'Não' })
     }
     if (documentosExigidosMudou) {
-      lista.push({ campo: 'Certidões exigidas', de: rotuloDaLista(marcadosParaTela((pessoa as any).documentosExigidos)), para: rotuloDaLista(docsMarcados) })
+      lista.push({ campo: 'Certidões exigidas', de: rotuloDaLista(marcadosParaTela(docsGravado)), para: rotuloDaLista(docsMarcados) })
     }
     if (paiMudou) lista.push({ campo: 'Pai', de: 'alterado', para: paiSelecionadoId ? (pessoas.find(p => p.id === Number(paiSelecionadoId))?.nome ?? 'outro') : 'nenhum' })
     if (maeMudou) lista.push({ campo: 'Mãe', de: 'alterada', para: maeSelecionadaId ? (pessoas.find(p => p.id === Number(maeSelecionadaId))?.nome ?? 'outra') : 'nenhuma' })
@@ -2654,6 +2666,9 @@ function EditPersonModal({
   })
 
   const [proposta, setProposta] = useState<PropostaImpacto | null>(null)
+  // REGRA FIXA: tirar da lista uma certidão que JÁ ANDOU só com confirmação explícita + motivo (decisão humana registrada).
+  const [remocaoPendente, setRemocaoPendente] = useState<string[] | null>(null)
+  const [motivoRemocao, setMotivoRemocao] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -2674,7 +2689,8 @@ function EditPersonModal({
     return false
   }
 
-  const persistir = async () => {
+  const persistir = () => persistirComRemocao(false)
+  const persistirComRemocao = async (confirmarRemocao: boolean) => {
     setProposta(null)
     setSaving(true)
     try {
@@ -2701,6 +2717,7 @@ function EditPersonModal({
           documentacao: precisaDocumentacao,
           // Só vai se o usuário MUDOU a lista: re-salvar pessoa antiga (NULL) nunca grava a lista cheia.
           ...(documentosExigidosMudou ? { documentosExigidos: docsMarcados } : {}),
+          ...(confirmarRemocao ? { confirmarRemocaoDeCertidao: true, motivoRemocaoDeCertidao: motivoRemocao } : {}),
           paiId: paiSelecionadoId || null,
           maeId: maeSelecionadaId || null,
         })
@@ -2708,6 +2725,7 @@ function EditPersonModal({
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}))
+        if (error.code === 'REMOCAO_DE_CERTIDAO_JA_ANDADA') { setRemocaoPendente(error.certidoes ?? []); return }
         alert(error.error || 'Erro ao atualizar pessoa')
         return
       }
@@ -2813,6 +2831,19 @@ function EditPersonModal({
           onConfirmar={persistir}
           onSemImpacto={persistir}
         />
+      )}
+      {remocaoPendente && (
+        <div className="fixed inset-0 z-[10010] flex items-center justify-center bg-[var(--overlay-modal)] p-4" data-testid="confirmar-remocao-certidao">
+          <div className="bg-[var(--surface-primary)] text-gray-900 rounded-xl shadow-[var(--elev-3)] w-full max-w-md p-5">
+            <h3 className="text-base font-bold">Tirar certidão que já andou?</h3>
+            <p className="text-sm mt-2">Esta edição tira da lista: <strong>{remocaoPendente.join(', ')}</strong>. A certidão já foi atendida/está em andamento. Isso precisa ser uma decisão sua, com motivo.</p>
+            <textarea value={motivoRemocao} onChange={(e) => setMotivoRemocao(e.target.value)} rows={3} placeholder="Motivo (pelo menos 10 caracteres)" className="w-full mt-3 border rounded-lg p-2 text-sm" />
+            <div className="flex justify-end gap-2 mt-4">
+              <button type="button" onClick={() => setRemocaoPendente(null)} className="px-3 py-2 text-sm rounded-lg border">Não, manter a certidão</button>
+              <button type="button" disabled={motivoRemocao.trim().length < 10} onClick={() => { setRemocaoPendente(null); void persistirComRemocao(true) }} className="px-3 py-2 text-sm rounded-lg bg-[var(--accent-primary)] text-white disabled:opacity-50">Tirar da lista</button>
+            </div>
+          </div>
+        </div>
       )}
       <div className="fixed inset-0 bg-[var(--overlay-modal)] z-[10003]" onClick={onClose} />
       {/* `text-gray-900` na RAIZ do modal não é redundância com as classes dos

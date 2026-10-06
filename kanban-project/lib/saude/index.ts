@@ -22,6 +22,7 @@ import './verificacoes/cadastro-execucao'
 import './verificacoes/prontidao'
 import './verificacoes/emissao-documental'
 import './verificacoes/genealogia'
+import './verificacoes/integridade-invariantes'
 
 export { catalogo, cobertura, dominiosSemCobertura, elegiveis, metadados, VERSAO_CATALOGO } from './catalogo'
 export { executarDiagnostico, consolidar } from './motor'

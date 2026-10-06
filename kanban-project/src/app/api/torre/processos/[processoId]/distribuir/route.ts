@@ -4,7 +4,8 @@
 // Régua: gestor da Torre + `tarefas.editar` (a mesma de atribuir).
 import { type NextRequest, NextResponse } from 'next/server'
 import { exigirTorre } from '@/src/lib/torre-acesso'
-import { distribuirProcesso } from '@/src/services/torre-processo-distribuir'
+import { distribuirProcesso, previaDeDistribuirProcesso } from '@/src/services/torre-processo-distribuir'
+import { confirmacaoDoCorpo, pedirConfirmacao } from '@/src/lib/torre-confirmacao'
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ processoId: string }> }) {
   const { usuario, erro } = await exigirTorre(request, 'tarefas.editar')
@@ -12,7 +13,12 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ proces
   const processoId = Number((await ctx.params).processoId)
   if (!Number.isInteger(processoId) || processoId <= 0) return NextResponse.json({ error: 'processo inválido' }, { status: 400 })
   try {
-    const r = await distribuirProcesso({ processoId, autorId: usuario.userId })
+    // SUGESTÃO NUNCA ATRIBUI SOZINHA: sem `confirmado` + assinatura da prévia, só devolve "Atribuir … a …?" (428) e não grava nada.
+    const { confirmado, assinatura } = confirmacaoDoCorpo(await request.json().catch(() => ({})))
+    const previa = await previaDeDistribuirProcesso(processoId)
+    if (previa && (!confirmado || assinatura == null)) return pedirConfirmacao(previa)
+    if (previa && assinatura !== previa.assinatura) return NextResponse.json({ ok: false, erro: 'A sugestão mudou desde que você confirmou. Revise e confirme de novo.', confirmacao: previa, code: 'SUGESTAO_MUDOU' }, { status: 409 })
+    const r = await distribuirProcesso({ processoId, autorId: usuario.userId, autorNome: usuario.nome })
     return NextResponse.json(r, { status: r.total > 0 && r.atribuidas === 0 ? 422 : 200 })
   } catch (e) {
     console.error('[torre/processos/distribuir]', e)

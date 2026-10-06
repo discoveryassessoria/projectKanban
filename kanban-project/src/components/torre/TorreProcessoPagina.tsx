@@ -4,6 +4,7 @@
 // canônicas para agir: distribuir (`/api/torre/processos/{id}/distribuir`), atribuir (`atribuir-sugerido`), pausar/reativar
 // (`processo-pausa.ts`), reabrir certidão (`reabrir-certidao`), avanço forçado (`advance/force`), comentários (`/api/comentarios`).
 // Nada daqui calcula regra: o servidor entrega os textos e os números; esta página desenha, filtra a tabela e chama as portas.
+import { useConfirmarAtribuicao } from "./ConfirmarAtribuicao"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
@@ -91,9 +92,10 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
     recarregar()
   }, [avisar, recarregar])
 
+  const { postar: postarComConfirmacao, modal: modalConfirmacao } = useConfirmarAtribuicao()
   const distribuir = async () => {
     setOcupado(true)
-    const r = await api<{ ok: boolean; mensagem: string; desfazer: DesfazerDeAtribuicao | null; error?: string }>(`/api/torre/processos/${processoId}/distribuir`, "POST")
+    const r = await postarComConfirmacao<{ ok: boolean; mensagem: string; desfazer: DesfazerDeAtribuicao | null; error?: string }>(`/api/torre/processos/${processoId}/distribuir`)
     setOcupado(false)
     if (r.data?.mensagem) avisar(r.data.mensagem, r.data.desfazer ? { rotulo: "Desfazer", fazer: desfazerAtribuicao(r.data.desfazer) } : undefined)
     else avisar(erroDe(r.data))
@@ -165,6 +167,7 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
 
   return (
     <>
+      {modalConfirmacao}
       <div className="tor">
         <div className="tpr">
           <VoltarDaTorre />

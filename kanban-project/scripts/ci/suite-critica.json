@@ -157,8 +157,10 @@
    "scripts/arvore-fonte-da-verdade-c-pai-mae.test.ts",
    "scripts/arvore-fonte-da-verdade-d-requerente.test.ts",
    "scripts/arvore-fonte-da-verdade-e-incluir-remover.test.ts",
-  "scripts/localizar-registro-pessoa-tardia.test.ts",
+    "scripts/localizar-registro-pessoa-tardia.test.ts",
+    "scripts/regras-fixas-integridade.test.ts",
    "scripts/localizar-registro-pessoa-tardia.test.ts",
+   "scripts/regras-fixas-integridade.test.ts",
    "scripts/arvore-fonte-da-verdade-f-linha-reta.test.ts",
    "scripts/arvore-fonte-da-verdade-g-regra.test.ts",
    "scripts/pessoa-documentos-exigidos-puro.test.ts",
@@ -234,6 +236,8 @@
   ]
  },
  "arquivos": [
+    "scripts/localizar-registro-pessoa-tardia.test.ts",
+    "scripts/regras-fixas-integridade.test.ts",
     "scripts/anexos-privados.test.ts",
     "scripts/anexos-rotas-auth.test.ts",
     "scripts/torre-foco-um-so-comportamento.test.ts",

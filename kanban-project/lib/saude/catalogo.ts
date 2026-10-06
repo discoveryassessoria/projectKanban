@@ -32,7 +32,8 @@ import { DOMINIOS } from './tipos'
 // Genealogia criar um segundo PhaseWorkflowStepInstance por certidão.
 // 1.11.0 — 30/09/2026: entrou ARV-002 (a árvore e seus derivados concordam) —
 // mandato "árvore = única fonte de verdade documental" (CLAUDE.md §37).
-export const VERSAO_CATALOGO = '1.11.0'
+// 1.12.0 — 06/10/2026: entrou INT-001 (vigia das regras fixas: Genealogia × Emissão × Torre) — caso Fogli.
+export const VERSAO_CATALOGO = '1.12.0'
 
 export interface ContextoVerificacao {
   /** agora, congelado no início da rodada (execuções são comparáveis) */

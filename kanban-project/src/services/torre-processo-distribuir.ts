@@ -51,33 +51,41 @@ export function mensagemDaDistribuicao(r: Pick<ResultadoDaDistribuicao, 'total' 
   return `${partes}${sobra} · fica no histórico`
 }
 
-export async function distribuirProcesso(args: { processoId: number; autorId: number; agora?: Date }): Promise<ResultadoDaDistribuicao> {
-  const agora = args.agora ?? new Date()
-  const { linhas } = await listarTarefasDaTorre({ processoId: args.processoId }, agora, { incluirPausados: true })
+/** O PLANO (sem gravar): quem receberia o quê. A prévia da confirmação e a execução leem o MESMO plano. */
+export async function planejarDistribuicaoDoProcesso(processoId: number, agora: Date) {
+  const { linhas } = await listarTarefasDaTorre({ processoId }, agora, { incluirPausados: true })
   const alvo = linhas.filter((l) => l.responsavelId == null)
   const objeto = alvo.length > 0 && alvo.every((l) => l.documentoId != null) ? 'certidões' : 'tarefas'
+  const porUsuario = new Map<number, { nome: string; ids: number[]; apto: string | null }>()
+  const sem = new Map<string, number>()
+  const semMotivo = (m: string) => sem.set(m, (sem.get(m) ?? 0) + 1)
+  if (alvo.length > 0) {
+    const { recomendacoes } = await simularLote({ taskIds: alvo.map((l) => l.taskId) }, agora)
+    for (const r of recomendacoes) {
+      if (!r.recomendado) { semMotivo(r.abstencao?.texto ?? 'nenhum candidato apto e disponível'); continue }
+      const apto = aptidaoComprovada(r)
+      if (apto == null) { semMotivo('sem aptidão cadastrada'); continue }
+      const g = porUsuario.get(r.recomendado.usuarioId) ?? { nome: r.recomendado.nome, ids: [], apto }
+      g.ids.push(r.taskId)
+      porUsuario.set(r.recomendado.usuarioId, g)
+    }
+  }
+  return { alvo, objeto, porUsuario, sem, titulos: new Map(alvo.map((l) => [l.taskId, l.titulo])) }
+}
+
+export async function distribuirProcesso(args: { processoId: number; autorId: number; autorNome?: string | null; agora?: Date }): Promise<ResultadoDaDistribuicao> {
+  const agora = args.agora ?? new Date()
+  const { alvo, objeto, porUsuario, sem } = await planejarDistribuicaoDoProcesso(args.processoId, agora)
+  const semMotivo = (m: string) => sem.set(m, (sem.get(m) ?? 0) + 1)
   if (alvo.length === 0) {
     const vazio = { total: 0, atribuidas: 0, porPessoa: [], semAtribuir: [] }
     return { ok: true, ...vazio, tarefaIds: [], mensagem: mensagemDaDistribuicao(vazio, objeto), desfazer: null }
   }
 
-  const { recomendacoes } = await simularLote({ taskIds: alvo.map((l) => l.taskId) }, agora)
-  const porUsuario = new Map<number, { nome: string; ids: number[]; apto: string | null }>()
-  const sem = new Map<string, number>()
-  const semMotivo = (m: string) => sem.set(m, (sem.get(m) ?? 0) + 1)
-  for (const r of recomendacoes) {
-    if (!r.recomendado) { semMotivo(r.abstencao?.texto ?? 'nenhum candidato apto e disponível'); continue }
-    const apto = aptidaoComprovada(r)
-    if (apto == null) { semMotivo('sem aptidão cadastrada'); continue }
-    const g = porUsuario.get(r.recomendado.usuarioId) ?? { nome: r.recomendado.nome, ids: [], apto }
-    g.ids.push(r.taskId)
-    porUsuario.set(r.recomendado.usuarioId, g)
-  }
-
   const feitas: number[] = []
   const porPessoa: ResultadoDaDistribuicao['porPessoa'] = []
   for (const [usuarioId, g] of porUsuario) {
-    const lote = await atribuirEmLote({ tarefaIds: g.ids, responsavelId: usuarioId, autorId: args.autorId })
+    const lote = await atribuirEmLote({ tarefaIds: g.ids, responsavelId: usuarioId, autorId: args.autorId, motivo: `via sugestão do Precisa de você (Distribuir, confirmada${args.autorNome ? ` por ${args.autorNome}` : ''})` })
     const certas = lote.itens.filter((i) => i.ok).map((i) => i.tarefaId)
     feitas.push(...certas)
     if (certas.length > 0) porPessoa.push({ usuarioId, nome: g.nome, n: certas.length, apto: g.apto })
@@ -91,5 +99,18 @@ export async function distribuirProcesso(args: { processoId: number; autorId: nu
     ok: feitas.length > 0, ...resumo, tarefaIds: feitas,
     mensagem: feitas.length > 0 ? mensagemDaDistribuicao(resumo, objeto) : `Nenhuma tarefa atribuída: ${semAtribuir.map((x) => `${x.n} — ${x.motivo}`).join('; ') || 'nenhum candidato'}`,
     desfazer: feitas.length > 0 ? { tipo: 'ATRIBUICAO', tarefaIds: feitas } : null,
+  }
+}
+
+/** A prévia da confirmação do "Distribuir as N" (mesmo plano da execução; nada é gravado). `null` = nada a atribuir. */
+export async function previaDeDistribuirProcesso(processoId: number, agora = new Date()): Promise<import('@/src/lib/torre-confirmacao').PreviaDeConfirmacao | null> {
+  const { porUsuario, titulos } = await planejarDistribuicaoDoProcesso(processoId, agora)
+  if (porUsuario.size === 0) return null
+  const itens = [...porUsuario.values()].map((g) => ({ pessoa: g.nome, quantidade: g.ids.length, tarefas: g.ids.map((id) => titulos.get(id) ?? `#${id}`) }))
+  const total = itens.reduce((n, i) => n + i.quantidade, 0)
+  const pares = [...porUsuario.entries()].flatMap(([u, g]) => g.ids.map((t) => [t, u] as [number, number])).sort((a, b) => a[0] - b[0] || a[1] - b[1])
+  return {
+    pergunta: `Atribuir ${total} ${total === 1 ? 'tarefa' : 'tarefas'}: ${itens.map((i) => `${i.quantidade} a ${i.pessoa}`).join(', ')}?`,
+    itens, assinatura: pares.map(([t, u]) => `${t}:${u}`).join(','),
   }
 }

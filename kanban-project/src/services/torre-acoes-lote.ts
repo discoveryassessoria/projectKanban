@@ -72,7 +72,7 @@ export function validarIds(tarefaIds: unknown): { ok: true; ids: number[] } | { 
 
 // ─── ATRIBUIR A {PESSOA} ─────────────────────────────────────────────────────
 
-export async function atribuirEmLote(args: { tarefaIds: number[]; responsavelId: number; autorId: number }): Promise<ResultadoDoLote> {
+export async function atribuirEmLote(args: { tarefaIds: number[]; responsavelId: number; autorId: number; motivo?: string }): Promise<ResultadoDoLote> {
   const destino = await prisma.usuario.findUnique({ where: { id: args.responsavelId }, select: { id: true, nome: true } })
   if (!destino) {
     return { acao: 'ATRIBUIR', total: args.tarefaIds.length, sucesso: 0, falha: args.tarefaIds.length, desfazer: null,
@@ -82,7 +82,7 @@ export async function atribuirEmLote(args: { tarefaIds: number[]; responsavelId:
   // REATIVADA volta sem responsável (regra do motor, com log) — aqui ela é só mais uma sem dono.
   const r = await redistribuirTarefas({
     tarefaIds: args.tarefaIds, novoResponsavelId: args.responsavelId, autorId: args.autorId,
-    motivo: `atribuição em lote pela Torre para ${destino.nome}`,
+    motivo: args.motivo ?? `manual: atribuição em lote pela Torre para ${destino.nome}`,
   })
   const itens = itensDe(r.itens)
   return {

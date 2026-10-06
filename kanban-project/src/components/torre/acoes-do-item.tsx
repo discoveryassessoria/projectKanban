@@ -6,6 +6,7 @@
 // O TOAST é o do protótipo: "<botão> · <1ª parte do título>", com "Desfazer" quando o fato é reversível (atribuição, redistribuição,
 // desbloqueio, troca de canal — cada um lê o PRÓPRIO LogAuditoria e recusa se algo mudou depois). Avançar fase, reconciliar, registrar
 // ligação e cobrar o cliente são fatos acontecidos: o toast confirma, sem "Desfazer".
+import { useConfirmarAtribuicao } from "./ConfirmarAtribuicao"
 import { useCallback, useEffect, useState, type ReactNode } from "react"
 import { CANAIS_SOLICITACAO } from "@/src/lib/process-stage/canais-solicitacao"
 import { api, erroDe, Campo, useTorre } from "./torre-base"
@@ -60,10 +61,11 @@ export function useAcoesDoItem({ irParaAba, onFeito }: { irParaAba: (aba: "equip
     setPedido(p((r) => { setPedido(null); resolve(r) }))
   }), [])
 
+  const { postar, modal: modalConfirmacao } = useConfirmarAtribuicao()
   const chamar = useCallback(async (corpo: Record<string, unknown>): Promise<{ ok: boolean; d: RespAcao }> => {
-    const r = await api<RespAcao>("/api/torre/precisa-de-voce/acao", "POST", corpo)
+    const r = await postar<RespAcao>("/api/torre/precisa-de-voce/acao", corpo)
     return { ok: r.ok && r.data.ok !== false, d: r.data }
-  }, [])
+  }, [postar])
 
   /** O que identifica o item na porta: o PROCESSO (Sem responsável, Fase deixada) e/ou a tarefa. */
   const alvo = (item: ItemPrecisa) => ({ processoId: item.processoId ?? undefined, tarefaId: item.tarefaId ?? undefined })
@@ -172,6 +174,7 @@ export function useAcoesDoItem({ irParaAba, onFeito }: { irParaAba: (aba: "equip
           : pedido.tipo === "ligacao" ? <ModalLigacao pedido={pedido} chamar={chamar} concluir={concluir} />
           : <ModalCanal pedido={pedido} chamar={chamar} concluir={concluir} />
       )}
+      {modalConfirmacao}
       {toast && (
         <div className="tor-toast" role="status">
           <span>{toast.msg}{toast.detalhe && toast.detalhe !== toast.msg ? <><br /><span className="pdv-toast-det">{toast.detalhe}</span></> : null}</span>
