@@ -91,7 +91,10 @@ const dataPrazoMs = (l: LinhaParaProximaAcao) => (l.dataPrazo ? new Date(l.dataP
  * A PRÓXIMA AÇÃO do processo a partir das linhas de tarefa ABERTAS. Só entram as da fase `faseAtualKey` (leitura escopada por
  * ciclo: tarefa de outra fase nunca vaza para a fase consultada). `null` = nenhuma tarefa elegível.
  */
-export function proximaAcaoDoProcesso(linhas: LinhaParaProximaAcao[], faseAtualKey: string | null, ordemDaFase?: ReadonlyMap<string, number>): ProximaAcao | null {
+export function proximaAcaoDoProcesso(
+  linhas: LinhaParaProximaAcao[], faseAtualKey: string | null, ordemDaFase?: ReadonlyMap<string, number>,
+  rotulos?: { rotuloDaFase: (key: string) => string; faseAtualLabel: string | null },
+): ProximaAcao | null {
   const abertas = linhas.filter((l) => l.estadoOperacao !== 'CONCLUIDA' && (faseAtualKey == null || l.faseMacroKey === faseAtualKey))
   if (abertas.length === 0) return null
   // Com `ordemDaFase` a escolha começa pela fase MAIS ANTIGA (é ela que trava as seguintes) e a contagem é a de todas as fases abertas.
@@ -112,9 +115,22 @@ export function proximaAcaoDoProcesso(linhas: LinhaParaProximaAcao[], faseAtualK
         : `Cobrar ${quem} (${(l.totalCobrancas ?? 0) + 1}ª cobrança): ${l.titulo}`
       break
     }
-    case 'distribuir':
-      texto = n > 1 ? `Distribuir as ${n} ${substantivo(mesmas, n)}` : `Distribuir: ${l.titulo}`
+    case 'distribuir': {
+      // MAIS DE UMA FASE entre as sem responsável: o texto diz o que trava o quê, a fase mais antiga primeiro
+      // ("Atribuir 1 de Genealogia (trava a Emissão) e 14 de Emissão") — a mesma conta da lista da página e do botão "Distribuir as N".
+      const porFase = new Map<string, LinhaParaProximaAcao[]>()
+      for (const m of mesmas) porFase.set(m.faseMacroKey ?? '', [...(porFase.get(m.faseMacroKey ?? '') ?? []), m])
+      if (rotulos && porFase.size > 1) {
+        const grupos = [...porFase.entries()].sort((a, b) => (ordemDaFase?.get(a[0]) ?? 9000) - (ordemDaFase?.get(b[0]) ?? 9000))
+        const partes = grupos.map(([k, g], i) => {
+          const nome = k ? rotulos.rotuloDaFase(k) : 'outra fase'
+          const trava = i === 0 && grupos.length > 1 && rotulos.faseAtualLabel && nome !== rotulos.faseAtualLabel ? ` (trava a ${rotulos.faseAtualLabel})` : ''
+          return `${g.length} de ${nome}${trava}`
+        })
+        texto = `Atribuir ${partes.length === 2 ? partes.join(' e ') : `${partes.slice(0, -1).join(', ')} e ${partes[partes.length - 1]}`}`
+      } else texto = n > 1 ? `Distribuir as ${n} ${substantivo(mesmas, n)}` : `Distribuir: ${l.titulo}`
       break
+    }
     case 'desbloquear':
       texto = n > 1 ? `Resolver o bloqueio de ${n} ${substantivo(mesmas, n)}` : `Resolver o bloqueio: ${l.titulo}`
       break

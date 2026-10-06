@@ -64,6 +64,9 @@
 .tpr-fase.concluida { background: var(--success-tile); }
 .tpr-fase.concluida .l1, .tpr-fase.concluida .l2, .tpr-fase.concluida .l3 { color: var(--success-text); }
 .tpr-fase.concluida .l1 { font-weight: 700; }
+.tpr-fase.reaberta { background: var(--warning-tile); }
+.tpr-fase.reaberta .l1, .tpr-fase.reaberta .l2, .tpr-fase.reaberta .l3 { color: var(--warning-text); }
+.tpr-fase.reaberta .l1 { font-weight: 700; }
 .tpr-fase.atual { background: var(--action-primary); color: var(--action-primary-ink); }
 .tpr-fase.atual .l1, .tpr-fase.atual .l2, .tpr-fase.atual .l3 { color: var(--action-primary-ink); }
 .tpr-fase.atual .l1 { font-weight: 700; }

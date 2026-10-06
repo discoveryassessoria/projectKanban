@@ -690,7 +690,15 @@ function projetar(
     passoCorrente: (() => {
       const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
       const atual = porSubtarefa?.atual
-      return atual ? { chave: atual.subtaskKey, label: atual.label } : null
+      if (atual) return { chave: atual.subtaskKey, label: atual.label }
+      // PASSO ÚNICO, SEM SUBTAREFA (ex.: Genealogia "Localizar registro da certidão"): o passo atual É o nome do passo — nunca "—".
+      if (!t.workflowStepInstance) return null
+      const nome = rotuloDoPasso({
+        stepKey: t.workflowStepInstance.stepKey, snapshot: t.workflowStepInstance.snapshot,
+        labelPublicado: t.workflowStepInstance.stepDefinitionId != null ? rotulosDePasso?.get(t.workflowStepInstance.stepDefinitionId) ?? null : null,
+        faseCode: phaseKeyToFaseCode(t.faseMacroKey),
+      })
+      return nome ? { chave: t.workflowStepInstance.stepKey, label: nome } : null
     })(),
   }
 }
