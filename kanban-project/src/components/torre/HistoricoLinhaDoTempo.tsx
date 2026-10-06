@@ -166,7 +166,7 @@ export function HistoricoLinhaDoTempo({ processoId, url, certidaoInicial }: { pr
         <button type="button" className="thl-btn" aria-expanded={painel} onClick={() => setPainel((p) => !p)}>Filtrar{nFiltros > 0 ? ` (${nFiltros})` : ""}</button>
         <button type="button" className="thl-btn" disabled={!!exportando || fatosFiltrados.length === 0} onClick={() => void exportarCsv()}>{exportando === "csv" ? "Exportando…" : "Exportar CSV"}</button>
         <button type="button" className="thl-btn" disabled={!!exportando || fatosFiltrados.length === 0} onClick={() => void exportarPdf(false)}>{exportando === "pdf" ? "Exportando…" : "Exportar PDF"}</button>
-        <button type="button" className="thl-btn" disabled={!!exportando} onClick={() => void exportarPdf(true)} title="Só o andamento: mudança de fase, certidão pedida, recebida, validada, apostilada, traduzida e protocolo. Sem dados internos.">{exportando === "cliente" ? "Gerando…" : "PDF para o cliente"}</button>
+        <button type="button" className="thl-btn" disabled={!!exportando} onClick={() => void exportarPdf(true)} title="Só o andamento: abertura, avanço de fase, registro localizado, certidão pedida, recebida, validada, apostilada, traduzida e protocolo. Sem dados internos.">{exportando === "cliente" ? "Gerando…" : "PDF para o cliente"}</button>
       </div>
 
       <div className="thl-resumo" data-resumo-do-historico>{visao.resumo.texto}</div>
