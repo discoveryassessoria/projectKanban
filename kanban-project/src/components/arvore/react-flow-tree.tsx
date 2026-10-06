@@ -20,7 +20,6 @@ import ReactFlow, {
   ConnectionLineType,
 } from "reactflow"
 import { desenharArvore, ladosDoCasal, type Retangulo } from "@/src/lib/genealogia/layout/arvore-camadas"
-import { LinhaDeFiliacao, type DadosDeFiliacao } from "./linha-de-filiacao"
 import "reactflow/dist/style.css"
 import type { PessoaArvore, UniaoArvore } from "./types"
 import { classificarMaioridade, ehRequerente } from "@/src/lib/documentos/maioridade"
@@ -636,8 +635,6 @@ function GrupoRecolhidoNode({ data }: NodeProps<GrupoNodeData>) {
 }
 
 // Tipos de nós customizados
-const edgeTypes = { filiacao: LinhaDeFiliacao }
-
 const nodeTypes = {
   person: PersonNode,
   addPerson: AddPersonNode,
@@ -649,7 +646,7 @@ const nodeTypes = {
 // ========================================
 // Substitui o dagre + as cinco passadas de correção. O motor é puro e testado; aqui só se aplicam as posições e se montam as linhas:
 //  • casamento: segmento curto entre os lados que se tocam (`ladosDoCasal`, recalculado a cada movimento do cartão);
-//  • filiação: do meio do casal, barra, e descida até o filho (`LinhaDeFiliacao`).
+//  • filiação: como sempre foi — do cartão do filho a cada genitor, saindo de baixo de cada um.
 const idDaPessoa = (nodeId: string): number | null => {
   const m = nodeId.match(/^person-(\d+)$/)
   return m ? Number(m[1]) : null
@@ -686,8 +683,9 @@ const getLayoutedElements = (
   }
   const porId = new Map(doDesenho.map((p) => [p.id, p]))
 
-  // Casamento: UMA linha por casal (união registrada ou pais em comum), mesmo quando há filhos.
-  const casamentos: Edge[] = resultado.casais.map(({ a, b }) => {
+  // Linha de casamento só quando o casal NÃO tem filhos em comum (como sempre foi): com filhos, o fio sai de BAIXO de cada genitor até o filho.
+  const temFilhosEmComum = (a: number, b: number) => doDesenho.some((p) => (p.paiId === a && p.maeId === b) || (p.paiId === b && p.maeId === a))
+  const casamentos: Edge[] = resultado.casais.filter(({ a, b }) => !temFilhosEmComum(a, b)).map(({ a, b }) => {
     const lados = ladosDoCasal(retangulo(a), retangulo(b))
     return {
       id: `edge-marriage-${Math.min(a, b)}-${Math.max(a, b)}`,
@@ -700,26 +698,15 @@ const getLayoutedElements = (
     }
   })
 
-  // Filiação: uma aresta por genitor (sem duplicatas), do filho ao genitor — a convenção que `classificarVinculo` lê.
+  // Filiação: do cartão do filho a CADA genitor (de baixo de cada um, como sempre foi) — a convenção que `classificarVinculo` lê. Sem duplicatas.
   const vistas = new Set<string>()
   const filiacao: Edge[] = []
   for (const e of edges) {
     if (e.id.startsWith('edge-marriage-') || e.id.startsWith('edge-grupo-')) continue
-    const filho = idDaPessoa(e.source), genitor = idDaPessoa(e.target)
-    if (filho == null || genitor == null) { filiacao.push(e); continue }
     const chave = `${e.source}|${e.target}`
     if (vistas.has(chave)) continue
     vistas.add(chave)
-    const f = porId.get(filho)
-    const conhecidos = [f?.paiId, f?.maeId].filter((x): x is number => x != null && desenhadas.has(x))
-    const doisConhecidos = conhecidos.length === 2 && conhecidos.includes(genitor)
-    const outro = doisConhecidos ? conhecidos.find((x) => x !== genitor)! : null
-    const dados: DadosDeFiliacao = {
-      disposicao: mode, largura: nodeSize.width, altura: nodeSize.height,
-      outroId: outro != null ? `person-${outro}` : null,
-      tronco: doisConhecidos ? genitor === f?.paiId : true,
-    }
-    filiacao.push({ ...e, type: 'filiacao', data: dados })
+    filiacao.push(e)
   }
   // Arestas que não são de pessoa (ex.: grupos recolhidos) seguem como estavam.
   const outras = edges.filter((e) => e.id.startsWith('edge-grupo-'))
@@ -1584,7 +1571,6 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
       // (ver remover-vinculo-modal.tsx) e passa pela porta oficial da árvore.
       deleteKeyCode={null}
       nodeTypes={nodeTypes}
-      edgeTypes={edgeTypes}
       connectionLineType={ConnectionLineType.SmoothStep}
       fitView
       fitViewOptions={{ padding: 0.2 }}

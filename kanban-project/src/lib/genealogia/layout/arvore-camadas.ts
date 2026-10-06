@@ -12,7 +12,7 @@
 //  5. Filhos sob o casal, centralizados, em ordem de nascimento; irmãos juntos; ramo colateral na mesma linha dos irmãos.
 //  6. Subárvores não se sobrepõem: a largura de cada ramo é calculada de baixo para cima por CONTORNOS (um intervalo por geração), e os
 //     ramos se afastam só o necessário — um ramo raso encaixa-se sob a folga de um ramo fundo.
-//  7. A descendência desce do meio do casal, por uma barra horizontal, até cada filho (`caminhoDeFiliacao`).
+//  7. A filiação é desenhada como sempre foi: do cartão do filho a CADA genitor (sai de baixo de cada um). O fio NÃO sai do meio do casal.
 //
 // COMO FUNCIONA
 //  • CLUSTER = pessoas ligadas por união (ou por filhos em comum): uma sequência rígida na mesma geração.
@@ -472,43 +472,4 @@ export function ladosDoCasal(a: Retangulo, b: Retangulo): { a: Lado; b: Lado } {
   const dy = b.y + b.h / 2 - (a.y + a.h / 2)
   if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? { a: "right", b: "left" } : { a: "left", b: "right" }
   return dy >= 0 ? { a: "bottom", b: "top" } : { a: "top", b: "bottom" }
-}
-
-export interface PontoXY { x: number; y: number }
-
-/** A descendência: do meio do casal, barra, e descida até o filho. Retorna a âncora e a poligonal até o lado do filho. */
-export function caminhoDeFiliacao(
-  disposicao: Disposicao,
-  pais: readonly Retangulo[],
-  filho: Retangulo,
-): { ancora: PontoXY; poligonal: PontoXY[] } {
-  const centros = pais.map((p) => ({ x: p.x + p.w / 2, y: p.y + p.h / 2 }))
-  if (disposicao === "retrato") {
-    const base = Math.max(...pais.map((p) => p.y + p.h))
-    const ancora = pais.length >= 2
-      ? { x: (centros[0].x + centros[1].x) / 2, y: (centros[0].y + centros[1].y) / 2 }
-      : { x: centros[0].x, y: base }
-    const topoFilho = filho.y
-    const barra = topoFilho > base ? base + (topoFilho - base) / 2 : topoFilho - 20
-    const cx = filho.x + filho.w / 2
-    return { ancora, poligonal: [ancora, { x: ancora.x, y: barra }, { x: cx, y: barra }, { x: cx, y: topoFilho }] }
-  }
-  // Paisagem: os pais ficam à direita do filho; a descendência sai para a esquerda.
-  const esquerda = Math.min(...pais.map((p) => p.x))
-  const ancora = pais.length >= 2
-    ? { x: (centros[0].x + centros[1].x) / 2, y: (centros[0].y + centros[1].y) / 2 }
-    : { x: esquerda, y: centros[0].y }
-  const direitaFilho = filho.x + filho.w
-  const barra = direitaFilho < esquerda ? direitaFilho + (esquerda - direitaFilho) / 2 : direitaFilho + 20
-  const cy = filho.y + filho.h / 2
-  return { ancora, poligonal: [ancora, { x: barra, y: ancora.y }, { x: barra, y: cy }, { x: direitaFilho, y: cy }] }
-}
-
-/** Ponto onde o segmento centro→alvo sai do retângulo (o "toco" do genitor até a âncora). */
-export function saidaDoRetangulo(r: Retangulo, alvo: PontoXY): PontoXY {
-  const c = { x: r.x + r.w / 2, y: r.y + r.h / 2 }
-  const dx = alvo.x - c.x, dy = alvo.y - c.y
-  if (dx === 0 && dy === 0) return c
-  const t = Math.min(dx !== 0 ? r.w / 2 / Math.abs(dx) : Infinity, dy !== 0 ? r.h / 2 / Math.abs(dy) : Infinity)
-  return { x: c.x + dx * Math.min(1, t), y: c.y + dy * Math.min(1, t) }
 }
