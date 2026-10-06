@@ -179,7 +179,7 @@ export async function reconciliarGenealogiaEEmissaoTx(tx: TX, processoId: number
           res.liberados++
           // A tarefa da obrigação que estava no "Localizar registro" (levada pela regra ou nascida lá) segue para a certidão (mesmo taskId).
           const volta = await tx.tarefa.findFirst({
-            where: { necessidadeId: nec, processoId, workflowInstance: { faseMacroKey: FASE_GENEALOGIA_KEY }, statusTarefa: { notIn: ["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI", "CANCELADA", "SUPERSEDIDA"] } },
+            where: { processoId, OR: [{ necessidadeId: nec }, ...(e.documentoId != null ? [{ documentoId: e.documentoId }] : [])], workflowInstance: { faseMacroKey: FASE_GENEALOGIA_KEY }, statusTarefa: { notIn: ["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI", "CANCELADA", "SUPERSEDIDA"] } },
             select: { id: true },
           })
           if (volta) {
