@@ -1,7 +1,7 @@
 // scripts/operacao-ordem-por-evento.test.ts
 // A ORDEM DAS CERTIDÕES É POR EVENTO: nascimento → casamento → óbito. Sempre. (A Operação da Daniela mostrava nascimento, óbito, casamento.)
 import { readFileSync } from 'node:fs'
-import { agruparDentroDaFamilia } from '../src/components/operacao/operacao-v3-derivacoes'
+import { agruparDentroDaFamilia, agruparPorFamilia, agruparPorOrgao, ordenarPorEvento } from '../src/components/operacao/operacao-v3-derivacoes'
 
 let passou = 0, falhou = 0
 const ok = (n: string, c: boolean, extra = '') => { if (c) { passou++; console.log(`  ✅ ${n}${extra ? ` — ${extra}` : ''}`) } else { falhou++; console.log(`  ❌ ${n}${extra ? ` — ${extra}` : ''}`) } }
@@ -25,6 +25,14 @@ ok('por órgão também segue nascimento → casamento → óbito', cats(porOrga
 const semNumero = agruparDentroDaFamilia([linha('OBITO', 5, null), linha('NASCIMENTO', 5, null), linha('NASCIMENTO', 1, 2)], 'pessoa')
 ok('quem não tem número de linhagem vai ao fim, sem sumir, e também em ordem de evento', semNumero.map((g) => g.titulo).join() === 'Pessoa 1,Pessoa 5' && cats(semNumero[1]) === 'NASCIMENTO>OBITO')
 
+// A aba FEITO (e Aguardando, Acompanhamento, Fila): a lista da família também sai por evento — era a que mostrava casamento, nascimento, óbito.
+const feito = agruparPorFamilia([
+  linha('CASAMENTO', 1, 1, { familiaNome: 'Sanchez Dias' }), linha('NASCIMENTO', 1, 1, { familiaNome: 'Sanchez Dias' }), linha('OBITO', 1, 1, { familiaNome: 'Sanchez Dias' }),
+  linha('OBITO', 2, 2, { familiaNome: 'Sanchez Dias' }), linha('CASAMENTO', 2, 2, { familiaNome: 'Sanchez Dias' }), linha('NASCIMENTO', 2, 2, { familiaNome: 'Sanchez Dias' }),
+])
+ok('por família (Feito etc.): G1 inteira — nascimento, casamento, óbito — e depois G2 na mesma ordem', feito.length === 1 && feito[0].linhas.map((l) => `${l.numeroLinhagem}${String(l.categoriaDoc)[0]}`).join(' ') === '1N 1C 1O 2N 2C 2O', feito[0].linhas.map((l) => `${l.numeroLinhagem}${String(l.categoriaDoc)[0]}`).join(' '))
+ok('por órgão (Aguardando agrupado por órgão) também', agruparPorOrgao([linha('OBITO', 1, 1, { terceiroNome: 'Cartório Y' }), linha('CASAMENTO', 1, 1, { terceiroNome: 'Cartório Y' }), linha('NASCIMENTO', 1, 1, { terceiroNome: 'Cartório Y' })])[0].linhas.map((l) => l.categoriaDoc).join('>') === 'NASCIMENTO>CASAMENTO>OBITO')
+ok('a mesma pessoa nunca se separa por causa da ordem (duas pessoas na mesma geração ficam cada uma inteira)', ordenarPorEvento([linha('OBITO', 3, 2, { pessoaNome: 'Beto' }), linha('NASCIMENTO', 4, 2, { pessoaNome: 'Ana' }), linha('NASCIMENTO', 3, 2, { pessoaNome: 'Beto' }), linha('OBITO', 4, 2, { pessoaNome: 'Ana' })]).map((l) => `${l.pessoaNome}:${String(l.categoriaDoc)[0]}`).join(' ') === 'Ana:N Ana:O Beto:N Beto:O')
 const fonte = readFileSync('src/components/operacao/operacao-v3-derivacoes.ts', 'utf8')
 ok('a tabela de ordem do código é nascimento 0, casamento 1, óbito 2 (como a da Torre)', /\{ NASCIMENTO: 0, CASAMENTO: 1, OBITO: 2 \}/.test(fonte) && !/NASCIMENTO: 0, OBITO: 1/.test(fonte))
 console.log(`\n${falhou === 0 ? '✅ PASSOU' : '❌ FALHOU'}: ${passou} ok, ${falhou} falhas`)

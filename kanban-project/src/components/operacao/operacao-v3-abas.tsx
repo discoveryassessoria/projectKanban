@@ -10,7 +10,7 @@ import { textoPrazoDaTarefa } from "@/src/lib/tarefa/texto-prazo"
 import type { LinhaOperacaoV3 } from "./operacao-v3-tipos"
 import {
   fmtData, acompTxtCompleto, relCls, passoLabelDe, orgaoTxt, cobrancasTxt, prazoTarefaCls, docTipoTxt,
-  concluirLabelDe, aIniciarEfetivo, agruparPorFamilia, agruparPorOrgao, statusTarefaTxt, statusTarefaCls,
+  concluirLabelDe, aIniciarEfetivo, agruparDentroDaFamilia, agruparPorFamilia, agruparPorOrgao, statusTarefaTxt, statusTarefaCls,
   chaveDaFamilia, familiasDaAba, faseAtualDaFamilia, gargaloDaFamilia, proximoMarcoDaFamilia, type FamiliaComGrupos,
 } from "./operacao-v3-derivacoes"
 
@@ -239,7 +239,7 @@ const ESTAGIOS: Array<{ chave: string; label: string; pred: (l: LinhaOperacaoV3)
 ]
 
 export function AbaFamilias({
-  abertos, feito, famOpen, setFamOpen, famUltimo, setFamUltimo, onAbrir, onNaoLigado,
+  abertos, feito, famOpen, setFamOpen, famUltimo, setFamUltimo, onAbrir, onAbrirProcesso,
 }: {
   abertos: LinhaOperacaoV3[]
   feito: LinhaOperacaoV3[]
@@ -248,7 +248,8 @@ export function AbaFamilias({
   famUltimo: Record<string, string>
   setFamUltimo: (f: Record<string, string>) => void
   onAbrir: (id: number) => void
-  onNaoLigado: () => void
+  /** "Abrir processo": leva ao processo (Central Operacional dele). */
+  onAbrirProcesso: (processoId: number) => void
 }) {
   const todas = useMemo(() => [...abertos, ...feito], [abertos, feito])
   // UMA lista de famílias (`familiasDaAba`) — a mesma que dá o número da aba. Fase = a FASE ATUAL REAL do processo
@@ -284,7 +285,7 @@ export function AbaFamilias({
               <button className="opv3-btn" onClick={() => { const ultimo = famUltimo[f.nome] ?? "iniciar"; const abrindo = famOpen?.fam !== f.nome; setFamOpen(abrindo ? { fam: f.nome, estagio: ultimo } : null) }}>
                 {famOpen?.fam === f.nome ? "Recolher ▴" : "Expandir ▾"}
               </button>
-              <button className="opv3-btn" onClick={onNaoLigado}>Abrir processo</button>
+              <button className="opv3-btn" disabled={f.ts[0]?.processoId == null} onClick={() => { const id = f.ts[0]?.processoId; if (id != null) onAbrirProcesso(id) }}>Abrir processo</button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: 10 }}>
               {cards.map((c) => {
@@ -345,7 +346,7 @@ export const textoDaEscalada = (limiar: number): string => `escala após ${limia
 export const textoDaPendenciaDeFaseAnterior = (primeiro: LinhaOperacaoV3 | undefined): string =>
   primeiro ? `${primeiro.familiaNome ?? primeiro.processoNome ?? "—"} · ${docTipoTxt(primeiro)} · ${primeiro.pessoaNome ?? "—"} · fase anterior ainda aberta` : "nenhuma"
 export function AbaRadar({
-  atras, acompVenc, decis, noOrg, genOpen, verEscaladas, escaladaLimiar, onKAtras, onGoAcomp, onKEsc, onNoOrg, onFaseAnterior, onNaoLigado,
+  atras, acompVenc, decis, noOrg, genOpen, verEscaladas, escaladaLimiar, onKAtras, onGoAcomp, onKEsc, onNoOrg, onFaseAnterior,
 }: {
   atras: LinhaOperacaoV3[]
   acompVenc: LinhaOperacaoV3[]
@@ -361,7 +362,6 @@ export function AbaRadar({
   onKEsc: () => void
   onNoOrg: () => void
   onFaseAnterior: () => void
-  onNaoLigado: () => void
 }) {
   const cor = (n: number) => (n > 0 ? "#b3261e" : "#1f7a4d")
   const cls = (n: number) => (n > 0 ? "opv3-p-red" : "opv3-p-grn")
@@ -395,21 +395,21 @@ export function AbaRadar({
           <div style={{ display: "flex", justifyContent: "space-between" }}><b>Pendência de fase anterior</b><span className={`opv3-pill ${cls(genOpen.length)}`}>{genOpen.length}</span></div>
           <div style={{ fontSize: 12, color: "#5b6478" }}>{textoDaPendenciaDeFaseAnterior(primeiro)}</div>
         </button>
-        <button className="opv3-radar" style={{ borderLeftColor: "#1f7a4d" }} onClick={onNaoLigado}>
+        <div className="opv3-radar" style={{ borderLeftColor: "#1f7a4d", cursor: "default" }}>
           <div style={{ display: "flex", justifyContent: "space-between" }}><b>Dados inconsistentes</b><span className="opv3-pill opv3-p-grn">0</span></div>
           <div style={{ fontSize: 12, color: "#5b6478" }}>sem checagem automática ainda — 0 por definição</div>
-        </button>
-        <button className="opv3-radar" style={{ borderLeftColor: "#1f7a4d" }} onClick={onNaoLigado}>
+        </div>
+        <div className="opv3-radar" style={{ borderLeftColor: "#1f7a4d", cursor: "default" }}>
           <div style={{ display: "flex", justifyContent: "space-between" }}><b>Sem responsável</b><span className="opv3-pill opv3-p-grn">0</span></div>
-        </button>
-        <button className="opv3-radar" style={{ borderLeftColor: "#1f7a4d" }} onClick={onNaoLigado}>
+        </div>
+        <div className="opv3-radar" style={{ borderLeftColor: "#1f7a4d", cursor: "default" }}>
           <div style={{ display: "flex", justifyContent: "space-between" }}><b>Anexo faltando</b><span className="opv3-pill opv3-p-grn">0</span></div>
           <div style={{ fontSize: 12, color: "#5b6478" }}>recebida sem arquivo — sem checagem automática ainda</div>
-        </button>
-        <button className="opv3-radar" style={{ borderLeftColor: "#1f7a4d" }} onClick={onNaoLigado}>
+        </div>
+        <div className="opv3-radar" style={{ borderLeftColor: "#1f7a4d", cursor: "default" }}>
           <div style={{ display: "flex", justifyContent: "space-between" }}><b>Erro do sistema</b><span className="opv3-pill opv3-p-grn">0</span></div>
           <div style={{ fontSize: 12, color: "#5b6478" }}>ex.: lista não carregou (500)</div>
-        </button>
+        </div>
       </div>
     </>
   )
@@ -455,19 +455,25 @@ export function AbaFeito({ linhas, col, setCol, onAbrir }: {
                 <span className="opv3-pill opv3-p-gry">Família</span><b style={{ fontSize: 12.5 }}>{g.fam}</b><span style={{ color: "#5b6478" }}>{g.pais} · {g.linhas.length} tarefa(s)</span>
               </div>
               {!col[`fe|${b.title}|${g.fam}`] && (
-                <div style={{ margin: "12px 12px 0", border: "1px solid #dfe4ee", borderRadius: 10, overflow: "hidden" }}>
-                  <div className="opv3-hd" style={{ gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1.3fr) minmax(0,0.8fr) minmax(0,1.1fr) minmax(0,1.6fr) 90px" }}><span>Documento</span><span>Pessoa</span><span>Concluída em</span><span>Prazo da tarefa</span><span>Órgão</span><span>Ação</span></div>
-                  {g.linhas.map((t) => (
-                    <div key={t.taskId} className="opv3-row" style={{ gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1.3fr) minmax(0,0.8fr) minmax(0,1.1fr) minmax(0,1.6fr) 90px" }}>
-                      <div style={{ fontWeight: 600 }}>{docTipoTxt(t)}</div>
-                      <div>{t.pessoaNome ?? "—"}<div style={{ fontSize: 11, color: "#7a8296" }}>{t.numeroLinhagem != null ? `G${t.numeroLinhagem}` : ""}</div></div>
-                      <div><span className="opv3-pill opv3-p-grn">{fmtData(t.concluidaEm)}</span></div>
-                      <div><span className={`opv3-pill ${prazoTarefaCls(t)}`}>{textoPrazoDaTarefa(t)}</span></div>
-                      <div><span className="opv3-pill opv3-p-gry">{orgaoTxt(t)}</span></div>
-                      <div><button className="opv3-btn opv3-sm" onClick={() => onAbrir(t.taskId)}>Abrir</button></div>
+                // AGRUPADO POR PESSOA (como em A fazer: "Por família, depois por Pessoa"): G1→Gn e, em cada pessoa, nascimento → casamento → óbito.
+                agruparDentroDaFamilia(g.linhas, "pessoa").map((p) => (
+                  <div key={p.chave} style={{ margin: "12px 12px 0", border: "1px solid #dfe4ee", borderRadius: 10, overflow: "hidden" }}>
+                    <div className="opv3-grp" style={{ borderTop: 0 }}>
+                      <span className={`opv3-pill ${p.pillCls}`}>{p.pill}</span><b style={{ fontSize: 12.5 }}>{p.titulo}</b><span style={{ color: "#5b6478" }}>{p.sub}</span>
                     </div>
-                  ))}
-                </div>
+                    <div className="opv3-hd" style={{ gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1.3fr) minmax(0,0.8fr) minmax(0,1.1fr) minmax(0,1.6fr) 90px" }}><span>Documento</span><span>Pessoa</span><span>Concluída em</span><span>Prazo da tarefa</span><span>Órgão</span><span>Ação</span></div>
+                    {p.linhas.map((t) => (
+                      <div key={t.taskId} className="opv3-row" style={{ gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1.3fr) minmax(0,0.8fr) minmax(0,1.1fr) minmax(0,1.6fr) 90px" }}>
+                        <div style={{ fontWeight: 600 }}>{docTipoTxt(t)}</div>
+                        <div>{t.pessoaNome ?? "—"}<div style={{ fontSize: 11, color: "#7a8296" }}>{t.numeroLinhagem != null ? `G${t.numeroLinhagem}` : ""}</div></div>
+                        <div><span className="opv3-pill opv3-p-grn">{fmtData(t.concluidaEm)}</span></div>
+                        <div><span className={`opv3-pill ${prazoTarefaCls(t)}`}>{textoPrazoDaTarefa(t)}</span></div>
+                        <div><span className="opv3-pill opv3-p-gry">{orgaoTxt(t)}</span></div>
+                        <div><button className="opv3-btn opv3-sm" onClick={() => onAbrir(t.taskId)}>Abrir</button></div>
+                      </div>
+                    ))}
+                  </div>
+                ))
               )}
             </div>
           ))}
