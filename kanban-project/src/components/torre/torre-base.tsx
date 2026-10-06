@@ -48,7 +48,6 @@ interface Ctx {
   avisar: (msg: string, desfazer?: Desfazer | null) => void
   recarregar: () => void
   /** Abre o Foco da família (Bloco I3) — de qualquer aba (Tarefas, Radar, Processos). Implementado pelo casco (Torre.tsx). */
-  abrirFoco: (processoId: number) => void
   /** Abre o Relatório de controle (Bloco I4) — de qualquer aba. Implementado pelo casco (Torre.tsx). */
   abrirRelatorio: (alvo: AlvoDoRelatorio) => void
 }
@@ -59,11 +58,11 @@ export const useTorre = (): Ctx => {
   return c
 }
 
-export function TorreProvider({ permissoes, recarregar, fixo = false, abrirFoco = () => {}, abrirRelatorio = () => {}, children }: {
+export function TorreProvider({ permissoes, recarregar, fixo = false, abrirRelatorio = () => {}, children }: {
   permissoes: PermissoesTorre | null; recarregar: () => void
   /** Toast FIXO (T013–T015): não some sozinho — só pelo ✕ ou quando outro o substitui — e fica acima de modais e gaveta. A Torre usa; o resto mantém os 6 s. */
   fixo?: boolean
-  abrirFoco?: (processoId: number) => void; abrirRelatorio?: (alvo: AlvoDoRelatorio) => void; children: ReactNode
+  abrirRelatorio?: (alvo: AlvoDoRelatorio) => void; children: ReactNode
 }) {
   const [toast, setToast] = useState<{ msg: string; desfazer: Desfazer | null; em: number } | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -96,7 +95,7 @@ export function TorreProvider({ permissoes, recarregar, fixo = false, abrirFoco 
   }
 
   return (
-    <TorreCtx.Provider value={{ permissoes, avisar, recarregar, abrirFoco, abrirRelatorio }}>
+    <TorreCtx.Provider value={{ permissoes, avisar, recarregar, abrirRelatorio }}>
       {children}
       {toast && (
         <div className="tor-toast" role="status">
