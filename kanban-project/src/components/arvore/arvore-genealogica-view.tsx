@@ -17,6 +17,7 @@ import { criarHistorico, type ComandoEdicao } from '@/src/lib/genealogia/histori
 import {
   classificarVinculo,
   comandoMoverNos,
+  comandoResetarLayout,
   comandoRemoverFiliacao,
   comandoRemoverUniao,
   comandoVincularConjuges,
@@ -705,6 +706,16 @@ export function ArvoreGenealogicaView({
       if (!arvore) throw new Error('árvore indisponível')
       arvore.aplicarPosicoes(m, posicoes)
     })
+    historicoRef.current.registrar(cmd)
+  }, [])
+
+  // "Resetar layout": o que havia de ajuste manual vai para o Desfazer.
+  const aoResetarLayout = useCallback((modo: string, anteriores: Record<string, { x: number; y: number }>) => {
+    const cmd = comandoResetarLayout(
+      modo, anteriores,
+      (m, posicoes) => { const a = reactFlowTreeRef.current; if (!a) throw new Error('árvore indisponível'); a.aplicarPosicoes(m, posicoes) },
+      (m) => { const a = reactFlowTreeRef.current; if (!a) throw new Error('árvore indisponível'); a.resetarAjustes(m) },
+    )
     historicoRef.current.registrar(cmd)
   }, [])
 
@@ -1589,6 +1600,7 @@ export function ArvoreGenealogicaView({
             lacunas={operacional.lacunas}
             saude={operacional.saude}
             onPosicoesMovidas={aoMoverCartoes}
+            onLayoutResetado={aoResetarLayout}
             onVinculoSelecionado={setArestaSelecionada}
             arestaSelecionadaId={vinculoSelecionado ? arestaSelecionada?.id ?? null : null}
           />

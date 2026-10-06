@@ -301,6 +301,28 @@ export function comandoMoverNos(
   }
 }
 
+/**
+ * "Resetar layout da árvore": limpa os ajustes manuais da disposição e volta ao desenho automático. Só layout (nada de pessoa, vínculo ou
+ * documento). Desfazer devolve os ajustes que havia; refazer limpa de novo.
+ */
+export function comandoResetarLayout(
+  modo: string,
+  anteriores: Record<string, Posicao>,
+  aplicarPosicoes: (modo: string, posicoes: Record<string, Posicao>) => void,
+  resetarAjustes: (modo: string) => void,
+): ComandoEdicao {
+  const n = Object.keys(anteriores).length
+  const rodar = (f: () => void): ResultadoComando => {
+    try { f(); return { ok: true } } catch { return { ok: false, erro: "Não foi possível refazer o layout." } }
+  }
+  return {
+    rotulo: n === 1 ? "reset do layout (1 ajuste)" : `reset do layout (${n} ajustes)`,
+    afetaDados: false,
+    aplicar: async () => rodar(() => resetarAjustes(modo)),
+    desfazer: async () => rodar(() => aplicarPosicoes(modo, { ...anteriores })),
+  }
+}
+
 /** Deslocamento zero não é ação: não entra na pilha. */
 export function houveMovimento(movimentos: readonly MovimentoNo[]): MovimentoNo[] {
   return movimentos.filter((m) => Math.abs(m.antes.x - m.depois.x) > 0.5 || Math.abs(m.antes.y - m.depois.y) > 0.5)

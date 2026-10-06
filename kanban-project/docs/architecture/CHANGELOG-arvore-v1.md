@@ -130,3 +130,6 @@ Três categorias, e nenhuma outra: **BUG** e **MELHORIA PONTUAL** não exigem AD
 
 E a lição que o item 5 deixou registrada: **classificar pelo contrato, não pela
 implementação.** O que o código faz hoje não é prova do que ele deveria fazer.
+
+## 06/10/2026 — Desenho em camadas (ADR 15)
+Evolução pedida pelo dono: novo algoritmo de posição (casais, várias uniões, família do cônjuge), linha de casamento pelos lados que se tocam, filiação com barra, e ajustes manuais explícitos por disposição. Visual dos cartões inalterado.
