@@ -2,7 +2,7 @@
 
 "use client"
 
-import { useState, useEffect, useCallback, useMemo, useRef, forwardRef, useImperativeHandle } from "react"
+import { Fragment, useState, useEffect, useCallback, useMemo, useRef, forwardRef, useImperativeHandle } from "react"
 import ReactFlow, {
   Node,
   Edge,
@@ -19,7 +19,8 @@ import ReactFlow, {
   MarkerType,
   ConnectionLineType,
 } from "reactflow"
-import dagre from "dagre"
+import { desenharArvore, ladosDoCasal, type Retangulo } from "@/src/lib/genealogia/layout/arvore-camadas"
+import { LinhaDeFiliacao, type DadosDeFiliacao } from "./linha-de-filiacao"
 import "reactflow/dist/style.css"
 import type { PessoaArvore, UniaoArvore } from "./types"
 import { classificarMaioridade, ehRequerente } from "@/src/lib/documentos/maioridade"
@@ -41,10 +42,31 @@ const colors = {
 
 type ViewMode = 'paisagem' | 'retrato'
 
+/** Chave, em `Arvore.posicoesNodes`, dos ajustes MANUAIS de cada disposição (nunca compartilhados entre paisagem e retrato). */
+const chaveManual = (modo: ViewMode): string => `manual-${modo}`
+
 // Tamanhos dos nós
 const NODE_SIZES = {
   paisagem: { width: 240, height: 90 },
   retrato: { width: 160, height: 120 }
+}
+
+// Linha de casamento (invisível): um ponto de saída e um de chegada em CADA lado do cartão. O lado usado em cada linha é escolhido pela
+// posição real dos dois cartões (`ladosDoCasal`), e acompanha o cartão se ele for arrastado para o outro lado.
+const LADOS_DO_CARTAO: Array<[Position, string]> = [
+  [Position.Top, 'top'], [Position.Right, 'right'], [Position.Bottom, 'bottom'], [Position.Left, 'left'],
+]
+function HandlesDeCasamento() {
+  return (
+    <>
+      {LADOS_DO_CARTAO.map(([posicao, lado]) => (
+        <Fragment key={lado}>
+          <Handle type="source" position={posicao} id={`ms-${lado}`} className="!opacity-0 !w-1 !h-1" />
+          <Handle type="target" position={posicao} id={`mt-${lado}`} className="!opacity-0 !w-1 !h-1" />
+        </Fragment>
+      ))}
+    </>
+  )
 }
 
 // ========================================
@@ -302,19 +324,7 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
           position={Position.Left}
           className="!bg-gray-400 !w-2 !h-2 !border-2 !border-[var(--border-default)]"
         />
-        {/* Handles para linha de casamento (invisíveis) */}
-        <Handle
-          type="source"
-          position={Position.Bottom}
-          id="marriage-out"
-          className="!opacity-0 !w-1 !h-1"
-        />
-        <Handle
-          type="target"
-          position={Position.Top}
-          id="marriage-in"
-          className="!opacity-0 !w-1 !h-1"
-        />
+        <HandlesDeCasamento />
 
         <MarcasDiscretas sinais={sinais} />
 
@@ -422,19 +432,7 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
         position={Position.Bottom}
         className="!bg-gray-400 !w-2 !h-2 !border-2 !border-[var(--border-default)]"
       />
-      {/* Handles para linha de casamento (invisíveis) */}
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="marriage-out"
-        className="!opacity-0 !w-1 !h-1"
-      />
-      <Handle
-        type="target"
-        position={Position.Left}
-        id="marriage-in"
-        className="!opacity-0 !w-1 !h-1"
-      />
+      <HandlesDeCasamento />
 
       <MarcasDiscretas sinais={sinais} />
 
@@ -638,6 +636,8 @@ function GrupoRecolhidoNode({ data }: NodeProps<GrupoNodeData>) {
 }
 
 // Tipos de nós customizados
+const edgeTypes = { filiacao: LinhaDeFiliacao }
+
 const nodeTypes = {
   person: PersonNode,
   addPerson: AddPersonNode,
@@ -645,458 +645,105 @@ const nodeTypes = {
 }
 
 // ========================================
-// DAGRE LAYOUT CONFIGURATION
+// DESENHO — algoritmo em camadas para casais (`arvore-camadas.ts`), 06/10/2026
 // ========================================
+// Substitui o dagre + as cinco passadas de correção. O motor é puro e testado; aqui só se aplicam as posições e se montam as linhas:
+//  • casamento: segmento curto entre os lados que se tocam (`ladosDoCasal`, recalculado a cada movimento do cartão);
+//  • filiação: do meio do casal, barra, e descida até o filho (`LinhaDeFiliacao`).
+const idDaPessoa = (nodeId: string): number | null => {
+  const m = nodeId.match(/^person-(\d+)$/)
+  return m ? Number(m[1]) : null
+}
+
 const getLayoutedElements = (
   nodes: Node[],
   edges: Edge[],
   mode: ViewMode,
   pessoas?: PessoaArvore[],
-  unioes?: UniaoArvore[]  // Receber uniões para incluir casais sem filhos
+  unioes?: UniaoArvore[],
+  principalId?: number | null,
 ) => {
-  const dagreGraph = new dagre.graphlib.Graph()
-  dagreGraph.setDefaultEdgeLabel(() => ({}))
-
-  const isHorizontal = mode === 'paisagem'
   const nodeSize = NODE_SIZES[mode]
-  
-  // Configuração do Dagre com mais espaço
-  dagreGraph.setGraph({
-    rankdir: isHorizontal ? 'LR' : 'BT',
-    nodesep: isHorizontal ? 80 : 60,  // Espaço entre nós no mesmo rank
-    ranksep: isHorizontal ? 120 : 100, // Espaço entre ranks (gerações)
-    marginx: 50,
-    marginy: 50,
-  })
+  const desenhadas = new Set<number>()
+  for (const n of nodes) { const id = idDaPessoa(n.id); if (id != null) desenhadas.add(id) }
+  const doDesenho = (pessoas ?? []).filter((p) => desenhadas.has(p.id))
 
-  // Identificar casais (pessoas que compartilham filhos OU têm união registrada)
-  const casais = new Map<string, { pessoa1Id: number; pessoa2Id: number }>()
-  
-  // Primeiro adicionar casais das uniões (inclui casais sem filhos)
-  if (unioes) {
-    unioes.forEach(uniao => {
-      // Verificar se ambos os IDs existem
-      if (uniao.pessoa1Id == null || uniao.pessoa2Id == null) return
-      
-      const pairKey = `${Math.min(uniao.pessoa1Id, uniao.pessoa2Id)}-${Math.max(uniao.pessoa1Id, uniao.pessoa2Id)}`
-      if (!casais.has(pairKey)) {
-        casais.set(pairKey, { pessoa1Id: uniao.pessoa1Id, pessoa2Id: uniao.pessoa2Id })
-      }
-    })
-  }
-  
-  // Depois adicionar casais que compartilham filhos (pode sobrepor, Map evita duplicatas)
-  if (pessoas) {
-    pessoas.forEach(pessoa => {
-      if (pessoa.paiId && pessoa.maeId) {
-        const pairKey = `${Math.min(pessoa.paiId, pessoa.maeId)}-${Math.max(pessoa.paiId, pessoa.maeId)}`
-        if (!casais.has(pairKey)) {
-          casais.set(pairKey, { pessoa1Id: pessoa.paiId, pessoa2Id: pessoa.maeId })
-        }
-      }
-    })
-  }
+  const resultado = desenharArvore(
+    doDesenho.map((p) => ({ id: p.id, paiId: p.paiId, maeId: p.maeId, sexo: p.sexo, data_nasc: p.data_nasc })),
+    (unioes ?? []).map((u) => ({ id: u.id, pessoa1Id: u.pessoa1Id, pessoa2Id: u.pessoa2Id, data_inicio: u.data_inicio })),
+    { disposicao: mode, largura: nodeSize.width, altura: nodeSize.height, principalId },
+  )
 
-  // Adicionar todos os nós ao Dagre
-  nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, {
-      width: node.width || nodeSize.width,
-      height: node.height || nodeSize.height,
-    })
-  })
-
-  // Adicionar todas as edges ao Dagre (exceto edges de casamento visuais)
-  edges.forEach((edge) => {
-    if (!edge.id.startsWith('edge-marriage-')) {
-      dagreGraph.setEdge(edge.source, edge.target)
-    }
-  })
-
-  // Executar layout inicial do Dagre
-  dagre.layout(dagreGraph)
-
-  // Criar array de nós com posições iniciais
   const layoutedNodes = nodes.map((node) => {
-    const nodeWithPosition = dagreGraph.node(node.id)
+    const id = idDaPessoa(node.id)
+    const pos = id != null ? resultado.posicoes.get(id) : undefined
+    return pos ? { ...node, position: { x: pos.x, y: pos.y } } : node
+  })
+
+  const retangulo = (id: number): Retangulo => {
+    const p = resultado.posicoes.get(id)!
+    return { x: p.x, y: p.y, w: nodeSize.width, h: nodeSize.height }
+  }
+  const porId = new Map(doDesenho.map((p) => [p.id, p]))
+
+  // Casamento: UMA linha por casal (união registrada ou pais em comum), mesmo quando há filhos.
+  const casamentos: Edge[] = resultado.casais.map(({ a, b }) => {
+    const lados = ladosDoCasal(retangulo(a), retangulo(b))
     return {
-      ...node,
-      position: {
-        x: nodeWithPosition.x - nodeSize.width / 2,
-        y: nodeWithPosition.y - nodeSize.height / 2,
-      },
+      id: `edge-marriage-${Math.min(a, b)}-${Math.max(a, b)}`,
+      source: `person-${a}`,
+      target: `person-${b}`,
+      sourceHandle: `ms-${lados.a}`,
+      targetHandle: `mt-${lados.b}`,
+      type: 'straight',
+      style: { stroke: colors.neutral, strokeWidth: 2 },
     }
   })
 
-  // ========================================
-  // PÓS-PROCESSAMENTO: Ajustar casais
-  // ========================================
-  if (pessoas && casais.size > 0) {
-    // ========================================
-    // PASSADA ZERO: Posicionar cônjuge ao lado do parceiro
-    // ========================================
-    casais.forEach(({ pessoa1Id, pessoa2Id }) => {
-      const node1 = layoutedNodes.find(n => n.id === `person-${pessoa1Id}`)
-      const node2 = layoutedNodes.find(n => n.id === `person-${pessoa2Id}`)
-      
-      if (!node1 || !node2) return
-      
-      const temFilhos = pessoas.some(p => 
-        (p.paiId === pessoa1Id && p.maeId === pessoa2Id) ||
-        (p.paiId === pessoa2Id && p.maeId === pessoa1Id)
-      )
-      
-      if (isHorizontal) {
-        if (!temFilhos) {
-          node2.position.x = node1.position.x
-          node2.position.y = node1.position.y + nodeSize.height + 15
-        } else {
-          const avgX = (node1.position.x + node2.position.x) / 2
-          node1.position.x = avgX
-          node2.position.x = avgX
-        }
-      } else {
-        if (!temFilhos) {
-          node2.position.y = node1.position.y
-          node2.position.x = node1.position.x + nodeSize.width + 20
-        } else {
-          const avgY = (node1.position.y + node2.position.y) / 2
-          node1.position.y = avgY
-          node2.position.y = avgY
-        }
-      }
-    })
-    
-    const casaisOrdenados = Array.from(casais.values()).sort((a, b) => {
-      const nodeA1 = layoutedNodes.find(n => n.id === `person-${a.pessoa1Id}`)
-      const nodeB1 = layoutedNodes.find(n => n.id === `person-${b.pessoa1Id}`)
-      if (!nodeA1 || !nodeB1) return 0
-      
-      if (isHorizontal) {
-        return nodeA1.position.x - nodeB1.position.x
-      } else {
-        return nodeB1.position.y - nodeA1.position.y
-      }
-    })
-
-    casaisOrdenados.forEach(({ pessoa1Id, pessoa2Id }) => {
-      const node1 = layoutedNodes.find(n => n.id === `person-${pessoa1Id}`)
-      const node2 = layoutedNodes.find(n => n.id === `person-${pessoa2Id}`)
-      
-      if (!node1 || !node2) return
-
-      if (isHorizontal) {
-        const avgX = (node1.position.x + node2.position.x) / 2
-        const spacing = nodeSize.height + 15
-        
-        node1.position.x = avgX
-        node2.position.x = avgX
-        
-        const avgY = (node1.position.y + node2.position.y) / 2
-        node1.position.y = avgY - spacing / 2
-        node2.position.y = avgY + spacing / 2
-      } else {
-        const avgY = (node1.position.y + node2.position.y) / 2
-        const spacing = nodeSize.width + 20
-        
-        node1.position.y = avgY
-        node2.position.y = avgY
-        
-        const avgX = (node1.position.x + node2.position.x) / 2
-        if (node1.position.x <= node2.position.x) {
-          node1.position.x = avgX - spacing / 2
-          node2.position.x = avgX + spacing / 2
-        } else {
-          node1.position.x = avgX + spacing / 2
-          node2.position.x = avgX - spacing / 2
-        }
-      }
-    })
-
-    // SEGUNDA PASSADA: Resolver sobreposições
-    const nodesByLevel = new Map<number, Node[]>()
-    const levelTolerance = isHorizontal ? nodeSize.width / 2 : nodeSize.height / 2
-    
-    layoutedNodes.forEach(node => {
-      const position = isHorizontal ? node.position.x : node.position.y
-      
-      let foundLevel: number | null = null
-      nodesByLevel.forEach((_, level) => {
-        if (Math.abs(position - level) < levelTolerance) {
-          foundLevel = level
-        }
-      })
-      
-      const level = foundLevel !== null ? foundLevel : position
-      
-      if (!nodesByLevel.has(level)) {
-        nodesByLevel.set(level, [])
-      }
-      nodesByLevel.get(level)!.push(node)
-    })
-
-    nodesByLevel.forEach((nodesInLevel) => {
-      if (nodesInLevel.length <= 1) return
-
-      if (isHorizontal) {
-        nodesInLevel.sort((a, b) => a.position.y - b.position.y)
-      } else {
-        nodesInLevel.sort((a, b) => a.position.x - b.position.x)
-      }
-
-      const minSpacing = isHorizontal ? nodeSize.height + 20 : nodeSize.width + 30
-      
-      for (let pass = 0; pass < 3; pass++) {
-        for (let i = 1; i < nodesInLevel.length; i++) {
-          const prevNode = nodesInLevel[i - 1]
-          const currNode = nodesInLevel[i]
-          
-          if (isHorizontal) {
-            const prevBottom = prevNode.position.y + nodeSize.height
-            const currTop = currNode.position.y
-            const overlap = prevBottom + minSpacing - nodeSize.height - currTop
-            
-            if (overlap > 0) {
-              const pessoaId = parseInt(currNode.id.replace('person-', ''))
-              if (!isNaN(pessoaId)) {
-                moverPessoaEDescendentes(layoutedNodes, pessoaId, overlap, pessoas, casais, isHorizontal)
-              } else {
-                currNode.position.y += overlap
-              }
-            }
-          } else {
-            const prevRight = prevNode.position.x + nodeSize.width
-            const currLeft = currNode.position.x
-            const overlap = prevRight + minSpacing - nodeSize.width - currLeft
-            
-            if (overlap > 0) {
-              const pessoaId = parseInt(currNode.id.replace('person-', ''))
-              if (!isNaN(pessoaId)) {
-                moverPessoaEDescendentes(layoutedNodes, pessoaId, overlap, pessoas, casais, isHorizontal)
-              } else {
-                currNode.position.x += overlap
-              }
-            }
-          }
-        }
-        
-        if (isHorizontal) {
-          nodesInLevel.sort((a, b) => a.position.y - b.position.y)
-        } else {
-          nodesInLevel.sort((a, b) => a.position.x - b.position.x)
-        }
-      }
-    })
-
-    // TERCEIRA PASSADA: Centralizar filhos sob os pais
-    casaisOrdenados.forEach(({ pessoa1Id, pessoa2Id }) => {
-      const nodePai = layoutedNodes.find(n => n.id === `person-${pessoa1Id}`)
-      const nodeMae = layoutedNodes.find(n => n.id === `person-${pessoa2Id}`)
-      
-      if (!nodePai || !nodeMae) return
-
-      const filhos = pessoas.filter(p => 
-        (p.paiId === pessoa1Id && p.maeId === pessoa2Id) ||
-        (p.paiId === pessoa2Id && p.maeId === pessoa1Id)
-      )
-
-      if (filhos.length === 0) return
-
-      const nodosFilhos = filhos
-        .map(f => layoutedNodes.find(n => n.id === `person-${f.id}`))
-        .filter(Boolean) as Node[]
-
-      if (nodosFilhos.length === 0) return
-
-      const centroPaisX = (nodePai.position.x + nodeMae.position.x + nodeSize.width) / 2
-      const centroPaisY = (nodePai.position.y + nodeMae.position.y + nodeSize.height) / 2
-
-      const minFilhoX = Math.min(...nodosFilhos.map(n => n.position.x))
-      const maxFilhoX = Math.max(...nodosFilhos.map(n => n.position.x + nodeSize.width))
-      const centroFilhosX = (minFilhoX + maxFilhoX) / 2
-
-      if (!isHorizontal) {
-        const deltaX = centroPaisX - centroFilhosX
-        
-        nodosFilhos.forEach(nodoFilho => {
-          const pessoaId = parseInt(nodoFilho.id.replace('person-', ''))
-          moverPessoaEDescendentes(layoutedNodes, pessoaId, deltaX, pessoas, casais, isHorizontal)
-        })
-      }
-    })
-
-    // QUARTA PASSADA: Verificação GLOBAL de sobreposições
-    const moverComConjuge = (node: Node, deltaX: number, deltaY: number) => {
-      node.position.x += deltaX
-      node.position.y += deltaY
-      
-      const pessoaId = parseInt(node.id.replace('person-', ''))
-      if (!isNaN(pessoaId)) {
-        casais.forEach((casal) => {
-          let conjugeId: number | null = null
-          if (casal.pessoa1Id === pessoaId) conjugeId = casal.pessoa2Id
-          if (casal.pessoa2Id === pessoaId) conjugeId = casal.pessoa1Id
-          
-          if (conjugeId !== null) {
-            const conjugeNode = layoutedNodes.find(n => n.id === `person-${conjugeId}`)
-            if (conjugeNode) {
-              conjugeNode.position.x += deltaX
-              conjugeNode.position.y += deltaY
-            }
-          }
-        })
-      }
+  // Filiação: uma aresta por genitor (sem duplicatas), do filho ao genitor — a convenção que `classificarVinculo` lê.
+  const vistas = new Set<string>()
+  const filiacao: Edge[] = []
+  for (const e of edges) {
+    if (e.id.startsWith('edge-marriage-') || e.id.startsWith('edge-grupo-')) continue
+    const filho = idDaPessoa(e.source), genitor = idDaPessoa(e.target)
+    if (filho == null || genitor == null) { filiacao.push(e); continue }
+    const chave = `${e.source}|${e.target}`
+    if (vistas.has(chave)) continue
+    vistas.add(chave)
+    const f = porId.get(filho)
+    const conhecidos = [f?.paiId, f?.maeId].filter((x): x is number => x != null && desenhadas.has(x))
+    const doisConhecidos = conhecidos.length === 2 && conhecidos.includes(genitor)
+    const outro = doisConhecidos ? conhecidos.find((x) => x !== genitor)! : null
+    const dados: DadosDeFiliacao = {
+      disposicao: mode, largura: nodeSize.width, altura: nodeSize.height,
+      outroId: outro != null ? `person-${outro}` : null,
+      tronco: doisConhecidos ? genitor === f?.paiId : true,
     }
-    
-    for (let pass = 0; pass < 10; pass++) {
-      let hasOverlap = false
-      
-      for (let i = 0; i < layoutedNodes.length; i++) {
-        for (let j = i + 1; j < layoutedNodes.length; j++) {
-          const nodeA = layoutedNodes[i]
-          const nodeB = layoutedNodes[j]
-          
-          const idA = parseInt(nodeA.id.replace('person-', ''))
-          const idB = parseInt(nodeB.id.replace('person-', ''))
-          if (!isNaN(idA) && !isNaN(idB)) {
-            const pairKey = `${Math.min(idA, idB)}-${Math.max(idA, idB)}`
-            if (casais.has(pairKey)) continue
-          }
-          
-          const aLeft = nodeA.position.x
-          const aRight = nodeA.position.x + nodeSize.width
-          const aTop = nodeA.position.y
-          const aBottom = nodeA.position.y + nodeSize.height
-          
-          const bLeft = nodeB.position.x
-          const bRight = nodeB.position.x + nodeSize.width
-          const bTop = nodeB.position.y
-          const bBottom = nodeB.position.y + nodeSize.height
-          
-          const overlapX = Math.min(aRight, bRight) - Math.max(aLeft, bLeft)
-          const overlapY = Math.min(aBottom, bBottom) - Math.max(aTop, bTop)
-          
-          if (overlapX > 0 && overlapY > 0) {
-            hasOverlap = true
-            
-            const sameLevelY = Math.abs(nodeA.position.y - nodeB.position.y) < nodeSize.height
-            
-            if (isHorizontal) {
-              const moveAmount = overlapY + 20
-              if (nodeA.position.y < nodeB.position.y) {
-                moverComConjuge(nodeB, 0, moveAmount)
-              } else {
-                moverComConjuge(nodeA, 0, moveAmount)
-              }
-            } else {
-              if (sameLevelY) {
-                const moveAmount = overlapX + 20
-                if (nodeA.position.x < nodeB.position.x) {
-                  moverComConjuge(nodeB, moveAmount, 0)
-                } else {
-                  moverComConjuge(nodeA, moveAmount, 0)
-                }
-              } else {
-                const moveAmount = overlapY + 20
-                if (nodeA.position.y < nodeB.position.y) {
-                  moverComConjuge(nodeB, 0, moveAmount)
-                } else {
-                  moverComConjuge(nodeA, 0, moveAmount)
-                }
-              }
-            }
-          }
-        }
-      }
-      
-      if (!hasOverlap) break
-    }
-    
-    // QUINTA PASSADA: Garantir casais lado a lado novamente
-    casaisOrdenados.forEach(({ pessoa1Id, pessoa2Id }) => {
-      const node1 = layoutedNodes.find(n => n.id === `person-${pessoa1Id}`)
-      const node2 = layoutedNodes.find(n => n.id === `person-${pessoa2Id}`)
-      
-      if (!node1 || !node2) return
-
-      if (isHorizontal) {
-        const avgX = (node1.position.x + node2.position.x) / 2
-        node1.position.x = avgX
-        node2.position.x = avgX
-        
-        const spacing = nodeSize.height + 15
-        const avgY = (node1.position.y + node2.position.y) / 2
-        if (Math.abs(node1.position.y - node2.position.y) < spacing * 0.8) {
-          node1.position.y = avgY - spacing / 2
-          node2.position.y = avgY + spacing / 2
-        }
-      } else {
-        const avgY = (node1.position.y + node2.position.y) / 2
-        node1.position.y = avgY
-        node2.position.y = avgY
-        
-        const spacing = nodeSize.width + 20
-        const avgX = (node1.position.x + node2.position.x) / 2
-        if (Math.abs(node1.position.x - node2.position.x) < spacing * 0.8) {
-          if (node1.position.x <= node2.position.x) {
-            node1.position.x = avgX - spacing / 2
-            node2.position.x = avgX + spacing / 2
-          } else {
-            node1.position.x = avgX + spacing / 2
-            node2.position.x = avgX - spacing / 2
-          }
-        }
-      }
-    })
+    filiacao.push({ ...e, type: 'filiacao', data: dados })
   }
+  // Arestas que não são de pessoa (ex.: grupos recolhidos) seguem como estavam.
+  const outras = edges.filter((e) => e.id.startsWith('edge-grupo-'))
 
-  return { nodes: layoutedNodes, edges }
+  return { nodes: layoutedNodes, edges: [...filiacao, ...casamentos, ...outras] }
 }
 
-// Função auxiliar para mover uma pessoa e todos os seus descendentes
-function moverPessoaEDescendentes(
-  nodes: Node[], 
-  pessoaId: number, 
-  delta: number, 
-  pessoas: PessoaArvore[],
-  casais: Map<string, { pessoa1Id: number; pessoa2Id: number }>,
-  isHorizontal: boolean
-) {
-  const nodesToMove = new Set<string>()
-  const visited = new Set<number>()
-  
-  const collectNodes = (pId: number) => {
-    if (visited.has(pId)) return
-    visited.add(pId)
-    
-    nodesToMove.add(`person-${pId}`)
-    
-    casais.forEach((casal) => {
-      if (casal.pessoa1Id === pId && !visited.has(casal.pessoa2Id)) {
-        nodesToMove.add(`person-${casal.pessoa2Id}`)
-      }
-      if (casal.pessoa2Id === pId && !visited.has(casal.pessoa1Id)) {
-        nodesToMove.add(`person-${casal.pessoa1Id}`)
-      }
-    })
-    
-    pessoas.forEach(p => {
-      if ((p.paiId === pId || p.maeId === pId) && !visited.has(p.id)) {
-        collectNodes(p.id)
-      }
-    })
-  }
-  
-  collectNodes(pessoaId)
-  
-  nodes.forEach(node => {
-    if (nodesToMove.has(node.id)) {
-      if (isHorizontal) {
-        node.position.y += delta
-      } else {
-        node.position.x += delta
-      }
-    }
+/** Reaponta a linha de casamento aos lados que HOJE se tocam (o cartão pode ter sido arrastado). Devolve o mesmo array se nada mudou. */
+function ajustarLadosDeCasamento(nodes: Node[], edges: Edge[], mode: ViewMode): Edge[] {
+  const tam = NODE_SIZES[mode]
+  const rect = new Map<string, Retangulo>()
+  for (const n of nodes) if (n.type === 'person') rect.set(n.id, { x: n.position.x, y: n.position.y, w: n.width ?? tam.width, h: n.height ?? tam.height })
+  let mudou = false
+  const novas = edges.map((e) => {
+    if (!e.id.startsWith('edge-marriage-')) return e
+    const a = rect.get(e.source), b = rect.get(e.target)
+    if (!a || !b) return e
+    const l = ladosDoCasal(a, b)
+    const sh = `ms-${l.a}`, th = `mt-${l.b}`
+    if (e.sourceHandle === sh && e.targetHandle === th) return e
+    mudou = true
+    return { ...e, sourceHandle: sh, targetHandle: th }
   })
+  return mudou ? novas : edges
 }
 
 // ========================================
@@ -1434,7 +1081,7 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
   // não está no guard de layout congelado, nem no ADR, nem em commit.
   //
   // Pessoa sem vínculo é cadastro em andamento, não pessoa inexistente. Ela entra
-  // como nó solto, exatamente com o mesmo cartão — o dagre a posiciona num
+  // como nó solto, exatamente com o mesmo cartão — o desenho em camadas a posiciona num
   // componente próprio, sem tocar nas coordenadas de quem já estava conectado.
   for (const pessoa of pessoas) {
     if (processedIds.has(pessoa.id)) continue
@@ -1455,7 +1102,7 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
 // ========================================
 //
 // Esta é a decisão central da evolução da árvore: o foco NÃO recalcula posição.
-// O dagre roda sobre a árvore inteira, como sempre rodou, e produz exatamente as
+// O desenho em camadas roda sobre a árvore inteira e produz as
 // mesmas coordenadas de antes. O que esta função faz é decidir, por nó já
 // posicionado, se ele aparece inteiro, apagado, ou não aparece.
 //
@@ -1623,6 +1270,8 @@ export interface ReactFlowTreeRef {
    * posições são guardadas por modo (paisagem/retrato).
    */
   aplicarPosicoes: (modo: string, posicoes: Record<string, { x: number; y: number }>) => void
+  /** Limpa os ajustes manuais da disposição `modo` (desfazer do "mover" até o automático; refazer do reset). */
+  resetarAjustes: (modo: string) => void
 }
 
 // ========================================
@@ -1653,6 +1302,8 @@ interface ReactFlowTreeProps {
   saude?: ReadonlyMap<number, SaudePessoa>
   /** Cartões arrastados (antes/depois) — alimenta o Desfazer. Só chega com movimento real. */
   onPosicoesMovidas?: (modo: ViewMode, movimentos: { pessoaId: number; antes: { x: number; y: number }; depois: { x: number; y: number } }[]) => void
+  /** O operador limpou os ajustes manuais da disposição visível (botão "Resetar layout"): `anteriores` é o que havia — alimenta o Desfazer. */
+  onLayoutResetado?: (modo: ViewMode, anteriores: Record<string, { x: number; y: number }>) => void
   /** Aresta selecionada no canvas (clique ou Enter); `null` ao limpar. Quem decide o que é removível é a tela. */
   onVinculoSelecionado?: (aresta: { id: string; source: string; target: string } | null) => void
   /** Aresta em destaque — CONTROLADA pela tela (ela a limpa ao remover/recarregar). */
@@ -1678,6 +1329,7 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
   lacunas,
   saude,
   onPosicoesMovidas,
+  onLayoutResetado,
   onVinculoSelecionado,
   arestaSelecionadaId = null,
 }, ref) => {
@@ -1691,6 +1343,11 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
   const onSavePositionsRef = useRef(onSavePositions)
   const onPosicoesMovidasRef = useRef(onPosicoesMovidas)
   const onVinculoSelecionadoRef = useRef(onVinculoSelecionado)
+  const onLayoutResetadoRef = useRef(onLayoutResetado)
+  // O desenho AUTOMÁTICO de cada cartão, na disposição visível — para saber se um arrasto é, de fato, um ajuste manual.
+  const automaticoRef = useRef<Map<string, { x: number; y: number }>>(new Map())
+  // Quais cartões têm ajuste manual (só os arrastados, só nesta disposição) — marcados na tela.
+  const [ajustados, setAjustados] = useState<Set<string>>(new Set())
   const posicoesNoInicioDoArrasteRef = useRef<Map<string, { x: number; y: number }>>(new Map())
 
   const onPersonClickRef = useRef(onPersonClick)
@@ -1709,7 +1366,8 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
     onSavePositionsRef.current = onSavePositions
     onPosicoesMovidasRef.current = onPosicoesMovidas
     onVinculoSelecionadoRef.current = onVinculoSelecionado
-  }, [onPersonClick, onAddPai, onAddMae, onAddFilho, onAddConjuge, savedPositions, onSavePositions, onPosicoesMovidas, onVinculoSelecionado])
+    onLayoutResetadoRef.current = onLayoutResetado
+  }, [onPersonClick, onAddPai, onAddMae, onAddFilho, onAddConjuge, savedPositions, onSavePositions, onPosicoesMovidas, onLayoutResetado, onVinculoSelecionado])
 
   const calculateLayout = useCallback(() => {
     const { nodes: rawNodes, edges: rawEdges } = buildTreeNodesAndEdges({
@@ -1724,23 +1382,22 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
       onAddConjuge: (id) => onAddConjugeRef.current?.(id),
     })
 
-    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(rawNodes, rawEdges, mode, pessoas, unioes)
+    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(rawNodes, rawEdges, mode, pessoas, unioes, pessoaPrincipal?.id ?? null)
 
-    // ✅ NOVO: Aplicar posições salvas (override do dagre)
-    const modePositions = savedPositionsRef.current?.[mode]
-    if (modePositions) {
-      layoutedNodes.forEach(node => {
-        // Extrair pessoaId do node.id (formato: "person-123")
-        const match = node.id.match(/^person-(\d+)$/)
-        if (match) {
-          const pessoaId = match[1]
-          const saved = modePositions[pessoaId]
-          if (saved) {
-            node.position = { x: saved.x, y: saved.y }
-          }
-        }
-      })
-    }
+    // O desenho AUTOMÁTICO é o padrão. Só vale posição salva se for um AJUSTE MANUAL explícito (arrastar um cartão) feito NESTA disposição:
+    // `manual-paisagem` / `manual-retrato`. As chaves antigas `paisagem`/`retrato` (um retrato de TODOS os cartões, gravado a cada arrasto
+    // pelo desenho anterior) já não são aplicadas — ficam intactas no banco, só deixam de mandar no desenho.
+    const automatico = new Map<string, { x: number; y: number }>()
+    layoutedNodes.forEach((n) => automatico.set(n.id, { x: n.position.x, y: n.position.y }))
+    automaticoRef.current = automatico
+    const manuais = savedPositionsRef.current?.[chaveManual(mode)] ?? {}
+    const marcados = new Set<string>()
+    layoutedNodes.forEach(node => {
+      const match = node.id.match(/^person-(\d+)$/)
+      const saved = match ? manuais[match[1]] : undefined
+      if (saved) { node.position = { x: saved.x, y: saved.y }; marcados.add(node.id) }
+    })
+    setAjustados(marcados)
 
     setNodes(layoutedNodes)
     setEdges(layoutedEdges)
@@ -1750,36 +1407,41 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
     calculateLayout()
   }, [calculateLayout])
 
-  const handleResetLayout = useCallback(() => {
-    // Limpar posições salvas do modo atual
-    const currentPositions = { ...(savedPositionsRef.current || {}) }
-    delete currentPositions[mode]
-    savedPositionsRef.current = currentPositions
-    onSavePositionsRef.current?.(currentPositions)
-    
-    calculateLayout()
-  }, [calculateLayout, mode])
+  // RESET (por árvore, só a disposição visível): limpa os ajustes manuais DESTA árvore e volta ao desenho automático. As posições de OUTRAS
+  // árvores nunca são tocadas (cada árvore tem o próprio `posicoesNodes`). O que havia vai para o Desfazer (`onLayoutResetado`).
+  const limparAjustes = useCallback((modoAlvo: ViewMode) => {
+    const atuais = { ...(savedPositionsRef.current || {}) }
+    delete atuais[chaveManual(modoAlvo)]
+    savedPositionsRef.current = atuais
+    onSavePositionsRef.current?.(atuais)
+  }, [])
 
-  // Persistência das posições: grava a posição de TODOS os nós person- visíveis
-  // (mais as `sobrescritas`, que valem mais que o estado do canvas — o setNodes
-  // acabou de ser pedido e o store ainda pode não tê-lo refletido).
+  const handleResetLayout = useCallback(() => {
+    const anteriores = { ...(savedPositionsRef.current?.[chaveManual(mode)] ?? {}) }
+    if (Object.keys(anteriores).length > 0) onLayoutResetadoRef.current?.(mode, anteriores)
+    limparAjustes(mode)
+    calculateLayout()
+  }, [calculateLayout, mode, limparAjustes])
+
+  // Persistência: grava SÓ os cartões movidos (`sobrescritas`) — nunca um retrato de todos. Um cartão devolvido ao ponto do desenho automático
+  // deixa de ser ajuste (a entrada é removida).
   const persistirPosicoes = useCallback((
     modoAlvo: ViewMode,
     sobrescritas: Record<string, { x: number; y: number }> = {},
   ) => {
     const atuais = { ...(savedPositionsRef.current || {}) }
-    const doModo = { ...(atuais[modoAlvo] || {}) }
-    if (modoAlvo === mode) {
-      getNodes().forEach(n => {
-        const m = n.id.match(/^person-(\d+)$/)
-        if (m) doModo[m[1]] = { x: n.position.x, y: n.position.y }
-      })
+    const doModo = { ...(atuais[chaveManual(modoAlvo)] || {}) }
+    for (const [id, pos] of Object.entries(sobrescritas)) {
+      const auto = modoAlvo === mode ? automaticoRef.current.get(`person-${id}`) : undefined
+      if (auto && Math.abs(auto.x - pos.x) < 0.5 && Math.abs(auto.y - pos.y) < 0.5) delete doModo[id]
+      else doModo[id] = { x: pos.x, y: pos.y }
     }
-    for (const [id, pos] of Object.entries(sobrescritas)) doModo[id] = { x: pos.x, y: pos.y }
-    atuais[modoAlvo] = doModo
+    if (Object.keys(doModo).length > 0) atuais[chaveManual(modoAlvo)] = doModo
+    else delete atuais[chaveManual(modoAlvo)]
     savedPositionsRef.current = atuais
     onSavePositionsRef.current?.(atuais)
-  }, [mode, getNodes])
+    if (modoAlvo === mode) setAjustados(new Set(Object.keys(doModo).map((id) => `person-${id}`)))
+  }, [mode])
 
   // Posição de cada cartão no INÍCIO do arrasto — é o "antes" do Desfazer.
   const handleNodeDragStart = useCallback((_: unknown, node: Node, arrastados?: Node[]) => {
@@ -1804,7 +1466,13 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
     }
     posicoesNoInicioDoArrasteRef.current = new Map()
 
-    persistirPosicoes(mode, { [match[1]]: { x: node.position.x, y: node.position.y } })
+    // Persiste TODOS os cartões arrastados (arrasto em grupo), e só eles: cada um passa a ser um ajuste manual explícito.
+    const movidos: Record<string, { x: number; y: number }> = { [match[1]]: { x: node.position.x, y: node.position.y } }
+    for (const n of (arrastados && arrastados.length > 0 ? arrastados : [])) {
+      const m = n.id.match(/^person-(\d+)$/)
+      if (m) movidos[m[1]] = { x: n.position.x, y: n.position.y }
+    }
+    persistirPosicoes(mode, movidos)
 
     // Movimento nulo (clique) não é ação: não entra no histórico.
     const reais = movimentos.filter(m => Math.abs(m.antes.x - m.depois.x) > 0.5 || Math.abs(m.antes.y - m.depois.y) > 0.5)
@@ -1852,13 +1520,28 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
       }
       persistirPosicoes(alvo, posicoes)
     },
-  }), [getNodes, setCenter, getZoom, fitView, mode, setNodes, persistirPosicoes])
+    resetarAjustes: (modoAlvo: string) => {
+      const alvo: ViewMode = modoAlvo === 'retrato' ? 'retrato' : 'paisagem'
+      limparAjustes(alvo)
+      if (alvo === mode) calculateLayout()
+    },
+  }), [getNodes, setCenter, getZoom, fitView, mode, setNodes, persistirPosicoes, limparAjustes, calculateLayout])
+
+  // A linha de casamento acompanha os cartões: a cada movimento, escolhe de novo os lados que se tocam.
+  const edgesComLados = useMemo(() => ajustarLadosDeCasamento(nodes, edges, mode), [nodes, edges, mode])
+  // Ajuste manual MARCADO na tela: contorno tracejado âmbar no cartão arrastado (o desenho automático não tem marca).
+  const nodesMarcados = useMemo(
+    () => (ajustados.size === 0 ? nodes : nodes.map((n) => (ajustados.has(n.id)
+      ? { ...n, style: { ...n.style, outline: '2px dashed #d97706', outlineOffset: 3, borderRadius: 8 } }
+      : n))),
+    [nodes, ajustados],
+  )
 
   // Foco aplicado sobre o layout já calculado. Ver `aplicarFoco`: nada aqui
-  // recalcula dagre, então trocar de linhagem não move card nenhum.
+  // recalcula o desenho, então trocar de linhagem não move card nenhum.
   const { nodes: nodesEmTela, edges: edgesEmTela } = useMemo(
-    () => aplicarFoco(nodes, edges, { foco, sinais, grupos: gruposRecolhidos, lacunas, saude, mode, onExpandirGrupo }),
-    [nodes, edges, foco, sinais, gruposRecolhidos, lacunas, saude, mode, onExpandirGrupo],
+    () => aplicarFoco(nodesMarcados, edgesComLados, { foco, sinais, grupos: gruposRecolhidos, lacunas, saude, mode, onExpandirGrupo }),
+    [nodesMarcados, edgesComLados, foco, sinais, gruposRecolhidos, lacunas, saude, mode, onExpandirGrupo],
   )
 
   // Aresta selecionada ganha destaque PRÓPRIO (cor de ação, traço mais grosso):
@@ -1901,6 +1584,7 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
       // (ver remover-vinculo-modal.tsx) e passa pela porta oficial da árvore.
       deleteKeyCode={null}
       nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       connectionLineType={ConnectionLineType.SmoothStep}
       fitView
       fitViewOptions={{ padding: 0.2 }}
@@ -1914,6 +1598,23 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
     >
       <Background color="#e0e0e0" gap={20} />
       
+      {ajustados.size > 0 && (
+        <Panel position="top-left">
+          <div
+            data-testid="aviso-ajustes-manuais"
+            className="flex items-center gap-2 rounded border bg-[var(--surface-primary)] px-2.5 py-1.5 text-[12px] text-gray-700 shadow-[var(--elev-1)]"
+            style={{ borderColor: '#d97706' }}
+          >
+            <span style={{ color: '#b45309', fontWeight: 600 }}>
+              {ajustados.size} {ajustados.size === 1 ? 'cartão ajustado' : 'cartões ajustados'} à mão
+            </span>
+            <button onClick={handleResetLayout} className="rounded border border-gray-300 px-2 py-0.5 font-semibold hover:bg-gray-100">
+              Voltar ao desenho automático
+            </button>
+          </div>
+        </Panel>
+      )}
+
       <Panel position="bottom-left">
         {/* text-gray-700 EXPLÍCITO: os SVGs abaixo usam stroke="currentColor" e não
             declaram cor própria. Sem isto, herdam a cor do ancestral — e quando a
