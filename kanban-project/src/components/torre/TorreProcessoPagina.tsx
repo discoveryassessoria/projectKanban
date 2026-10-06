@@ -7,7 +7,8 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
-import { HistoricoDoProcesso } from "@/src/components/historico/HistoricoDoProcesso"
+import { HistoricoLinhaDoTempo } from "./HistoricoLinhaDoTempo"
+import type { CertidaoDoFiltro } from "@/lib/operacional/historico-linha-do-tempo"
 import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 import type { DetalheDoProcesso } from "@/lib/operacional/torre-foco"
 import type { LinhaDaTabela } from "@/lib/operacional/torre-processo-puro"
@@ -48,7 +49,7 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
   const [toast, setToast] = useState<ToastDaPagina | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [modal, setModal] = useState<
-    | null | { tipo: "pausar" } | { tipo: "forcar" } | { tipo: "historico" }
+    | null | { tipo: "pausar" } | { tipo: "forcar" } | { tipo: "historico"; certidao: CertidaoDoFiltro | null }
     | { tipo: "reabrir"; linha: LinhaDaTabela } | { tipo: "motivo"; linha: LinhaDaTabela }
   >(null)
 
@@ -168,18 +169,19 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
           <VoltarDaTorre />
           <ProcessoCabecalho
             d={d} agora={agora} perm={perm} ocupado={ocupado}
-            onDistribuir={() => void distribuir()} onRelatorio={() => gravarRelatorio(true, relatorioDaUrl.filtros)} onHistorico={() => setModal({ tipo: "historico" })}
+            onDistribuir={() => void distribuir()} onRelatorio={() => gravarRelatorio(true, relatorioDaUrl.filtros)} onHistorico={() => setModal({ tipo: "historico", certidao: null })}
             onPausar={() => setModal({ tipo: "pausar" })} onReativar={() => void reativar(false)} onForcar={() => setModal({ tipo: "forcar" })}
           />
           <ProcessoCaminho d={d} agora={agora} encerradasNaLista={statusDaLista === "TODOS" || statusDaLista === "ENCERRADAS"} onAlternarEncerradas={() => setStatusDaLista((s) => (s === "TODOS" || s === "ENCERRADAS" ? "ATIVAS" : "TODOS"))} />
           <ProcessoCertidoes
             status={statusDaLista} onStatus={setStatusDaLista}
             d={d} agora={agora} podeAtribuir={perm.editar} ocupado={ocupado}
+            onHistorico={(l) => setModal({ tipo: "historico", certidao: { documentoId: l.documentoId, tarefaId: l.tarefaId, rotulo: [l.titulo, l.pessoa].filter(Boolean).join(" · ") } })}
             onAtribuir={(id) => void atribuir(id)} onAtribuirVarias={(ids) => void atribuirVarias(ids)}
             onMotivo={(l) => setModal({ tipo: "motivo", linha: l })} onReabrir={(l) => setModal({ tipo: "reabrir", linha: l })}
-            onVerHistorico={() => setModal({ tipo: "historico" })}
+            onVerHistorico={() => setModal({ tipo: "historico", certidao: null })}
           />
-          <ProcessoFatos processoId={processoId} agora={agora} versao={versao} onVerTudo={() => setModal({ tipo: "historico" })} />
+          <ProcessoFatos processoId={processoId} agora={agora} versao={versao} onVerTudo={() => setModal({ tipo: "historico", certidao: null })} />
           <ProcessoComentarios processoId={processoId} familiaId={d.familiaId} agora={agora} podeComentar={perm.editar} avisar={avisarSimples} />
         </div>
 
@@ -215,8 +217,7 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
                 <div style={{ fontSize: 17, fontWeight: 700 }}>Histórico completo · {d.familiaNome}</div>
                 <button type="button" aria-label="Fechar" className="tpr-linkbtn" style={{ marginLeft: "auto", fontSize: 20, textDecoration: "none" }} onClick={() => setModal(null)}>✕</button>
               </div>
-              <HistoricoDoProcesso processoId={d.processoId} url={`/api/torre/foco/${d.processoId}/historico`} onMudou={recarregar}
-                onAbrirCertidao={(l) => { if (l.tarefaId != null) window.location.assign(urlOperacionalDaTarefa({ taskId: l.tarefaId, processoId: d.processoId })) }} />
+              <HistoricoLinhaDoTempo processoId={d.processoId} url={`/api/torre/foco/${d.processoId}/historico`} certidaoInicial={modal.certidao} />
             </div>
           </div>
         )}

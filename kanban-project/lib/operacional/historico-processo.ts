@@ -112,7 +112,9 @@ export interface ContextoDoHistorico {
 // ─── SAÍDA ──────────────────────────────────────────────────────────────────
 export interface Quem { tipo: 'humano' | 'sistema'; id: number | null; nome: string }
 export interface LinksDoFato { processoId: number; tarefaId: number | null; documentoId: number | null; pessoaId: number | null; necessidadeId: number | null }
-export interface FatoItem { id: string; quando: string; frase: string; certidao: string | null; pessoa: string | null; links: LinksDoFato }
+/** UMA alteração, antes → depois ("prazo 30/09 → 15/10", "responsável ninguém → Daniela Brait", "fase Genealogia → Emissão Documental"). */
+export interface Mudanca { campo: string; antes: string | null; depois: string | null }
+export interface FatoItem { id: string; quando: string; frase: string; certidao: string | null; pessoa: string | null; links: LinksDoFato; mudancas: Mudanca[] }
 export interface FatoDoHistorico {
   id: string
   quando: string
@@ -143,6 +145,14 @@ export interface FatoDoHistorico {
   links: LinksDoFato
   /** Cancelamento cuja tarefa continua CANCELADA: a porta canônica de reabertura (`reabrir`) se aplica. */
   reabrivel: { tarefaId: number } | null
+  /** Marco do processo (abertura, avanço/retorno de fase): nunca é "automático" nem some do filtro. */
+  marco: boolean
+  /** O que mudou, antes → depois. Fato agrupado: só quando TODOS dizem o mesmo (senão fica por item em `agrupadoDe`). */
+  mudancas: Mudanca[]
+  /** Identificador do lote (quando a ação gravou um) — o agrupamento por lote vale mais que o do mesmo minuto. */
+  lote: string | null
+  /** Fase de destino de um marco (chave) — para contar "N dias na fase". */
+  faseDestino: string | null
 }
 
 export interface ResultadoDoHistorico {
@@ -187,6 +197,8 @@ interface Atomo {
   destinoId: number | null
   chaveExtra: string | null
   faseDestino: string | null
+  mudancas: Mudanca[]
+  lote: string | null
 }
 
 const SISTEMA: Quem = { tipo: 'sistema', id: null, nome: 'Sistema' }
@@ -235,7 +247,7 @@ const DESCARTAR_LOG = new Set([
   'STEP_ACTION_EXECUTED', 'PASSO_ANDAMENTO', 'PASSO_FORCADO', 'PASSO_DUPLICADO_SUPERSEDIDO', 'PASSO_FASE_FUTURA_SUPERSEDIDO', 'PASSO_TAREFA_REPARADO',
   'COMENTARIO_CRIADO', 'SOLICITACAO_DOCUMENTO_REGISTRADA', 'AUDITORIA_EXPORTADA', 'HISTORICO_EXPORTADO', 'TAREFA_UNIFICADA',
   'RECONCILIACAO_SOLICITADA', 'RECONCILIACAO_FASE_MACRO', 'RECONCILIACAO_ESCOPO_FASE', 'RECONCILIACAO_ESCOPO_FALHOU', 'RECONCILIACAO_WORKFLOW_INTERNO_FASE_ATUAL',
-  'BACKFILL_PASSOS_PUBLICADOS', 'TAREFA_SEM_RESPONSAVEL_NA_REATIVACAO', 'TAREFA_DEPENDENCIA_REMOVIDA',
+  'BACKFILL_PASSOS_PUBLICADOS', 'TAREFA_SEM_RESPONSAVEL_NA_REATIVACAO', 'TAREFA_DEPENDENCIA_REMOVIDA', 'HISTORICO_VISITADO',
 ])
 const DESCARTAR_WORKFLOW = new Set([
   'WORKFLOW_INSTANCIADO', 'WORKFLOW_INICIADO', 'WORKFLOW_BLOQUEADO', 'WORKFLOW_CONCLUIDO', 'WORKFLOW_REABERTO', 'WORKFLOW_SUPERSEDIDO',
@@ -320,7 +332,7 @@ function novoAtomo(ctx: ContextoDoHistorico, base: BaseAtomo & Partial<Atomo>, a
     quemId: null, sistema: false, marco: false, objeto: null, complemento: null, contextoExtra: null, fraseLivre: null,
     tarefaId: a?.tarefaId ?? null, documentoId: a?.documentoId ?? null, necessidadeId: a?.necessidadeId ?? null, stepInstanceId: a?.stepInstanceId ?? null, pessoaId: a?.pessoaId ?? null,
     faseKey: faseDoAlvo, passo: a?.stepInstanceId != null ? ctx.passos[a.stepInstanceId]?.titulo ?? null : null,
-    certidao: a?.rotulo ?? null, motivo: null, justificativa: null, efeito: null, destinoId: null, chaveExtra: null, faseDestino: null,
+    certidao: a?.rotulo ?? null, motivo: null, justificativa: null, efeito: null, destinoId: null, chaveExtra: null, faseDestino: null, mudancas: [], lote: null,
     ...base,
   }
 }
@@ -341,7 +353,7 @@ function atomosDoLog(l: Extract<LinhaCrua, { fonte: 'LOG' }>, ctx: ContextoDoHis
   const eTarefa = /^tarefa$/i.test(l.entidade)
   const eProcesso = /^processo$/i.test(l.entidade)
   const tarefaId = eTarefa && l.entidadeId ? l.entidadeId : num(d.tarefaId)
-  const origem = { id: `log:${l.id}`, fonte: 'LOG' as const, t, quemId: autor, sistema: autor == null }
+  const origem = { id: `log:${l.id}`, fonte: 'LOG' as const, t, quemId: autor, sistema: autor == null, lote: txt(d.loteId) }
   const alvoDaTarefa: Partial<Alvo> = { tarefaId, documentoId: num(d.documentoId), stepInstanceId: num(d.stepInstanceId) }
   const certidaoDaTarefa = (prep: Prep) => sobre(ctx, resolverAlvo(ctx, alvoDaTarefa), prep)
   const simples = (b: { rank: number; tipo: TipoDeFato; subtipo: SubtipoDeFato; verbo: string }, prep: Prep, extra: Partial<Atomo> = {}): Atomo => {
@@ -358,7 +370,7 @@ function atomosDoLog(l: Extract<LinhaCrua, { fonte: 'LOG' }>, ctx: ContextoDoHis
       if (!eProcesso) return 'desconhecido'
       const faseIni = ctx.rotuloDaFase(txt(d.primeiraFase))
       const partes = [ctx.processo.pais, ctx.processo.requerentes != null ? `${ctx.processo.requerentes} requerente${ctx.processo.requerentes === 1 ? '' : 's'}` : null, faseIni ? `fase inicial ${faseIni}` : null].filter(Boolean)
-      return [novoAtomo(ctx, { ...origem, rank: l.acao === 'PROCESSO_INICIALIZADO_V2' ? 2 : 1, tipo: 'PROCESSO', subtipo: 'abertura', verbo: 'abriu o processo', objeto: ctx.processo.nome, marco: true, contextoExtra: partes.join(' · ') || null })]
+      return [novoAtomo(ctx, { ...origem, rank: l.acao === 'PROCESSO_INICIALIZADO_V2' ? 2 : 1, tipo: 'PROCESSO', subtipo: 'abertura', verbo: 'abriu o processo', objeto: ctx.processo.nome, marco: true, contextoExtra: partes.join(' · ') || null, faseDestino: txt(d.primeiraFase), mudancas: faseIni ? [{ campo: 'fase', antes: null, depois: faseIni }] : [] })]
     }
     case 'editou':
       if (!eProcesso) return 'desconhecido'
@@ -390,7 +402,7 @@ function atomosDoLog(l: Extract<LinhaCrua, { fonte: 'LOG' }>, ctx: ContextoDoHis
       return [atomoDoSistema(ctx, { ...origem, rank: 1, tipo: 'ARVORE', subtipo: 'conferencia' }, 'transcreveu um documento automaticamente', { chaveExtra: l.acao })]
     case 'PROCESS_PHASE_ROLLED_BACK': {
       const de = txt(d.deFase), para = txt(d.paraFase)
-      return [novoAtomo(ctx, { ...origem, rank: 3, tipo: 'FASE', subtipo: 'retorno_fase', verbo: 'voltou o processo', marco: true, complemento: `de ${ctx.rotuloDaFase(de) ?? '—'} para ${ctx.rotuloDaFase(para) ?? '—'}`, justificativa: txt(d.justificativa), faseKey: null, faseDestino: para })]
+      return [novoAtomo(ctx, { ...origem, rank: 3, tipo: 'FASE', subtipo: 'retorno_fase', verbo: 'voltou o processo', marco: true, complemento: `de ${ctx.rotuloDaFase(de) ?? '—'} para ${ctx.rotuloDaFase(para) ?? '—'}`, justificativa: txt(d.justificativa), faseKey: null, faseDestino: para, mudancas: [{ campo: 'fase', antes: ctx.rotuloDaFase(de), depois: ctx.rotuloDaFase(para) }] })]
     }
     // ── ÁRVORE ────────────────────────────────────────────────────────────
     case 'NECESSIDADE_REMOVIDA_PELA_ARVORE':
@@ -429,11 +441,12 @@ function atomosDoLog(l: Extract<LinhaCrua, { fonte: 'LOG' }>, ctx: ContextoDoHis
       const nomePara = nomeDoUsuario(ctx, para), nomeDe = nomeDoUsuario(ctx, de)
       const a = simples({ rank: 2, tipo: 'ATRIBUICAO', subtipo: l.acao === 'TAREFA_ATRIBUIDA' ? 'atribuida' : 'transferida', verbo: l.acao === 'TAREFA_ATRIBUIDA' ? 'atribuiu' : 'transferiu' }, 'a', { destinoId: para, motivo: txt(d.motivo) })
       a.complemento = l.acao === 'TAREFA_ATRIBUIDA' ? (nomePara ? `a ${nomePara}` : null) : [nomeDe ? `de ${nomeDe}` : null, nomePara ? `para ${nomePara}` : null].filter(Boolean).join(' ') || null
+      a.mudancas = [{ campo: 'responsável', antes: nomeDe ?? 'ninguém', depois: nomePara }]
       return [a]
     }
     case 'TAREFA_DEVOLVIDA_A_FILA': {
       const de = nomeDoUsuario(ctx, num(d.de))
-      return [simples({ rank: 2, tipo: 'ATRIBUICAO', subtipo: 'devolvida', verbo: 'devolveu à fila da equipe' }, 'a', { motivo: txt(d.motivo), efeito: de ? `deixou de ser de ${de}` : null })]
+      return [simples({ rank: 2, tipo: 'ATRIBUICAO', subtipo: 'devolvida', verbo: 'devolveu à fila da equipe' }, 'a', { motivo: txt(d.motivo), efeito: de ? `deixou de ser de ${de}` : null, mudancas: [{ campo: 'responsável', antes: de, depois: 'ninguém' }] })]
     }
     case 'TAREFA_ATRIBUICAO_DESFEITA':
       return [simples({ rank: 2, tipo: 'ATRIBUICAO', subtipo: 'atribuicao_desfeita', verbo: 'desfez a atribuição' }, 'de', { motivo: txt(d.motivo) })]
@@ -472,6 +485,7 @@ function atomosDoLog(l: Extract<LinhaCrua, { fonte: 'LOG' }>, ctx: ContextoDoHis
       if (composto.slaNaoCancelado) efeitos.push('os prazos das etapas ativas não foram cancelados (conforme informado)')
       if (composto.impacto) efeitos.push(`impacto informado: ${composto.impacto}`)
       a.efeito = efeitos.join(' · ') || null
+      if (de && ROTULO_STATUS[de]) a.mudancas = [{ campo: 'situação', antes: ROTULO_STATUS[de], depois: 'Cancelada' }]
       return [a]
     }
     case 'TAREFA_REABERTA':
@@ -505,8 +519,11 @@ function atomosDoLog(l: Extract<LinhaCrua, { fonte: 'LOG' }>, ctx: ContextoDoHis
     case 'TAREFA_PRAZO_REPACTUACAO_DESFEITA': {
       const a = simples({ rank: 2, tipo: 'PRAZO', subtipo: 'prazo', verbo: l.acao === 'TAREFA_PRAZO_ALTERADO' ? 'repactuou o prazo' : 'desfez a repactuação do prazo' }, 'de', { motivo: txt(d.motivo) })
       const data = (v: unknown) => (v === null ? 'sem prazo' : typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? new Date(v).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : null)
+      // No "antes → depois" a data vem curta (30/09) quando é do mesmo ano do próprio registro; de outro ano, completa.
+      const curta = (v: unknown) => { const c = data(v); return c && /^\d{2}\/\d{2}\/\d{4}$/.test(c) && c.slice(6) === new Date(l.criadoEm).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).slice(6) ? c.slice(0, 5) : c }
       const de = data(d.de), para = data(d.para)
       a.complemento = para ? `para ${para}${de ? ` (era ${de})` : ''}` : null
+      a.mudancas = [{ campo: 'prazo', antes: curta(d.de) ?? 'sem prazo', depois: curta(d.para) ?? 'sem prazo' }]
       return [a]
     }
     case 'TAREFA_PRIORIDADE_ALTERADA':
@@ -514,6 +531,7 @@ function atomosDoLog(l: Extract<LinhaCrua, { fonte: 'LOG' }>, ctx: ContextoDoHis
       const a = simples({ rank: 2, tipo: 'TAREFA', subtipo: 'prioridade', verbo: l.acao === 'TAREFA_PRIORIDADE_ALTERADA' ? 'alterou a prioridade' : 'desfez a alteração de prioridade' }, 'de', { motivo: txt(d.motivo) })
       const de = txt(d.de), para = txt(d.para)
       a.complemento = para ? `${de ? `de ${ROTULO_PRIORIDADE[de] ?? de.toLowerCase()} ` : ''}para ${ROTULO_PRIORIDADE[para] ?? para.toLowerCase()}` : null
+      if (para) a.mudancas = [{ campo: 'prioridade', antes: de ? ROTULO_PRIORIDADE[de] ?? de.toLowerCase() : null, depois: ROTULO_PRIORIDADE[para] ?? para.toLowerCase() }]
       return [a]
     }
     // ── BLOQUEIO / ESPERA ─────────────────────────────────────────────────
@@ -529,6 +547,7 @@ function atomosDoLog(l: Extract<LinhaCrua, { fonte: 'LOG' }>, ctx: ContextoDoHis
       const a = simples({ rank: 2, tipo: 'CARTORIO', subtipo: 'canal', verbo: 'trocou o canal do pedido' }, 'de', { motivo: txt(d.motivo) })
       const de = txt(d.de), para = txt(d.para)
       a.complemento = de && para ? `de ${ROTULO_CANAL[de] ?? de} para ${ROTULO_CANAL[para] ?? para}` : null
+      if (de && para) a.mudancas = [{ campo: 'canal', antes: ROTULO_CANAL[de] ?? de, depois: ROTULO_CANAL[para] ?? para }]
       return [a]
     }
     case 'PROTOCOLO_INFORMADO_POSTERIORMENTE': {
@@ -553,7 +572,7 @@ function atomosDoWorkflow(w: Extract<LinhaCrua, { fonte: 'WORKFLOW' }>, ctx: Con
     const de = txt(d.de), para = txt(d.para) ?? txt(d.faseDestino)
     const sub: SubtipoDeFato = w.tipo === 'FASE_RETORNADA' ? 'retorno_fase' : w.tipo === 'FASE_MOVIDA' || w.tipo === 'FASE_REABERTA' ? 'movimento_fase' : 'avanco_fase'
     const verbo = sub === 'retorno_fase' ? 'voltou o processo' : sub === 'movimento_fase' ? 'moveu o processo' : w.tipo === 'FASE_AVANCADA_FORCADO' ? 'avançou (forçado) o processo' : 'avançou o processo'
-    return [novoAtomo(ctx, { ...origem, rank: 1, marco: true, tipo: 'FASE', subtipo: sub, verbo, complemento: `de ${ctx.rotuloDaFase(de) ?? '—'} para ${ctx.rotuloDaFase(para) ?? '—'}`, faseKey: null, faseDestino: para })]
+    return [novoAtomo(ctx, { ...origem, rank: 1, marco: true, tipo: 'FASE', subtipo: sub, verbo, complemento: `de ${ctx.rotuloDaFase(de) ?? '—'} para ${ctx.rotuloDaFase(para) ?? '—'}`, faseKey: null, faseDestino: para, mudancas: [{ campo: 'fase', antes: ctx.rotuloDaFase(de), depois: ctx.rotuloDaFase(para) }] })]
   }
   // Espera por terceiro decidida pelo motor: a tarefa continua com o prazo correndo (o prazo nunca pausa por terceiro).
   if (w.tipo === 'TAREFA_BLOQUEADA' && txt(d.motivoCodigo) === 'AGUARDANDO_TERCEIRO') {
@@ -574,6 +593,7 @@ function atomoDaFase(f: Extract<LinhaCrua, { fonte: 'FASE' }>, ctx: ContextoDoHi
     id: `fase:${f.id}`, fonte: 'FASE', rank: 2, t: ms(f.criadoEm), quemId: f.solicitadoPorId, sistema: f.solicitadoPorId == null, marco: true,
     tipo: 'FASE', subtipo: sub, verbo, complemento: `de ${ctx.rotuloDaFase(f.faseAtual) ?? '—'} para ${ctx.rotuloDaFase(f.fasePretendida) ?? '—'}`,
     justificativa: txt(f.justificativa), faseKey: null, faseDestino: f.fasePretendida,
+    mudancas: [{ campo: 'fase', antes: ctx.rotuloDaFase(f.faseAtual), depois: ctx.rotuloDaFase(f.fasePretendida) }],
   })]
 }
 
@@ -755,7 +775,18 @@ function dedupe(atomos: Atomo[]): Atomo[] {
 // Cancelar, reabrir e solicitar NÃO agrupam: cada um é uma decisão com motivo próprio (e o cancelamento tem o seu "Reabrir").
 const AGRUPAVEIS = new Set<SubtipoDeFato>(['validada', 'recebida', 'localizada', 'confirmacao_pedido', 'atribuida', 'transferida', 'devolvida', 'cobranca', 'tarefa_criada', 'exigencia_criada', 'exigencia_removida', 'nao_exigida', 'linhagem', 'conferencia', 'espera_terceiro', 'protocolo', 'prazo'])
 
-function chaveDeGrupo(a: Atomo): string | null {
+/** O que NUNCA vira lote, nem por minuto: marcos do processo, texto digitado por gente e fatos únicos por natureza. */
+const NAO_AGRUPA_NO_MINUTO = new Set<SubtipoDeFato>(['abertura', 'edicao', 'avanco_fase', 'retorno_fase', 'movimento_fase', 'preparo_fase', 'comentario', 'observacao'])
+
+export type ModoDeAgrupamento = 'sequencia' | 'minuto'
+
+function chaveDeGrupo(a: Atomo, modo: ModoDeAgrupamento = 'sequencia'): string | null {
+  if (modo === 'minuto') {
+    // Linha do tempo: "uma ação feita de uma vez" = mesmo identificador de lote, ou mesmo usuário + mesma ação no mesmo minuto.
+    if (NAO_AGRUPA_NO_MINUTO.has(a.subtipo) || a.marco) return null
+    if (a.lote) return `lote|${a.lote}`
+    return `${a.subtipo}|${a.sistema ? 'sys' : `u${a.quemId}`}|m${Math.floor(a.t / 60_000)}`
+  }
   if (!AGRUPAVEIS.has(a.subtipo)) return null
   const quem = a.sistema ? 'sys' : `u${a.quemId}`
   switch (a.subtipo) {
@@ -823,7 +854,7 @@ function montarFato(ctx: ContextoDoHistorico, membrosBrutos: Atomo[], reabriveis
   const itemDe = (x: Atomo): FatoItem => {
     const c = contextoDe(ctx, x)
     return {
-      id: x.id, quando: new Date(x.t).toISOString(), certidao: x.certidao, pessoa: nomeDaPessoa(ctx, x.pessoaId), links: linksDe(x),
+      id: x.id, quando: new Date(x.t).toISOString(), certidao: x.certidao, pessoa: nomeDaPessoa(ctx, x.pessoaId), links: linksDe(x), mudancas: x.mudancas,
       frase: redigir(quem.nome, { verbo: x.verbo, objeto: x.objeto, complemento: x.complemento, contexto: c.contexto, fraseLivre: x.fraseLivre, motivo: x.motivo, justificativa: x.justificativa, efeito: x.efeito }),
     }
   }
@@ -849,8 +880,13 @@ function montarFato(ctx: ContextoDoHistorico, membrosBrutos: Atomo[], reabriveis
         verbo = 'localizou o registro de'; objeto = `${certidoes}${dePessoa}`; contexto = [tipos.join(', ') || null, faseRot].filter(Boolean).join(' · ') || null; break
       case 'atribuida': case 'transferida': case 'devolvida':
         objeto = certidoes; contexto = [faseRot, 'lote'].filter(Boolean).join(' · ')
-        if (a.subtipo !== 'devolvida') complemento = a.complemento
+        // O destino ("a Daniela Brait") só sobe ao cartão quando é o mesmo em todas; senão cada item diz o seu em "Ver as N".
+        if (a.subtipo !== 'devolvida') complemento = new Set(membros.map((m) => m.complemento)).size === 1 ? a.complemento : null
         break
+      case 'prioridade': {
+        const depois = [...new Set(membros.map((m) => m.mudancas[0]?.depois ?? null))]
+        verbo = 'alterou a prioridade de'; objeto = certidoes; complemento = depois.length === 1 && depois[0] ? `para ${depois[0]}` : null; contexto = faseRot; break
+      }
       case 'tarefa_criada': verbo = 'criou'; objeto = `${n} tarefas de certidão`; contexto = faseRot; break
       case 'cobranca': verbo = 'cobrou'; objeto = `${n} cartórios`; complemento = `sobre ${certidoes}`; contexto = null; break
       case 'confirmacao_pedido': verbo = 'registrou a confirmação de'; objeto = `${n} pedidos pelo cartório`; complemento = pessoaUnica ? `de ${pessoaUnica}` : null; contexto = faseRot; break
@@ -864,7 +900,8 @@ function montarFato(ctx: ContextoDoHistorico, membrosBrutos: Atomo[], reabriveis
       case 'espera_terceiro': verbo = 'passou a aguardar terceiros em'; objeto = certidoes; contexto = faseRot; break
       case 'protocolo': verbo = 'informou protocolos de'; objeto = certidoes; contexto = null; break
       case 'prazo': verbo = 'repactuou o prazo de'; objeto = certidoes; contexto = null; break
-      default: break
+      // Qualquer outra ação feita de uma vez (modo linha do tempo): o verbo é o do fato e a contagem entra no objeto.
+      default: objeto = certidoes; contexto = faseRot; break
     }
     // Motivo/justificativa/efeito só sobem ao cartão quando TODOS os membros dizem o mesmo; senão ficam em "Ver as N".
     const igual = (f: (m: Atomo) => string | null) => new Set(membros.map(f)).size === 1
@@ -873,6 +910,15 @@ function montarFato(ctx: ContextoDoHistorico, membrosBrutos: Atomo[], reabriveis
     if (!igual((m) => m.efeito)) efeito = null
   }
 
+  // O ANTES → DEPOIS do cartão: o do próprio fato; num lote, só o que TODOS dizem (o resto fica por item).
+  let mudancas: Mudanca[] = a.mudancas
+  if (n > 1) {
+    const unicas = membros.map((m) => (m.mudancas.length === 1 ? m.mudancas[0] : null))
+    if (unicas.every((m) => m != null && m.campo === unicas[0]!.campo)) {
+      const antes = new Set(unicas.map((m) => m!.antes)), depois = new Set(unicas.map((m) => m!.depois))
+      mudancas = depois.size === 1 ? [{ campo: unicas[0]!.campo, antes: antes.size === 1 ? [...antes][0] : null, depois: [...depois][0] }] : []
+    } else mudancas = []
+  }
   const reabrivel = a.subtipo === 'cancelada' && n === 1 && a.tarefaId != null && reabriveis.has(a.id) ? { tarefaId: a.tarefaId } : null
   return {
     id: n > 1 ? `g:${ordenados[ordenados.length - 1].id}+${n}` : a.id,
@@ -885,11 +931,13 @@ function montarFato(ctx: ContextoDoHistorico, membrosBrutos: Atomo[], reabriveis
     pessoaId: n > 1 ? (pessoasDistintas.size === 1 ? a.pessoaId : null) : a.pessoaId,
     fase, passo: n > 1 ? null : a.passo, motivo, justificativa, efeito,
     automatico, quantidade: n, agrupadoDe: n > 1 ? ordenados.map(itemDe) : [], links: linksDe(a), reabrivel,
+    marco: membros.some((m) => m.marco), mudancas, lote: a.lote, faseDestino: a.faseDestino,
   }
 }
 
 // ─── API ────────────────────────────────────────────────────────────────────
-export function montarFatos(linhas: LinhaCrua[], ctx: ContextoDoHistorico): ResultadoDoHistorico {
+export function montarFatos(linhas: LinhaCrua[], ctx: ContextoDoHistorico, opcoes: { agrupar?: ModoDeAgrupamento } = {}): ResultadoDoHistorico {
+  const modo: ModoDeAgrupamento = opcoes.agrupar ?? 'sequencia'
   const { atomos, descartados, naoClassificados } = montarAtomos(linhas, ctx)
   const vivos = dedupe(atomos)
 
@@ -907,10 +955,10 @@ export function montarFatos(linhas: LinhaCrua[], ctx: ContextoDoHistorico): Resu
   const abertos = new Map<string, Atomo[]>()
   const grupos: Atomo[][] = []
   for (const a of cronologico) {
-    const chave = chaveDeGrupo(a)
+    const chave = chaveDeGrupo(a, modo)
     if (chave == null) { grupos.push([a]); continue }
     const g = abertos.get(chave)
-    if (g && a.t - g[g.length - 1].t <= JANELA_DE_GRUPO_MS) g.push(a)
+    if (g && (modo === 'minuto' || a.t - g[g.length - 1].t <= JANELA_DE_GRUPO_MS)) g.push(a)
     else { const novo = [a]; abertos.set(chave, novo); grupos.push(novo) }
   }
   const fatos = grupos.map((g) => montarFato(ctx, g, reabriveis)).sort((x, y) => (x.quando < y.quando ? 1 : x.quando > y.quando ? -1 : x.id < y.id ? 1 : -1))

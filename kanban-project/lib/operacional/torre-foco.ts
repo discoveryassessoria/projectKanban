@@ -32,6 +32,7 @@ import { proximaAcaoDoProcesso, prazoCurto } from './torre-proxima-acao'
 import { metaDaFase } from './torre-metas'
 import { BOLA_NOSSA } from './torre-bola'
 import { nivelDeRisco } from './torre-filtros'
+import { motivoLegivel, porQuem } from './motivos-legiveis'
 import { lerCaminhoDoProcesso, type CaminhoDoProcesso } from './torre-caminho-leitura'
 import { lerTravaDoProcesso, type TravaDoProcesso } from './torre-trava'
 import { RESULTADOS_QUE_MOVEM_DE_FASE } from './metricas-processo'
@@ -206,13 +207,12 @@ function linhaConcluida(l: LinhaGerencial, geracaoDe: Map<number, string>): Linh
 function linhaEncerrada(e: CertidaoEncerradaDoFoco, geracaoDe: Map<number, string>, agora: Date): LinhaDaTabela {
   const enc = e.encerramento
   const cancelada = e.tipo === 'CANCELADA'
-  const quem = enc?.porNome ?? 'o Sistema'
   const encerramentoTexto = cancelada
-    ? `cancelada${enc?.quandoRotulo ? ` ${enc.quandoRotulo}` : ''} por ${quem}${enc?.motivo ? ` · ${enc.motivo}` : ''}`
-    : `não exigida${enc?.quando ? ` desde ${rotuloDia(enc.quando, agora)}` : ''} · ${enc?.motivo ?? 'a árvore deixou de exigir'}`
+    ? `cancelada${enc?.quandoRotulo ? ` ${enc.quandoRotulo}` : ''} ${porQuem(enc?.porNome)}${enc?.motivo ? ` · ${motivoLegivel(enc.motivo)}` : ''}`
+    : `não exigida${enc?.quando ? ` desde ${rotuloDia(enc.quando, agora)}` : ''} · ${motivoLegivel(enc?.motivo) ?? 'a árvore deixou de exigir'}`
   const motivoTexto = cancelada
-    ? `Cancelada${enc?.porNome ? ` por ${enc.porNome}` : ''}${enc?.motivo ? ` · ${enc.motivo}` : ''}${enc?.justificativa ? ` (${enc.justificativa})` : ''}`
-    : `Não exigida: ${enc?.motivo ?? 'a árvore deixou de exigir'}${enc?.observacao ? `. ${enc.observacao}` : ''}`
+    ? `Cancelada ${porQuem(enc?.porNome)}${enc?.motivo ? ` · ${motivoLegivel(enc.motivo)}` : ''}${enc?.justificativa ? ` (${enc.justificativa})` : ''}`
+    : `Não exigida: ${motivoLegivel(enc?.motivo) ?? 'a árvore deixou de exigir'}${enc?.observacao ? `. ${enc.observacao}` : ''}`
   return {
     chave: `d${e.documentoId}`, tarefaId: enc?.tarefaReabrivelId ?? e.tarefaId ?? null, documentoId: e.documentoId, tipo: e.tipo,
     titulo: e.titulo, pessoaId: e.pessoaId ?? null, pessoa: e.pessoa,

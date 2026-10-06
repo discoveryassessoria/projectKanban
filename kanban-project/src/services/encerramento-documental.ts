@@ -15,6 +15,7 @@
 import type { Prisma, PrismaClient } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { lerMotivoComposto } from '@/lib/operacional/historico-processo'
+import { motivoLegivel } from '@/lib/operacional/motivos-legiveis'
 import { rotuloDoMomento } from '@/lib/operacional/historico-filtros'
 import { documentoAtivo } from '@/src/lib/documentos/status-inativos'
 import type { EncerramentoDoDocumento } from '@/src/lib/process-stage/estrutura-operacional-core'
@@ -90,7 +91,7 @@ export async function encerramentosDosDocumentos(documentoIds: number[], db: Pri
     saida.set(d.id, {
       tipo: 'CANCELADA', quando: (log?.criadoEm ?? d.ultimaMovimentacao)?.toISOString() ?? null, quandoRotulo: rotuloQuando(log?.criadoEm ?? d.ultimaMovimentacao),
       porId: autor, porNome: autor != null ? nomes.get(autor) ?? null : null,
-      motivo: composto.motivo, justificativa: composto.justificativa,
+      motivo: motivoLegivel(composto.motivo), justificativa: composto.justificativa,
       // Só cancelamento HUMANO de uma tarefa que continua CANCELADA pode ser reaberto pela porta canônica (`reabrir`).
       tarefaReabrivelId: autor != null && tarefa?.statusTarefa === 'CANCELADA' ? tarefa.id : null,
       observacao: null,

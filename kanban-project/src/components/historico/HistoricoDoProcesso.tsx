@@ -369,7 +369,7 @@ export function HistoricoDoProcesso({ processoId, url, onAbrirCertidao, onAbrirP
 
       <div className="mt-auto flex flex-wrap gap-x-6 gap-y-1 border-t border-[var(--border-default)] pt-3.5 text-[13px] text-[var(--text-secondary)]">
         <div><b className="font-semibold text-[var(--text-primary)]">{rodape.fatosNoPeriodo}</b> fatos no período</div>
-        <div><b className="font-semibold text-[var(--text-primary)]">{rodape.pessoasQueAtuaram.length}</b> pessoa{rodape.pessoasQueAtuaram.length === 1 ? "" : "s"} atuaram{rodape.pessoasQueAtuaram.length ? `: ${rodape.pessoasQueAtuaram.join(", ")}` : ""}</div>
+        <div><b className="font-semibold text-[var(--text-primary)]">{rodape.pessoasQueAtuaram.length}</b> {rodape.pessoasQueAtuaram.length === 1 ? "pessoa atuou" : "pessoas atuaram"}{rodape.pessoasQueAtuaram.length ? `: ${rodape.pessoasQueAtuaram.join(", ")}` : ""}</div>
         <div><b className="font-semibold text-[var(--text-primary)]">{rodape.cancelamentos}</b> cancelamento{rodape.cancelamentos === 1 ? "" : "s"}</div>
         <div><b className="font-semibold text-[var(--text-primary)]">{rodape.certidoesValidadas}</b> certidões validadas</div>
         <div className="ml-auto">Último fato: {rodape.ultimoFato ?? "—"}</div>

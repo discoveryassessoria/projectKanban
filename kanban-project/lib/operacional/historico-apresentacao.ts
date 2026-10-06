@@ -15,6 +15,8 @@
 // antes; nunca uma consulta por linha). Id sem cadastro vira "usuário removido do cadastro", nunca o número.
 // ============================================================================
 
+import { apresentarCodigos } from './motivos-legiveis'
+
 const DESCONHECIDO = 'usuário removido do cadastro'
 
 export type NomesDeUsuario = ReadonlyMap<number, string> | Readonly<Record<number, string>>
@@ -69,5 +71,7 @@ export function apresentarTextoDoHistorico(texto: string, nomes: NomesDeUsuario,
   t = t.replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (_m, a: string, m: string, d: string) => `${d}/${m}/${a}`)
   // 6) o status oficial no plural: "passou a aguardar terceiro" → "passou a aguardar terceiros".
   t = t.replace(/\baguardar terceiro\b(?!s)/g, 'aguardar terceiros')
+  // 7) código interno de motivo → português ("CAUSA_REMOVIDA" → "causa removida da árvore"): nunca cru na tela.
+  t = apresentarCodigos(t)
   return t
 }

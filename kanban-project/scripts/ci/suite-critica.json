@@ -225,6 +225,8 @@
     "scripts/anexos-rotas-auth.test.ts",
     "scripts/torre-foco-um-so-comportamento.test.ts",
     "scripts/torre-relatorio-filtros.test.ts",
+    "scripts/torre-historico-linha-do-tempo.test.ts",
+    "scripts/torre-historico-visita.test.ts",
     "scripts/coleta-pendentes-prazo.test.ts",
     "scripts/coleta-orfaos.test.ts",
     "scripts/processo-arquivos-orfaos.test.ts",
