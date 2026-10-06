@@ -6,6 +6,7 @@
 // A MESMA projeção da Operação (/api/torre/tarefas). Nenhuma regra nova: cada botão chama a porta que já existe (tarefa-comandos,
 // tarefa-ciclo, cobranca-terceiros, iniciar-envio, vincular-orgao-lote, atribuir). Toda regra de tela mora em
 // lib/operacional/torre-tarefas-tela.ts e torre-filtros.ts (puras, testadas). Nada de dado de exemplo.
+import { SeletorResponsavel } from "@/src/components/operacao/kit-operacional"
 import { ordenarLinhasDeCertidao } from "@/lib/operacional/ordem-certidoes"
 import { motivoLegivel, porQuem } from "@/lib/operacional/motivos-legiveis"
 import { PRIORIDADES_DO_LOTE, PRIORIDADE_NORMAL, prioridadeValida, textoDoLotePrioridade, type PrioridadeDoModelo } from "@/lib/operacional/torre-prioridade-lote"
@@ -265,9 +266,19 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
   }
 
   // ─── AÇÕES DA LINHA ──────────────────────────────────────────────────────
-  const atribuirRapido = async (l: LinhaTorre) => {
-    const r = await api<{ mensagem?: string; desfazer?: Desfazer }>(`/api/torre/tarefas/${l.taskId}/atribuir-sugerido`, "POST")
-    if (r.ok) { avisar(r.data.mensagem ?? "Atribuída.", r.data.desfazer ?? null); recarregar() } else avisar(erroDe(r.data))
+  // ATRIBUIR abre a ESCOLHA do funcionário (a mesma lista da Operação): nunca atribui sozinho à sugestão (essa é a ação «Atribuir a <sugerido>» do painel da tarefa).
+  const [escolhaLinha, setEscolhaLinha] = useState<LinhaTorre | null>(null)
+  const [erroEscolha, setErroEscolha] = useState<string | null>(null)
+  const [atribuindo, setAtribuindo] = useState(false)
+  const atribuirRapido = (l: LinhaTorre) => { setErroEscolha(null); setEscolhaLinha(l) }
+  const atribuirA = async (l: LinhaTorre, responsavelId: number) => {
+    setAtribuindo(true); setErroEscolha(null)
+    const r = await api<{ ok?: boolean; erro?: string }>(`/api/tarefas/${l.taskId}/comando`, "POST", { acao: l.responsavelId == null ? "atribuir" : "transferir", responsavelId })
+    setAtribuindo(false)
+    if (!r.ok) { setErroEscolha(erroDe(r.data)); return }
+    setEscolhaLinha(null)
+    avisar("Responsável atribuído · fica no histórico", { tipo: "ATRIBUICAO", tarefaIds: [l.taskId] } as Desfazer)
+    recarregar()
   }
   const iniciarRapido = async (l: LinhaTorre) => {
     const r = await api<{ mensagem?: string }>(`/api/torre/tarefas/${l.taskId}/iniciar`, "POST", {})
@@ -422,6 +433,14 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
           />
         )}
 
+      {escolhaLinha && (
+        <SeletorResponsavel
+          titulo={escolhaLinha.responsavelId == null ? "Atribuir tarefa" : `Transferir de ${escolhaLinha.responsavelNome ?? "—"}`}
+          atual={escolhaLinha.responsavelId} ocupado={atribuindo} erro={erroEscolha}
+          aoFechar={() => { setEscolhaLinha(null); setErroEscolha(null) }}
+          aoEscolher={(id) => void atribuirA(escolhaLinha, id)}
+        />
+      )}
       {modal && <ModalDaAcao acao={modal.acao} linha={modal.linha} agora={agora} onFechar={() => setModal(null)} />}
 
       {repactuarLote && (
