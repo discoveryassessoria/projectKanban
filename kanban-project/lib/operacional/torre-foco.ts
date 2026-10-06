@@ -318,7 +318,7 @@ export async function detalheDoProcesso(processoId: number, agora = new Date()):
   const risco: RiscoCalculado | null = foco.pausa ? null
     : riscoDoProcesso(entradaDoRisco({ linhas: abertasParaRisco, itens: itensDoProcesso, diasNaFase: foco.faseAtual.dias, metaDias, bolaRotulo: bolaForaRotulo }))
 
-  // A tabela: abertas e concluídas DA FASE ATUAL + as certidões fora do jogo (canceladas / não exigidas).
+  // A tabela: abertas e concluídas DA FASE ATUAL + as certidões canceladas / não exigidas.
   const abertasDaFase = foco.tarefas.filter((l) => faseAtualKey == null || l.faseMacroKey === faseAtualKey)
   const deFasesAnteriores = foco.tarefas.filter((l) => faseAtualKey != null && l.faseMacroKey !== faseAtualKey)
   const trabalho: LinhaDaTabela[] = [...abertasDaFase.map((l) => linhaAberta(l, geracaoDe)), ...concluidas.map((l) => linhaConcluida(l, geracaoDe))]
