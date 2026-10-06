@@ -5,6 +5,7 @@
 // (`processo-pausa.ts`), reabrir certidão (`reabrir-certidao`), avanço forçado (`advance/force`), comentários (`/api/comentarios`).
 // Nada daqui calcula regra: o servidor entrega os textos e os números; esta página desenha, filtra a tabela e chama as portas.
 import { useCallback, useEffect, useRef, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { HistoricoDoProcesso } from "@/src/components/historico/HistoricoDoProcesso"
 import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
@@ -16,6 +17,7 @@ import { ProcessoCabecalho } from "./ProcessoCabecalho"
 import { ProcessoCaminho } from "./ProcessoCaminho"
 import { ProcessoCertidoes } from "./ProcessoCertidoes"
 import { VoltarDaTorre } from "./VoltarDaTorre"
+import { escreverRelatorioNaUrl, lerRelatorioDaUrl, type FiltrosDoRelatorio } from "@/lib/operacional/torre-relatorio-filtros"
 import type { FiltroDeStatusDaTabela } from "@/lib/operacional/torre-processo-puro"
 import { ProcessoFatos } from "./ProcessoFatos"
 import { ProcessoComentarios } from "./ProcessoComentarios"
@@ -30,13 +32,23 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
   const [d, setD] = useState<DetalheDoProcesso | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [versao, setVersao] = useState(0)
+  // O RELATÓRIO VIVE NA URL (`?relatorio=1&rel_fase=…`): um link copiado abre a janela já filtrada; sem parâmetros, os padrões. `replace` (não empilha
+  // histórico): o "voltar" do navegador e o botão Voltar continuam levando à página de onde a pessoa veio.
+  const router = useRouter()
+  const caminhoAtual = usePathname()
+  const paramsUrl = useSearchParams()
+  const relatorioDaUrl = lerRelatorioDaUrl(paramsUrl)
+  const gravarRelatorio = useCallback((aberto: boolean, filtros: FiltrosDoRelatorio) => {
+    const q = escreverRelatorioNaUrl(new URLSearchParams(window.location.search), { aberto, filtros }).toString()
+    router.replace(q ? `${caminhoAtual}?${q}` : caminhoAtual, { scroll: false })
+  }, [router, caminhoAtual])
   // O estado da lista de certidões: o padrão é só as ATIVAS; o bloco "Cancelada / não exigida" e o select de Status mexem neste mesmo estado.
   const [statusDaLista, setStatusDaLista] = useState<FiltroDeStatusDaTabela>("ATIVAS")
   const [ocupado, setOcupado] = useState(false)
   const [toast, setToast] = useState<ToastDaPagina | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [modal, setModal] = useState<
-    | null | { tipo: "pausar" } | { tipo: "forcar" } | { tipo: "relatorio" } | { tipo: "historico" }
+    | null | { tipo: "pausar" } | { tipo: "forcar" } | { tipo: "historico" }
     | { tipo: "reabrir"; linha: LinhaDaTabela } | { tipo: "motivo"; linha: LinhaDaTabela }
   >(null)
 
@@ -156,7 +168,7 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
           <VoltarDaTorre />
           <ProcessoCabecalho
             d={d} agora={agora} perm={perm} ocupado={ocupado}
-            onDistribuir={() => void distribuir()} onRelatorio={() => setModal({ tipo: "relatorio" })} onHistorico={() => setModal({ tipo: "historico" })}
+            onDistribuir={() => void distribuir()} onRelatorio={() => gravarRelatorio(true, relatorioDaUrl.filtros)} onHistorico={() => setModal({ tipo: "historico" })}
             onPausar={() => setModal({ tipo: "pausar" })} onReativar={() => void reativar(false)} onForcar={() => setModal({ tipo: "forcar" })}
           />
           <ProcessoCaminho d={d} agora={agora} encerradasNaLista={statusDaLista === "TODOS" || statusDaLista === "ENCERRADAS"} onAlternarEncerradas={() => setStatusDaLista((s) => (s === "TODOS" || s === "ENCERRADAS" ? "ATIVAS" : "TODOS"))} />
@@ -191,8 +203,9 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
             {modal.linha.tarefaId != null && <a className="small" href={urlOperacionalDaTarefa({ taskId: modal.linha.tarefaId, processoId })}>Abrir a tarefa</a>}
           </Modal>
         )}
-        {modal?.tipo === "relatorio" && (
-          <ProcessoRelatorio processoId={d.processoId} processoRotulo={d.codigo ?? d.familiaNome} familiaId={d.familiaId} familiaNome={d.familiaNome} onFechar={() => setModal(null)} avisar={avisarSimples} />
+        {relatorioDaUrl.aberto && perm.relatorio && (
+          <ProcessoRelatorio processoId={d.processoId} processoRotulo={d.codigo ?? d.familiaNome} familiaId={d.familiaId} familiaNome={d.familiaNome}
+            filtrosIniciais={relatorioDaUrl.filtros} onFiltros={(f) => gravarRelatorio(true, f)} onFechar={() => gravarRelatorio(false, relatorioDaUrl.filtros)} avisar={avisarSimples} />
         )}
         {modal?.tipo === "historico" && (<HistoricoEsc onFechar={() => setModal(null)} />)}
         {modal?.tipo === "historico" && (

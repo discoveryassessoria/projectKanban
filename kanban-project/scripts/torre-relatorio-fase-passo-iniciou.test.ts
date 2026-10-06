@@ -30,8 +30,7 @@ const MARCA = "RELCTL"
 async function main() {
   secao("as listas do componente e do motor")
   const modal = readFileSync("src/components/torre/ProcessoRelatorio.tsx", "utf8")
-  const aba = readFileSync("src/components/torre/RelatorioControle.tsx", "utf8")
-  ok("a prévia (Detalhe) e as exportações (Detalhe e aba Processos) pedem a MESMA lista de colunas", /COLUNAS_DO_RELATORIO_DE_CONTROLE/.test(modal) && /colunas: \[\.\.\.COLUNAS_DO_RELATORIO_DE_CONTROLE\]/.test(aba) && /colunas: COLUNAS,/.test(modal) && /\.\.\.spec, formato/.test(modal))
+  ok("a prévia (Detalhe) e as exportações (Detalhe e aba Processos) pedem a MESMA lista de colunas", /COLUNAS_DO_RELATORIO_DE_CONTROLE/.test(modal) && !/RelatorioControle/.test(readFileSync("src/components/torre/Torre.tsx", "utf8")) && /colunas: COLUNAS,/.test(modal) && /\.\.\.spec, formato/.test(modal))
   ok("as colunas mantêm as existentes e acrescentam Fase, Passo e Iniciou", ["tipo", "pessoa", "geracao", "status", "responsavel_tarefa", "prazo"].every((k) => (COLUNAS_DO_RELATORIO_DE_CONTROLE as readonly string[]).includes(k)) && ["fase_certidao", "passo", "iniciou"].every((k) => (COLUNAS_DO_RELATORIO_DE_CONTROLE as readonly string[]).includes(k)))
   ok("todas existem no domínio de Certidões do motor, com os rótulos esperados", COLUNAS_DO_RELATORIO_DE_CONTROLE.map((k) => DOMINIO_CERTIDOES.colunas.find((c) => c.key === k)?.rotulo).join("|") === ROTULOS_DO_RELATORIO_DE_CONTROLE.join("|"), COLUNAS_DO_RELATORIO_DE_CONTROLE.map((k) => DOMINIO_CERTIDOES.colunas.find((c) => c.key === k)?.rotulo).join("|"))
 

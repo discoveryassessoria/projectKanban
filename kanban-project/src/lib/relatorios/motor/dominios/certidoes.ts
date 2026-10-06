@@ -27,8 +27,9 @@ import {
   type SituacaoSolicitacaoCertidao,
 } from "@/src/lib/process-stage/situacao-solicitacao-certidao"
 import { documentoTemDadosPreenchidos } from "@/src/lib/documentos/dados-preenchidos"
+import { documentoAtivo } from "@/src/lib/documentos/status-inativos"
 import { titularDaUniao } from "@/src/services/genealogia/titular-uniao"
-import type { CorDeCelula, DominioDef } from "../tipos"
+import type { ContextoDoFiltro, CorDeCelula, DominioDef, FiltroDef, ValorDeFiltro } from "../tipos"
 import { cadastro, contem, dataBR, diasEntre, emLista, emListaId, igualId, periodo, porCampo } from "./_comuns"
 
 /** A categoria que define "certidão" — do Cadastro Mestre, não do nome. */
@@ -227,6 +228,8 @@ const INCLUDE = {
         take: 1,
       },
     },
+    // Determinístico: a coluna e os filtros do relatório de controle leem o MESMO documento (o de menor id).
+    orderBy: { id: "asc" as const },
     take: 1,
   },
 } as const
@@ -268,6 +271,59 @@ const SO_CERTIDAO = {
   itemCatalogo: { tiposDocumento: { some: { categoriaDocumental: { code: CATEGORIA_CERTIDAO } } } },
 }
 
+
+// ─── FILTROS DO RELATÓRIO DE CONTROLE (Torre) ─────────────────────────────────────────────────────────────────────────────
+// Fase · Linhagem · Status · Pessoa. Cada um decide pela MESMA leitura das colunas (a tarefa mais recente do documento, `pessoaDaLinha`,
+// `Documento.status`) — filtro e coluna nunca divergem. Resolvem ids DENTRO do recorte já montado (família/processo), por isso
+// `depoisDoEscopo`. Nomes de status = os da página do processo: ativas (tudo que é trabalho, concluída inclusive) · concluídas ·
+// canceladas / não exigidas.
+const SELECT_CONTROLE = {
+  id: true,
+  pessoa: { select: { id: true, linhaReta: true } },
+  uniao: { select: { pessoa1Id: true, pessoa2Id: true, pessoa1: { select: { id: true, linhaReta: true } }, pessoa2: { select: { id: true, linhaReta: true } } } },
+  documentos: {
+    select: { status: true, tarefasVinculadas: { select: { faseMacroKey: true, statusTarefa: true }, orderBy: { id: "desc" as const }, take: 1 } },
+    orderBy: { id: "asc" as const }, take: 1,
+  },
+} as const
+
+const STATUS_TAREFA_CONCLUIDA: readonly string[] = ["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI"]
+type EstadoDoControle = "ativas" | "concluidas" | "encerradas"
+const ESTADOS_DO_CONTROLE: readonly EstadoDoControle[] = ["ativas", "concluidas", "encerradas"]
+
+/** O estado de UMA linha, na régua da página do processo. */
+export function estadoDaLinhaNoControle(l: any): EstadoDoControle[] {
+  const d = doc(l)
+  if (d && !documentoAtivo(d.status)) return ["encerradas"]
+  const t = tarefaDoDoc(l)
+  return t && STATUS_TAREFA_CONCLUIDA.includes(String(t.statusTarefa)) ? ["ativas", "concluidas"] : ["ativas"]
+}
+export const linhagemDaLinhaNoControle = (l: any): "reta" | "fora" => (pessoaDaLinha(l) as any)?.linhaReta === true ? "reta" : "fora"
+
+async function idsDoControle(contexto: ContextoDoFiltro | undefined, passa: (l: any) => boolean): Promise<Record<string, unknown>> {
+  const linhas = await prisma.necessidadeDocumental.findMany({
+    where: { AND: [contexto?.onde ?? {}, SO_CERTIDAO, { supersedePorId: null }] }, select: SELECT_CONTROLE,
+  })
+  // `{ id: { in: [] } }` (nenhuma casa) é um filtro VÁLIDO — devolve zero linhas; `null` faria o motor ignorá-lo e trazer tudo.
+  return { id: { in: (linhas as any[]).filter(passa).map((l) => l.id as number) } }
+}
+const valoresDe = (v: ValorDeFiltro): string[] => (v.tipo === "multi_selecao" ? v.valores.map(String) : [])
+
+export const FILTROS_DO_CONTROLE: FiltroDef[] = [
+  { key: "ctl_fase", rotulo: "Fase", tipo: "multi_selecao", depoisDoEscopo: true,
+    descricao: "A fase da tarefa da certidão (a coluna Fase). Certidão sem tarefa só aparece em \"Todas as fases\".",
+    paraWhere: (v, c) => { const k = valoresDe(v); return k.length ? idsDoControle(c, (l) => k.includes(String(tarefaDoDoc(l)?.faseMacroKey ?? "\u0000"))) : null } },
+  { key: "ctl_linhagem", rotulo: "Linhagem", tipo: "multi_selecao", depoisDoEscopo: true,
+    descricao: "Linha reta × fora da linha: a mesma classificação da aba Documentos (Pessoa.linhaReta; casamento vale pelo titular da união).",
+    paraWhere: (v, c) => { const k = valoresDe(v).filter((x) => x === "reta" || x === "fora"); return k.length ? idsDoControle(c, (l) => k.includes(linhagemDaLinhaNoControle(l))) : null } },
+  { key: "ctl_status", rotulo: "Status", tipo: "multi_selecao", depoisDoEscopo: true,
+    descricao: "Os nomes da página do processo: ativas (inclui as concluídas) · concluídas · canceladas / não exigidas.",
+    paraWhere: (v, c) => { const k = valoresDe(v).filter((x): x is EstadoDoControle => (ESTADOS_DO_CONTROLE as readonly string[]).includes(x)); return k.length ? idsDoControle(c, (l) => estadoDaLinhaNoControle(l).some((e) => k.includes(e))) : null } },
+  { key: "ctl_pessoa", rotulo: "Pessoa", tipo: "entidade", depoisDoEscopo: true,
+    descricao: "A pessoa da linha (a coluna Pessoa; no casamento, o titular da união).",
+    paraWhere: (v, c) => (v.tipo === "entidade" ? idsDoControle(c, (l) => (pessoaDaLinha(l) as any)?.id === v.id) : null) },
+]
+
 export const DOMINIO_CERTIDOES: DominioDef = {
   key: "certidoes",
   rotulo: "Certidões",
@@ -280,6 +336,7 @@ export const DOMINIO_CERTIDOES: DominioDef = {
   ondeNacionalidade: (countryKey) => ({ processo: { paisCanonico: { countryKey } } }),
 
   filtros: [
+    ...FILTROS_DO_CONTROLE,
     { key: "tipo", rotulo: "Tipo de certidão",
       descricao: "Só registro civil — a mesma categoria do Cadastro Mestre que define este domínio.",
       tipo: "multi_selecao", opcoes: cadastro("itens_certidao"), paraWhere: emListaId("itemCatalogoId") },

@@ -93,11 +93,17 @@ export async function executar(
     aplicados.push({ key: "__nacionalidade", rotulo: "Nacionalidade", descricao: spec.nacionalidade })
   }
 
-  for (const f of spec.filtros ?? []) {
+  // Filtros que dependem do recorte (`depoisDoEscopo`) rodam por último, com o `where` dos demais — a ordem do pedido não importa.
+  const pedidos = [...(spec.filtros ?? [])]
+  const ordenados = [
+    ...pedidos.filter((f) => !dominio.filtros.find((x) => x.key === f.key)?.depoisDoEscopo),
+    ...pedidos.filter((f) => dominio.filtros.find((x) => x.key === f.key)?.depoisDoEscopo),
+  ]
+  for (const f of ordenados) {
     const def = dominio.filtros.find((x) => x.key === f.key)
     if (!def) { ignorados.push(f.key); continue }
     if (chavesProibidas.has(def.key)) { ignorados.push(f.key); continue }
-    const clausula = await def.paraWhere(f.valor)
+    const clausula = await def.paraWhere(f.valor, def.depoisDoEscopo ? { onde: clausulas.length ? { AND: [...clausulas] } : {} } : undefined)
     // Filtro sem valor útil não vira cláusula vazia: sumiria o AND e passaria a
     // trazer tudo, que é o pior resultado possível — parece funcionar.
     if (!clausula) { ignorados.push(f.key); continue }
