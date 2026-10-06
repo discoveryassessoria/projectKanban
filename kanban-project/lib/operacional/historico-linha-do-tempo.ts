@@ -283,11 +283,12 @@ export function blocosDoPdf(visao: VisaoDaLinhaDoTempo): Array<{ tipo: 'dia'; te
 // ─── PDF "PARA O CLIENTE" ────────────────────────────────────────────────────────────────────────────────────────────────
 
 /**
- * Os tipos de fato (subtipos) que ENTRAM no PDF do cliente: só ANDAMENTO — mudança de fase, certidão pedida / confirmada pelo cartório /
- * recebida / validada, protocolo, e (por etapa concluída) apostilada e traduzida. Tudo o mais é interno e FICA FORA.
+ * Os tipos de fato (subtipos) que ENTRAM no PDF do cliente: só ANDAMENTO — abertura, avanço de fase, registro localizado, certidão pedida /
+ * confirmada pelo cartório / recebida / validada, protocolo, e (por etapa concluída) apostilada e traduzida. Tudo o mais é interno e FICA FORA
+ * (inclusive o RETORNO de fase: aparece na janela interna, não no PDF do cliente).
  */
 export const SUBTIPOS_NO_PDF_DO_CLIENTE: readonly SubtipoDeFato[] = [
-  'abertura', 'avanco_fase', 'retorno_fase', 'movimento_fase', 'solicitada', 'confirmacao_pedido', 'recebida', 'validada', 'protocolo',
+  'abertura', 'avanco_fase', 'movimento_fase', 'localizada', 'solicitada', 'confirmacao_pedido', 'recebida', 'validada', 'protocolo',
 ]
 /** 'etapa_concluida' entra SÓ quando a etapa é de apostila ou de tradução (o resto é rotina interna). */
 const RE_APOSTILA = /apostil/i
@@ -313,8 +314,13 @@ export function fraseDoCliente(f: FatoDoHistorico): string | null {
   switch (etapa ?? f.subtipo) {
     case 'abertura': return 'Processo aberto'
     case 'avanco_fase': return `O processo avançou para a fase ${depois ?? 'seguinte'}`
-    case 'retorno_fase': return `O processo voltou para a fase ${depois ?? 'anterior'}`
     case 'movimento_fase': return `O processo passou para a fase ${depois ?? 'indicada'}`
+    case 'localizada': {
+      // "Registro de nascimento de Erminio Salvarani localizado" — só a certidão e a pessoa (o fato não guarda cartório nem cidade).
+      if (n > 1) return `${n} registros localizados${f.pessoa ? ` · ${f.pessoa}` : ''}`
+      const tipo = /^Certid[ãa]o de ([^\s-]+)/i.exec(f.certidao ?? '')?.[1]?.toLowerCase()
+      return `Registro${tipo ? ` de ${tipo}` : ''}${f.pessoa ? ` de ${f.pessoa}` : ''} localizado`
+    }
     case 'solicitada': return `${cert} — solicitada${n > 1 ? 's' : ''}`
     case 'confirmacao_pedido': return `${cert} — pedido confirmado pelo cartório`
     case 'recebida': return `${cert} — recebida${n > 1 ? 's' : ''}`

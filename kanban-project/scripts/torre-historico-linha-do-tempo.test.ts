@@ -26,7 +26,7 @@ const passos: ContextoDoHistorico["passos"] = {}
 for (let i = 0; i < 12; i++) {
   tarefas[100 + i] = { titulo: `Certidão de nascimento - Inteiro Teor · Pessoa ${i}`, documentoId: 200 + i, necessidadeId: null, pessoaId: 10 + i, faseMacroKey: "emissao_documental", statusTarefa: "EM_ANDAMENTO", responsavelId: null }
   documentos[200 + i] = { rotulo: null, pessoaId: 10 + i, necessidadeId: null, status: "PENDENTE" }
-  passos[300 + i] = { stepKey: "solicitar_certidao", titulo: "Solicitar certidão", faseMacroKey: "emissao_documental", documentoId: 200 + i, necessidadeId: null, pessoaId: 10 + i }
+  passos[300 + i] = { stepKey: i === 7 ? "localizar_registro" : "solicitar_certidao", titulo: "Solicitar certidão", faseMacroKey: "emissao_documental", documentoId: 200 + i, necessidadeId: null, pessoaId: 10 + i }
 }
 const ctx = (): ContextoDoHistorico => ({
   processo: { id: 1, nome: "Salvarani", pais: "Itália", requerentes: 2, familiaId: 9 },
@@ -155,16 +155,22 @@ async function main() {
     { fonte: "SOLICITACAO", id: ++seq, documentoId: 204, tarefaId: 104, canal: "EMAIL", destinatarioNome: null, orgaoNome: "Cartório de Roma", criadoPorId: 2, criadoEm: T(D0, 800) },
     { fonte: "SUBTAREFA", id: ++seq, stepInstanceId: 305, subtaskKey: "receber_certidao", completedAt: T(D0, 1000), executadoPorId: 1, resultado: null },
     { fonte: "SUBTAREFA", id: ++seq, stepInstanceId: 306, subtaskKey: "conferir_validar_certidao", completedAt: T(D0, 1200), executadoPorId: 1, resultado: null },
+    { fonte: "PASSO", id: ++seq, stepInstanceId: 307, completedAt: T(D0, 1100), executadoPorId: 2 },
+    log("PROCESS_PHASE_ROLLED_BACK", { entidade: "Processo", entidadeId: 1, usuarioId: 1, quando: T(D0, 1300), detalhes: { deFase: "emissao_documental", paraFase: "genealogia", justificativa: "faltou conferir um documento da equipe" } }),
     avanco,
   ], ctx(), { agrupar: "minuto" })
   const cli = linhasDoCliente(interno.fatos)
   const texto = cli.map((c) => c.frase).join("\n")
-  ok("entram: pedido, recebida, validada e mudança de fase", cli.length === 4 && /solicitada/.test(texto) && /recebida/.test(texto) && /validada/.test(texto) && /avançou para a fase Emissão Documental/.test(texto), texto.replace(/\n/g, " | "))
+  ok("entram: pedido, recebida, validada, registro localizado e avanço de fase", cli.length === 5 && /solicitada/.test(texto) && /recebida/.test(texto) && /validada/.test(texto) && /avançou para a fase Emissão Documental/.test(texto), texto.replace(/\n/g, " | "))
+  ok("'Registro localizado' ENTRA, com texto de cliente: só a certidão e a pessoa", cli.some((c) => c.frase === "Registro de nascimento de Pessoa 7 localizado"), cli.map((c) => c.frase).join(" | "))
+  ok("'Retorno de fase' FICA FORA do PDF do cliente (e continua na janela interna)", !/voltou|retorn|Genealogia/i.test(texto) && interno.fatos.some((f) => f.subtipo === "retorno_fase") && linha(interno.fatos.find((f) => f.subtipo === "retorno_fase")!).texto.startsWith("Voltou para Genealogia"))
+  ok("nada do registro localizado vaza nome da equipe nem motivo interno", !/Daniela|Brait|equipe|faltou conferir/i.test(texto))
   ok("ficam fora: prioridade, atribuição, cancelamento interno, prazo e os motivos", !/priorid|atribu|cancel|prazo|erro interno|pressionou|fôlego/i.test(texto))
   ok("nenhum nome da equipe (Marco, Daniela) nem cartório no texto", !/Marco|Daniela|Rovatti|Brait|Cartório de Roma/.test(texto))
   const cab = cabecalhoDoCliente({ familiaNome: "Salvarani", faseAtual: "Emissão Documental", geradoEm: AGORA })
   ok("cabeçalho: nome da família, fase atual e a data", cab.titulo === "Andamento do processo — família Salvarani" && cab.subtitulo === "Fase atual: Emissão Documental · posição em 05/10/2026", `${cab.titulo} | ${cab.subtitulo}`)
-  ok("a lista do que entra e do que fica fora está declarada (e não se sobrepõe)", SUBTIPOS_NO_PDF_DO_CLIENTE.every((s) => !SUBTIPOS_FORA_DO_PDF_DO_CLIENTE.includes(s)) && ["prioridade", "atribuida", "cancelada", "prazo", "cobranca", "comentario"].every((s) => SUBTIPOS_FORA_DO_PDF_DO_CLIENTE.includes(s as never)))
+  ok("a lista do que entra e do que fica fora está declarada (e não se sobrepõe)", SUBTIPOS_NO_PDF_DO_CLIENTE.every((s) => !SUBTIPOS_FORA_DO_PDF_DO_CLIENTE.includes(s)) && ["prioridade", "atribuida", "cancelada", "prazo", "cobranca", "comentario", "retorno_fase"].every((s) => SUBTIPOS_FORA_DO_PDF_DO_CLIENTE.includes(s as never)))
+  ok("a lista final: localizada entra, retorno_fase fica fora", SUBTIPOS_NO_PDF_DO_CLIENTE.includes("localizada") && !SUBTIPOS_NO_PDF_DO_CLIENTE.includes("retorno_fase") && SUBTIPOS_FORA_DO_PDF_DO_CLIENTE.includes("retorno_fase") && !SUBTIPOS_FORA_DO_PDF_DO_CLIENTE.includes("localizada"))
   console.log("   entram:", SUBTIPOS_NO_PDF_DO_CLIENTE.join(", "), "(+ etapa de apostila/tradução)")
   console.log("   ficam fora:", SUBTIPOS_FORA_DO_PDF_DO_CLIENTE.join(", "))
 
