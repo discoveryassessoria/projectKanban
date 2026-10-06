@@ -57,6 +57,10 @@ async function main() {
   const { sincronizarDocumento, desfazerSincronizacao, divergenciasResolvidas, camposDoRegistro } = await import("../src/services/genealogia/sincronizar-com-registro")
   const { editarDadosRegistrais, contextoDeEdicao } = await import("../src/services/genealogia/editar-dados-registrais")
   const { historicoDoProcesso } = await import("../src/services/historico-processo")
+  // A ponte `legacyEnumKey` do cadastro é o que dá o TIPO (nascimento/óbito) ao documento que o sistema materializa: os tipos do palco ganham a ponte.
+  for (const [code, chave] of [[P.COD.NAS, "CERTIDAO_NASCIMENTO"], [P.COD.CAS, "CERTIDAO_CASAMENTO"], [P.COD.OBI, "CERTIDAO_OBITO"]] as const) {
+    if (!(await prisma.tipoDocumentoCadastro.findFirst({ where: { legacyEnumKey: chave }, select: { id: true } }))) await prisma.tipoDocumentoCadastro.updateMany({ where: { code }, data: { legacyEnumKey: chave } })
+  }
   const c = await P.novoCenario("sinc")
   await prisma.pessoa.update({ where: { id: c.titularId }, data: { data_nasc: new Date("1937-10-03T00:00:00Z"), estado_nasc: "SP", local_nasc: null, pais_nasc: null, profissao: "x" } })
   // Os documentos são os que o SISTEMA materializa a partir da árvore (documento órfão, sem necessidade, a árvore marca como «não exigido»): pessoa falecida → nascimento e óbito.
@@ -132,8 +136,23 @@ async function main() {
   ok("o Histórico do processo mostra «corrigiu os dados registrais» com o motivo", /corrigiu os dados registrais/.test(hist2) && /trocada com a do registro/.test(hist2))
   ok("edição sem mudança é recusada (SEM_MUDANCA)", (await editarDadosRegistrais({ documentoId: doc.id, autorId: P.adminId, valores: { data_evento: "1937-10-03" }, motivo: "sem mudança nenhuma aqui" }) as { ok: boolean; codigo?: string }).codigo === "SEM_MUDANCA")
 
+  secao("D) A tela (ligações, sem botão morto)")
+  const { readFileSync } = await import("node:fs")
+  const ler = (f: string) => readFileSync(f, "utf8")
+  const gaveta = ler("src/components/kanban/DocumentoOperationalDrawer.tsx"), modal = ler("src/components/kanban/documento/EditarDadosRegistrais.tsx"), arv = ler("src/components/arvore/arvore-genealogica-view.tsx")
+  ok("aba Dados Registrais: botão «Editar» em qualquer fase, para quem tem processos.editar", /pode\("processos\.editar"\) && \(/.test(gaveta) && /data-testid="editar-dados-registrais"/.test(gaveta) && /<EditarDadosRegistrais documentoId=\{doc\.id\}/.test(gaveta))
+  ok("o modal edita evento, localidade e referência (o órgão continua pelo «alterar»)", ["data_evento", "data_registro", "pais_registro", "estado_registro", "cidade_registro", "cartorio", "livro", "folha", "termo"].every((k) => modal.includes("CAMPOS_EDITAVEIS")) && /o órgão emissor continua pelo “alterar”/.test(modal))
+  ok("o modal pede o motivo (passo concluído), avisa o requerimento enviado e o conflito com a árvore, com o atalho «É a data do registro»", /Motivo da correção \(obrigatório/.test(modal) && /aviso-requerimento-enviado/.test(modal) && /aviso-conflito-arvore/.test(modal) && /É a data do registro/.test(modal) && /Salvar mesmo assim/.test(modal))
+  ok("salvar chama a rota de edição e o Desfazer da árvore existe no resultado", /dados-registrais`, \{\s*method: "PATCH"/.test(modal) && /sincronizacao-registral\/\$\{logId\}\/desfazer/.test(modal))
+  ok("modal do passo «Localizar registro»: campo «Data do registro», aviso de conflito e atalho", /label="Data do registro"/.test(ler("src/components/kanban/workflow/EditorRegistralModal.tsx")) && /aviso-conflito-arvore/.test(ler("src/components/kanban/workflow/EditorRegistralModal.tsx")) && /atalho-data-do-registro/.test(ler("src/components/kanban/workflow/EditorRegistralModal.tsx")))
+  ok("árvore: botão «Sincronizar com a Genealogia» + diálogo com a lista de diferenças e confirmação", /data-testid="botao-sincronizar-genealogia"/.test(arv) && /<SincronizarComGenealogiaModal/.test(arv) && /confirmar: true/.test(ler("src/components/arvore/sincronizar-com-genealogia.tsx")))
+  ok("árvore: campo que veio do registro aparece «do registro» e não se edita (TravaDoRegistro nos campos de nascimento, óbito e casamento)", (arv.match(/<TravaDoRegistro travado=/g) ?? []).length >= 7 && /do registro/.test(arv))
+  ok("Inteligência da árvore lista as divergências resolvidas (com Desfazer)", /<DivergenciasResolvidas/.test(ler("src/components/arvore/inteligencia/painel-inteligencia.tsx")) && /Divergências resolvidas/.test(ler("src/components/arvore/inteligencia/divergencias-resolvidas.tsx")))
+  ok("ganchos: conclusão do «Localizar registro» e edição dos dados registrais disparam a sincronização", /p\.stepKey === "localizar_registro"[\s\S]{0,200}sincronizarDocumento/.test(ler("src/services/documento-operacao.ts")) && /sincronizarDocumento\(documentoAtualizado\.id/.test(ler("src/app/api/documentos/[id]/route.ts")))
+  ok("a árvore nunca cria, remove nem religa pessoa/união por esta sincronização", !/\.(create|delete|deleteMany|createMany|upsert)\(/.test(ler("src/services/genealogia/sincronizar-com-registro.ts").replace(/logAuditoria\.create/g, "")))
+
   await P.limpar()
   console.log(`\n${falhou === 0 ? "✅" : "❌"} SINCRONIZAÇÃO REGISTRAL — ${passou} ok, ${falhou} falhas`)
   if (falhou) { console.log("Falhas: " + falhas.join("; ")); process.exit(1) }
 }
-main().catch((e) => { console.error(e); process.exit(1) }).finally(() => prisma.$disconnect())
+main().catch((e) => { console.log(`  ❌ ERRO: ${String((e as Error)?.message ?? e).replace(/\s+/g, " ").slice(-700)}`); process.exit(1) }).finally(() => prisma.$disconnect())
