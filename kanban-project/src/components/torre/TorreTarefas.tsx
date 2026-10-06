@@ -89,7 +89,7 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
   onEstadoUrl?: (e: { visao: string | null; agrupar: string | null; dentro: string | null }) => void
 }) {
   const router = useRouter()
-  const { permissoes, avisar, recarregar, abrirFoco } = useTorre()
+  const { permissoes, avisar, recarregar } = useTorre()
   const [agrupar, setAgrupar] = useState<Agrupar>(AGRUPAR_VALIDOS.includes(agruparPedido as Agrupar) ? (agruparPedido as Agrupar) : "fam")
   const [dentro, setDentro] = useState<DentroDaFamilia>(DENTRO_VALIDOS.includes(dentroPedido as DentroDaFamilia) ? (dentroPedido as DentroDaFamilia) : "none")
   const [agruparVisto, setAgruparVisto] = useState<string | null>(agruparPedido ?? null)
@@ -415,7 +415,7 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
             podeIniciar={!!permissoes?.iniciar} vazio={todasVisiveis.length === 0}
             onSelecionar={alternar} onTodas={alternar}
             onAbrirGaveta={(l) => { setFocoIds(null); setGavetaId(l.taskId) }}
-            onAcao={executar} onFocoDaFamilia={abrirFoco} rodape={rodape}
+            onAcao={executar} rodape={rodape}
           />
         )}
 

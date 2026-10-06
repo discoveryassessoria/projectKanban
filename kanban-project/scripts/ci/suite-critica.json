@@ -223,6 +223,7 @@
  "arquivos": [
     "scripts/anexos-privados.test.ts",
     "scripts/anexos-rotas-auth.test.ts",
+    "scripts/torre-foco-um-so-comportamento.test.ts",
     "scripts/coleta-pendentes-prazo.test.ts",
     "scripts/coleta-orfaos.test.ts",
     "scripts/processo-arquivos-orfaos.test.ts",

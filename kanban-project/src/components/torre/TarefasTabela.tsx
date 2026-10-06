@@ -24,7 +24,7 @@ export type GrupoDaPagina = [string, LinhaDaTela[]]
 const TOM_RISCO: Record<string, string> = { red: "red", amb: "amb", grn: "grn", blu: "grn", gry: "grn" }
 
 export function TarefasTabela({
-  grupos, agrupar, dentro, sel, novas, processos, agora, podeIniciar, onSelecionar, onTodas, onAbrirGaveta, onAcao, onFocoDaFamilia, vazio, rodape,
+  grupos, agrupar, dentro, sel, novas, processos, agora, podeIniciar, onSelecionar, onTodas, onAbrirGaveta, onAcao, vazio, rodape,
 }: {
   grupos: GrupoDaPagina[]
   agrupar: Agrupar
@@ -40,7 +40,6 @@ export function TarefasTabela({
   onTodas: (ids: number[], ligar: boolean) => void
   onAbrirGaveta: (l: LinhaDaTela) => void
   onAcao: (acao: AcaoDaLinha, l: LinhaDaTela) => void
-  onFocoDaFamilia: (processoId: number) => void
   vazio: boolean
   rodape: React.ReactNode
 }) {
@@ -145,7 +144,7 @@ export function TarefasTabela({
                   {resumo && <span className="resumo">{resumo}</span>}
                   <span className="tf-pilula">{trabalho.length > 0 ? `${trabalho.length} ${trabalho.length === 1 ? "tarefa" : "tarefas"}` : `${itens.length} ${itens.length === 1 ? "cancelada" : "canceladas"}`}</span>
                   {textoSel && <span className="tf-selpil" role="status">{textoSel}</span>}
-                  {processoId != null && <button type="button" className="foco" onClick={(e) => { parar(e); onFocoDaFamilia(processoId) }}>Foco ›</button>}
+                  {processoId != null && <Link className="foco" href={`/torre/processo/${processoId}`} onClick={parar}>Foco ›</Link>}
                 </div>
               </div>
               {aberto && cabecalho}
