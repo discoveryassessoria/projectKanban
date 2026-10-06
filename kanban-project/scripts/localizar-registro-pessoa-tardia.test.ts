@@ -147,6 +147,8 @@ async function main() {
   f = await P.foto(c.processoId)
   const nasTit = f.necDe("NAS", { pessoaId: c.titularId })[0]
   const tarefaEmissao = await prisma.tarefa.findFirstOrThrow({ where: { necessidadeId: nasTit.id, statusTarefa: { notIn: P.TAREFA_FECHADA as never } }, select: { id: true, workflowStepInstanceId: true } })
+  // Em produção (Fogli) as tarefas da Emissão estão ligadas só ao DOCUMENTO (necessidadeId nulo): a regra tem de achá-las assim também.
+  await prisma.tarefa.update({ where: { id: tarefaEmissao.id }, data: { necessidadeId: null } })
   await prisma.$transaction(async (tx) => {
     await reabrirPassoTx(tx, locTit.id, "DISPONIVEL", { correlationId: "lrpt|reabrir2", operacao: "teste", ciclo: 1, processoId: c.processoId, workflowInstanceId: c.instanciaId, ignorarDependencias: true })
   })
