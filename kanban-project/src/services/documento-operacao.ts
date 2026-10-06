@@ -35,6 +35,7 @@ import { evoluirNecessidadePorPasso, reabrirAtendimentoNecessidade, dispensarNec
 import { chaveEvento } from "@/src/services/task-step-sync-helpers"
 import { recalcularFaseDoProcesso } from "@/src/lib/process-stage/recalcular-fase"
 import { randomUUID } from "crypto"
+import { sincronizarDocumento } from "@/src/services/genealogia/sincronizar-com-registro"
 import { projetarTarefaDoPasso, assegurarCoerenciaPassoTarefa } from "@/src/services/passo-tarefa-projecao"
 import { impactoDaReabertura, type PassoComDependencia } from "@/src/services/dependencias-do-passo"
 import type { PermissaoChave } from "@/src/lib/permissoes"
@@ -1000,6 +1001,12 @@ export async function atualizarPassoV2(
     // (idempotente pela chave única da obrigação).
     await projetarCustosDocumentaisSeCouber(stepInstanceId)
     await avancarFaseSeCouber(documentoId, p.faseMacroKey)
+  }
+
+  // SINCRONIZAÇÃO COM A ÁRVORE (06/10/2026): "Localizar registro" CONCLUÍDO é o momento em que o registro vira o dado real — os Dados Registrais da certidão
+  // passam a valer sobre a árvore (vazio preenche; diferente vence, com histórico e divergência resolvida). Post-commit e isolado: nunca desfaz a conclusão.
+  if (liberarProximo && p.stepKey === "localizar_registro") {
+    await sincronizarDocumento(documentoId, ctx?.usuarioId ?? null, "CONCLUSAO_DO_REGISTRO")
   }
 
   return {

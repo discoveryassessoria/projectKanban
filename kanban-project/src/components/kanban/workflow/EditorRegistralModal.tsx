@@ -17,6 +17,8 @@ import { createPortal } from "react-dom"
 import { X, Loader2, AlertTriangle, BookOpen, ChevronDown, ChevronUp } from "lucide-react"
 import { CampoData } from "@/src/components/ui/campo-data"
 import { CartorioOrgaoField } from "@/src/components/orgaos/CartorioOrgaoField"
+import { conflitosComArvore } from "@/src/lib/genealogia/dados-registrais-edicao"
+import { CAMPOS_SINCRONIZAVEIS, textoDoAvisoDeConflito } from "@/src/lib/genealogia/sincronizacao-registral"
 
 // ============================================================
 // TIPOS
@@ -153,6 +155,7 @@ interface FormState {
 
   // Datas (yyyy-mm-dd pro input[type=date])
   data_evento: string
+  data_registro: string
 
   // Rastreamento
   nro_pedido: string
@@ -184,6 +187,7 @@ const emptyForm = (): FormState => ({
   crc: "",
   protocolo: "",
   data_evento: "",
+  data_registro: "",
   nro_pedido: "",
   canal_solicitacao: "",
   link_acompanhamento: "",
@@ -215,6 +219,7 @@ const docToForm = (doc: Documento): FormState => ({
   crc: (doc.crc || "").toUpperCase(),
   protocolo: (doc.protocolo || "").toUpperCase(),
   data_evento: doc.data_evento ? doc.data_evento.slice(0, 10) : "",
+  data_registro: doc.data_registro ? doc.data_registro.slice(0, 10) : "",
   nro_pedido: doc.nro_pedido || "",
   canal_solicitacao: doc.canal_solicitacao || "",
   link_acompanhamento: doc.link_acompanhamento || "",
@@ -261,6 +266,9 @@ function ConteudoModal({
   // -- Carrega documento pela camada oficial
   const consulta = useApi<Documento>(documentoId ? `/api/documentos/${documentoId}` : null)
   const doc = consulta.dados ?? null
+  // O QUE A ÁRVORE TEM para os campos desta certidão (a árvore começa como guia; o registro localizado vale mais). Ao digitar um valor DIFERENTE, a tela avisa e pede confirmação.
+  const arvoreReq = useApi<{ campos: Array<{ chave: string; rotulo: string; origem: string; tipo: "data" | "texto"; arvore: string | null }> }>(documentoId ? `/api/documentos/${documentoId}/arvore-valores` : null)
+  const [confirmadosArvore, setConfirmadosArvore] = useState<Set<string>>(new Set())
   const loading = consulta.carregando
   const erro = consulta.erro ? "Erro ao carregar documento." : null
   const carregar = consulta.recarregar
@@ -371,9 +379,24 @@ function ConteudoModal({
     nomeRegistradoOk && estadoOk && cidadeOk && cartorioOk && orgaoOk &&
     livroOk && folhaOk && termoOk && dataEventoOk
 
+  // AVISO DE CONFLITO COM A ÁRVORE (dados do evento digitados × o que a árvore tem). Só se o valor difere e a árvore já tinha algo; vale o registro, mas confirma-se antes.
+  // Só do que foi DIGITADO agora (diferente do que o documento já tinha): não se reclama de campo que ninguém tocou.
+  const digitadoAgora: Record<string, string> = {}
+  if (doc) {
+    if (form.data_evento !== (doc.data_evento ? doc.data_evento.slice(0, 10) : "")) digitadoAgora.data_evento = form.data_evento
+    if (form.cidade_registro !== (doc.cidade_registro ?? "")) digitadoAgora.cidade_registro = form.cidade_registro
+    if (form.estado_registro !== (doc.estado_registro ?? "")) digitadoAgora.estado_registro = form.estado_registro
+    if (form.pais_registro !== (doc.pais_registro ?? "")) digitadoAgora.pais_registro = form.pais_registro
+  }
+  const conflitosArvore = arvoreReq.dados ? conflitosComArvore(arvoreReq.dados.campos, digitadoAgora) : []
+  const pendentesArvore = conflitosArvore.filter((c) => !confirmadosArvore.has(`${c.campo.chave}=${c.novo}`))
+  // "É a data do registro": o valor digitado na data do EVENTO era a do REGISTRO — vai para o campo certo e a data do evento é limpa para digitar a certa.
+  const moverParaDataDoRegistro = (novo: string) => { setForm((f) => ({ ...f, data_registro: novo, data_evento: "" })) }
+
   // -- Salvar (e opcionalmente concluir etapa)
   const handleSalvar = async () => {
     if (!documentoId || !doc) return
+    if (pendentesArvore.length > 0) { alert("Confirme (ou corrija) os valores que diferem da árvore antes de salvar."); return }
 
     // Em modo buscar, valida antes
     if (isModoBuscar && !podeConcluirEtapa) {
@@ -420,6 +443,7 @@ function ConteudoModal({
         protocolo: form.protocolo.trim().toUpperCase() || null,
 
         data_evento: form.data_evento || null,
+        data_registro: form.data_registro || null,
 
         nro_pedido: form.nro_pedido.trim() || null,
         canal_solicitacao: form.canal_solicitacao.trim() || null,
@@ -822,7 +846,29 @@ function ConteudoModal({
                       value={form.data_evento}
                       onChange={(v) => setForm({ ...form, data_evento: v })}
                     />
+                    <Field
+                      label="Data do registro"
+                      type="date"
+                      value={form.data_registro}
+                      onChange={(v) => setForm({ ...form, data_registro: v })}
+                    />
                   </div>
+                  {conflitosArvore.map((c) => {
+                    const confirmado = confirmadosArvore.has(`${c.campo.chave}=${c.novo}`)
+                    const def = CAMPOS_SINCRONIZAVEIS.find((x) => x.chave === c.campo.chave)
+                    return (
+                      <div key={c.campo.chave} data-testid="aviso-conflito-arvore" className="mt-3 p-2.5 rounded-md border border-[var(--warning-text)]/40 text-[12.5px] text-[var(--text-primary)]">
+                        {def ? textoDoAvisoDeConflito(def, c.arvore, c.novo) : `A árvore diz ${c.arvore}. Confirmar ${c.novo}?`}
+                        <div className="mt-1.5 flex gap-2 flex-wrap">
+                          <button type="button" disabled={confirmado} onClick={() => setConfirmadosArvore((s) => new Set(s).add(`${c.campo.chave}=${c.novo}`))}
+                            className="px-2.5 py-1 rounded-md text-[12px] font-semibold bg-[var(--accent-primary)] text-white disabled:opacity-50">{confirmado ? "Confirmado" : "Confirmar"}</button>
+                          {c.origem === "data_evento" && (
+                            <button type="button" data-testid="atalho-data-do-registro" onClick={() => moverParaDataDoRegistro(c.novo)} className="px-2.5 py-1 rounded-md text-[12px] border border-[var(--border-default)]">É a data do registro</button>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </Section>
 
                 {/* ============== SEÇÃO 5: Rastreamento (só no modo completo) ============== */}

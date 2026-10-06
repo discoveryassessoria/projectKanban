@@ -9,6 +9,7 @@ import dagre from "dagre"
 import type { PessoaArvore, UniaoArvore, DocumentoArvore, CampoEdicaoPessoa } from "./types"
 import { RemocaoPessoaModal, type PlanoRemocaoUI } from '@/src/components/arvore/remocao-pessoa-modal'
 import { ExclusaoArvoreModal, type PlanoExclusaoArvoreUI } from '@/src/components/arvore/exclusao-arvore-modal'
+import { SincronizarComGenealogiaModal } from "./sincronizar-com-genealogia"
 import { MenuMaisArvore } from './menu-mais-arvore'
 import { AvisoEdicao, type AvisoEdicaoDados } from './aviso-edicao'
 import { RemoverVinculoModal } from './remover-vinculo-modal'
@@ -136,12 +137,29 @@ const fsColors = {
   line: '#8fa6b5'
 }
 
+/**
+ * Campo que veio do REGISTRO localizado na Genealogia: aparece com a marca "do registro" e NÃO se edita na árvore (sentido único: para corrigir, corrige-se nos
+ * Dados Registrais da certidão). Campo sem registro continua editável. O servidor também recusa a edição (409), esta trava é só a cara dela.
+ */
+function TravaDoRegistro({ travado, children }: { travado: boolean; children: React.ReactNode }) {
+  if (!travado) return <>{children}</>
+  return (
+    <div className="relative" data-testid="campo-do-registro">
+      <div className="pointer-events-none opacity-70" aria-disabled="true">{children}</div>
+      <div className="absolute inset-0 z-10 cursor-not-allowed" title="Veio do registro localizado na Genealogia. Para corrigir, altere nos Dados Registrais da certidão." />
+      <span className="mt-1 inline-block rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--text-secondary)]">do registro</span>
+    </div>
+  )
+}
+
 /** Resposta da árvore como a API a devolve. */
 type PosicoesNodes = Record<string, Record<string, { x: number; y: number }>>
 interface RespostaArvore {
   pessoas?: PessoaArvore[]
   pessoaPrincipalId?: number | null
   posicoesNodes?: PosicoesNodes | null
+  /** O que veio do registro localizado na Genealogia (pessoa/união → chaves dos campos travados). */
+  camposDoRegistro?: { pessoas?: Record<number, string[]>; unioes?: Record<number, string[]> } | null
 }
 const SEM_PESSOAS: PessoaArvore[] = []
 
@@ -294,6 +312,7 @@ export function ArvoreGenealogicaView({
   const [idiomaPdf, setIdiomaPdf] = useState<string>(
     idiomaDoPais && TITULO_ARVORE[idiomaDoPais] ? idiomaDoPais : IDIOMA_PADRAO,
   )
+  const [mostrarSincronizacao, setMostrarSincronizacao] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const treeContainerRef = useRef<HTMLDivElement>(null)
   
@@ -1517,6 +1536,13 @@ export function ArvoreGenealogicaView({
             desabilitado={pessoas.length === 0}
           />
 
+          {/* SINCRONIZAR COM A GENEALOGIA — lista as diferenças entre a árvore e os registros localizados e aplica depois de confirmação (vale o registro). */}
+          {arvoreId && pode('arvore.editar') && pessoas.length > 0 && (
+            <button type="button" data-testid="botao-sincronizar-genealogia" className={CLASSE_BOTAO_BARRA} onClick={() => setMostrarSincronizacao(true)} title="Comparar a árvore com os dados registrais localizados na Genealogia">
+              Sincronizar com a Genealogia
+            </button>
+          )}
+
           {/* Botão Fullscreen */}
           <button
             className="p-2 hover:bg-[var(--surface-tertiary)] rounded transition-colors"
@@ -1669,6 +1695,8 @@ export function ArvoreGenealogicaView({
           onCriarTarefa={abrirCriarTarefa}
           rascunhoDoPasso={operacional.rascunhoDoPasso}
           onAbrirTarefa={abrirTarefaNaCentral}
+          arvoreId={arvoreId}
+          onDivergenciaDesfeita={() => { void fetchArvore() }}
         />
         {rascunhoTarefa && (
           <CriarTarefaModal
@@ -1829,6 +1857,10 @@ export function ArvoreGenealogicaView({
         />
       )}
 
+      {mostrarSincronizacao && arvoreId && (
+        <SincronizarComGenealogiaModal arvoreId={arvoreId} onFechar={() => setMostrarSincronizacao(false)} onAplicado={() => { void fetchArvore() }} />
+      )}
+
       {/* Modal Editar Pessoa */}
       {showEditPersonModal && editingPerson && (
         <EditPersonModal
@@ -1838,6 +1870,7 @@ export function ArvoreGenealogicaView({
           processoId={processoId}
           arvoreId={arvoreId!}
           requerentesAfetadosPor={requerentesAfetadosPor}
+          camposDoRegistro={arvoreReq.dados?.camposDoRegistro ?? null}
           estadoAtual={operacional.estadoAtual}
           campoInicial={campoEdicaoInicial}
           onClose={() => {
@@ -2368,6 +2401,7 @@ function EditPersonModal({
   unioes,
   processoId,
   arvoreId,
+  camposDoRegistro,
   requerentesAfetadosPor,
   estadoAtual,
   campoInicial,
@@ -2379,6 +2413,8 @@ function EditPersonModal({
   unioes: UniaoArvore[]
   processoId: number
   arvoreId: number
+  /** Campos desta árvore que vieram do REGISTRO localizado na Genealogia (travados aqui; corrige-se nos Dados Registrais). */
+  camposDoRegistro?: { pessoas?: Record<number, string[]>; unioes?: Record<number, string[]> } | null
   /** Nomes dos requerentes cuja linha passa por esta pessoa. */
   requerentesAfetadosPor: (pessoaId: number) => string[]
   /** Números de hoje, para o preview montar a coluna ANTES. */
@@ -2389,6 +2425,9 @@ function EditPersonModal({
   onSuccess: () => void
 }) {
   const uniaoExistente = unioes.find(u => u.pessoa1Id === pessoa.id || u.pessoa2Id === pessoa.id)
+  // SENTIDO ÚNICO: o que veio do registro localizado na Genealogia aparece marcado "do registro" e não se edita aqui.
+  const travadosPessoa = new Set(camposDoRegistro?.pessoas?.[pessoa.id] ?? [])
+  const travadosUniao = new Set(camposDoRegistro?.unioes?.[uniaoExistente?.id ?? -1] ?? [])
   const conjugeExistenteId = uniaoExistente
     ? (uniaoExistente.pessoa1Id === pessoa.id ? uniaoExistente.pessoa2Id : uniaoExistente.pessoa1Id)
     : null
@@ -2849,20 +2888,20 @@ function EditPersonModal({
             <div className="grid grid-cols-3 gap-3">
               <div data-campo="data_nasc">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
-                <DatePickerField value={dataNasc} onChange={(value) => setDataNasc(value)} />
+                <TravaDoRegistro travado={travadosPessoa.has("PESSOA.data_nasc")}><DatePickerField value={dataNasc} onChange={(value) => setDataNasc(value)} /></TravaDoRegistro>
                 <SeloMaioridade nascimento={dataNasc} marcador={requerente} mostrarSemData={jaEhRequerente} />
               </div>
               <div data-campo="pais_nasc">
                 <label className="block text-sm font-medium text-gray-700 mb-1">País de Nascimento</label>
-                <CampoPaisNascimento value={paisNasc} onChange={setPaisNasc} inputClass={inputClass} />
+                <TravaDoRegistro travado={travadosPessoa.has("PESSOA.pais_nasc")}><CampoPaisNascimento value={paisNasc} onChange={setPaisNasc} inputClass={inputClass} /></TravaDoRegistro>
               </div>
               <div data-campo="estado_nasc">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Estado de Nascimento</label>
-                <CampoEstadoNascimento value={estadoNasc} onChange={setEstadoNasc} pais={paisNasc} inputClass={inputClass} />
+                <TravaDoRegistro travado={travadosPessoa.has("PESSOA.estado_nasc")}><CampoEstadoNascimento value={estadoNasc} onChange={setEstadoNasc} pais={paisNasc} inputClass={inputClass} /></TravaDoRegistro>
               </div>
               <div data-campo="cidade_nasc">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Cidade de Nascimento</label>
-                <CampoCidadeNascimento value={localNasc} onChange={setLocalNasc} pais={paisNasc} uf={estadoNasc} inputClass={inputClass} />
+                <TravaDoRegistro travado={travadosPessoa.has("PESSOA.local_nasc")}><CampoCidadeNascimento value={localNasc} onChange={setLocalNasc} pais={paisNasc} uf={estadoNasc} inputClass={inputClass} /></TravaDoRegistro>
               </div>
               <div data-campo="nacionalidade">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nacionalidade</label>
@@ -2901,11 +2940,11 @@ function EditPersonModal({
                   </div>
                   <div data-campo="data_casamento">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Data do Casamento</label>
-                    <DatePickerField value={dataCasamento} onChange={(value) => setDataCasamento(value)} />
+                    <TravaDoRegistro travado={travadosUniao.has("UNIAO.data_inicio")}><DatePickerField value={dataCasamento} onChange={(value) => setDataCasamento(value)} /></TravaDoRegistro>
                   </div>
                   <div data-campo="local_casamento">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Local do Casamento</label>
-                    <input type="text" value={localCasamento} onChange={(e) => setLocalCasamento(e.target.value)} placeholder="Cidade - Estado" className={inputClass} />
+                    <TravaDoRegistro travado={travadosUniao.has("UNIAO.local")}><input type="text" value={localCasamento} onChange={(e) => setLocalCasamento(e.target.value)} placeholder="Cidade - Estado" className={inputClass} /></TravaDoRegistro>
                   </div>
                 </div>
               </div>
@@ -2917,7 +2956,7 @@ function EditPersonModal({
                 <div className="grid grid-cols-2 gap-3">
                   <div data-campo="data_obito">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Data de Falecimento</label>
-                    <DatePickerField value={dataObito} onChange={(value) => setDataObito(value)} />
+                    <TravaDoRegistro travado={travadosPessoa.has("PESSOA.data_obito")}><DatePickerField value={dataObito} onChange={(value) => setDataObito(value)} /></TravaDoRegistro>
                   </div>
                   <div data-campo="local_obito">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Local de Falecimento</label>

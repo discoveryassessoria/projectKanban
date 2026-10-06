@@ -1,0 +1,174 @@
+// src/components/kanban/documento/EditarDadosRegistrais.tsx
+// ============================================================================
+// "EDITAR" DA ABA DADOS REGISTRAIS (06/10/2026) — corrige evento, localidade e referência registral de uma certidão em QUALQUER fase. Não reabre o passo, não muda
+// a fase, não cancela nada, não reenvia ao cartório. Pede o MOTIVO quando o "Localizar registro" já estava concluído; AVISA se o pedido ao cartório já saiu com os dados
+// antigos; AVISA quando o valor digitado difere do que a árvore tem (vale o registro). Regras e textos: `src/lib/genealogia/dados-registrais-edicao.ts`.
+// ============================================================================
+"use client"
+
+import { useEffect, useMemo, useState } from "react"
+import { createPortal } from "react-dom"
+import { Loader2 } from "lucide-react"
+import { LAYER } from "@/src/lib/ui/layers"
+import {
+  CAMPOS_EDITAVEIS, MOTIVO_MINIMO, avisoDoRequerimentoEnviado, conflitosComArvore, mudancasDaEdicao, mostrarMudanca, type ChaveEditavel, type ValoresEditaveis,
+} from "@/src/lib/genealogia/dados-registrais-edicao"
+import { textoDoAvisoDeConflito, CAMPOS_SINCRONIZAVEIS } from "@/src/lib/genealogia/sincronizacao-registral"
+
+interface Contexto { documentoId: number; pessoaNome: string; passoConcluido: boolean; requerimentoEnviadoEm: string | null; valores: Record<string, string | null> }
+interface ArvoreValores { evento: string | null; campos: Array<{ chave: string; rotulo: string; origem: string; tipo: "data" | "texto"; arvore: string | null }> }
+interface Aplicado { chave: string; rotulo: string; pessoaNome: string; arvoreTexto: string; registroTexto: string; tipo: string; logId?: number }
+
+const auth = () => ({ "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` })
+const cls = "w-full px-2.5 py-1.5 text-[13px] rounded-md bg-[var(--surface-secondary)] border border-[var(--border-default)] text-[var(--text-primary)]"
+const lab = "block text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)] mb-1"
+
+export function EditarDadosRegistrais({ documentoId, onFechar, onSaved }: { documentoId: number; onFechar: () => void; onSaved?: () => void }) {
+  const [ctx, setCtx] = useState<Contexto | null>(null)
+  const [arvore, setArvore] = useState<ArvoreValores | null>(null)
+  const [form, setForm] = useState<Record<string, string>>({})
+  const [motivo, setMotivo] = useState("")
+  const [confirmados, setConfirmados] = useState<Set<string>>(new Set())
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  const [aplicados, setAplicados] = useState<Aplicado[] | null>(null)
+  const [desfeitos, setDesfeitos] = useState<Set<number>>(new Set())
+
+  useEffect(() => {
+    let vivo = true
+    void Promise.all([
+      fetch(`/api/documentos/${documentoId}/dados-registrais`, { headers: auth() }).then((r) => (r.ok ? r.json() : null)),
+      fetch(`/api/documentos/${documentoId}/arvore-valores`, { headers: auth() }).then((r) => (r.ok ? r.json() : null)),
+    ]).then(([c, a]) => {
+      if (!vivo) return
+      if (!c) { setErro("Não foi possível carregar os dados desta certidão."); return }
+      setCtx(c)
+      setArvore(a)
+      setForm(Object.fromEntries(CAMPOS_EDITAVEIS.map((f) => [f.chave, c.valores[f.chave] ?? ""])))
+    })
+    return () => { vivo = false }
+  }, [documentoId])
+
+  const mudancas = useMemo(() => (ctx ? mudancasDaEdicao(ctx.valores as ValoresEditaveis, form as ValoresEditaveis) : []), [ctx, form])
+  // Conflito com a árvore: só dos campos que ESTA edição mudou (não se reclama do que ninguém tocou).
+  const conflitos = useMemo(() => {
+    if (!arvore) return []
+    const tocados = new Set(mudancas.map((m) => m.chave as string))
+    return conflitosComArvore(arvore.campos, Object.fromEntries(Object.entries(form).filter(([k]) => tocados.has(k))))
+  }, [arvore, form, mudancas])
+  const aviso = useMemo(() => (ctx ? avisoDoRequerimentoEnviado(ctx.requerimentoEnviadoEm, mudancas) : null), [ctx, mudancas])
+  const pendentesDeConfirmacao = conflitos.filter((c) => !confirmados.has(`${c.campo.chave}=${c.novo}`))
+  const motivoOk = !ctx?.passoConcluido || motivo.trim().length >= MOTIVO_MINIMO
+  const podeSalvar = !!ctx && mudancas.length > 0 && motivoOk && pendentesDeConfirmacao.length === 0 && !salvando
+
+  const mudar = (chave: ChaveEditavel, v: string) => setForm((f) => ({ ...f, [chave]: v }))
+  const comoDataDoRegistro = (novo: string) => {
+    // "É a data do registro": o valor digitado era a data do REGISTRO, não a do evento — vai para o campo certo e a data do evento volta ao que era.
+    setForm((f) => ({ ...f, data_registro: novo, data_evento: ctx?.valores.data_evento ?? "" }))
+  }
+
+  const salvar = async () => {
+    if (!ctx) return
+    setSalvando(true); setErro(null)
+    try {
+      const r = await fetch(`/api/documentos/${documentoId}/dados-registrais`, {
+        method: "PATCH", headers: auth(),
+        body: JSON.stringify({ valores: Object.fromEntries(mudancas.map((m) => [m.chave, form[m.chave] === "" ? null : form[m.chave]])), motivo, confirmouRequerimentoEnviado: aviso != null }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok || j.ok === false) { setErro(j.error ?? "Não foi possível salvar."); return }
+      onSaved?.()
+      if (Array.isArray(j.sincronizados) && j.sincronizados.length > 0) setAplicados(j.sincronizados)
+      else onFechar()
+    } catch { setErro("Não foi possível salvar agora. Tente novamente.") } finally { setSalvando(false) }
+  }
+
+  const desfazer = async (logId: number) => {
+    const r = await fetch(`/api/sincronizacao-registral/${logId}/desfazer`, { method: "POST", headers: auth() })
+    const j = await r.json().catch(() => ({}))
+    if (r.ok) { setDesfeitos((s) => new Set(s).add(logId)); onSaved?.() } else setErro(j.error ?? "Não foi possível desfazer.")
+  }
+
+  const grupos = ["Evento", "Localidade", "Referência registral"] as const
+  return createPortal(
+    <div className="fixed inset-0 flex items-center justify-center bg-black/50" style={{ zIndex: LAYER.aboveProcessCritical }} data-testid="modal-editar-dados-registrais">
+      <div className="w-[560px] max-w-[94vw] max-h-[92vh] overflow-y-auto rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] p-5">
+        <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">Editar dados registrais</h3>
+        {ctx && <p className="text-[12px] text-[var(--text-secondary)] mb-3">{ctx.pessoaNome} · o órgão emissor continua pelo “alterar”</p>}
+        {!ctx && !erro && <div className="flex items-center gap-2 text-[13px] py-6"><Loader2 className="w-4 h-4 animate-spin" /> Carregando…</div>}
+
+        {aplicados ? (
+          <div data-testid="resultado-sincronizacao">
+            <p className="text-[13px] text-[var(--text-primary)] mb-2">Dados registrais salvos. A árvore foi atualizada com o registro:</p>
+            <ul className="space-y-1.5 mb-3">
+              {aplicados.map((a, i) => (
+                <li key={i} className="text-[12.5px] flex items-center gap-2 flex-wrap">
+                  <span><b>{a.pessoaNome}</b> — {a.rotulo}: {a.arvoreTexto} → {a.registroTexto}{a.tipo === "CONFLITO" ? " (divergência resolvida)" : ""}</span>
+                  {a.logId != null && (desfeitos.has(a.logId)
+                    ? <span className="text-[11px] text-[var(--text-secondary)]">desfeito</span>
+                    : <button type="button" onClick={() => void desfazer(a.logId!)} className="text-[11px] underline text-[var(--accent-text)]">Desfazer na árvore</button>)}
+                </li>
+              ))}
+            </ul>
+            {erro && <div className="text-[12px] text-[var(--warning-text)] mb-2">{erro}</div>}
+            <div className="flex justify-end"><button type="button" onClick={onFechar} className="px-3 py-1.5 rounded-md text-[12px] font-semibold bg-[var(--accent-primary)] text-white">Fechar</button></div>
+          </div>
+        ) : ctx && (
+          <>
+            {grupos.map((g) => (
+              <div key={g} className="mb-3">
+                <div className="text-[11px] font-semibold text-[var(--text-secondary)] mb-1.5">{g}</div>
+                <div className="grid grid-cols-2 gap-3">
+                  {CAMPOS_EDITAVEIS.filter((c) => c.grupo === g).map((c) => (
+                    <div key={c.chave} className={c.chave === "cartorio" ? "col-span-2" : ""}>
+                      <label className={lab} htmlFor={`edr-${c.chave}`}>{c.rotulo}</label>
+                      <input id={`edr-${c.chave}`} data-testid={`campo-${c.chave}`} className={cls} type={c.tipo === "data" ? "date" : "text"} value={form[c.chave] ?? ""} maxLength={c.max}
+                        onChange={(e) => mudar(c.chave, c.maiuscula ? e.target.value.toUpperCase() : e.target.value)} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {conflitos.map((c) => {
+              const confirmado = confirmados.has(`${c.campo.chave}=${c.novo}`)
+              const arvoreCampo = CAMPOS_SINCRONIZAVEIS.find((x) => x.chave === c.campo.chave) ?? { ...c.campo, evento: "NASCIMENTO" as const, alvo: "PESSOA" as const, coluna: "", origem: "data_evento" as const }
+              return (
+                <div key={c.campo.chave} data-testid="aviso-conflito-arvore" className="mb-2 p-2.5 rounded-md border border-[var(--warning-text)]/40 text-[12.5px] text-[var(--text-primary)]">
+                  {textoDoAvisoDeConflito(arvoreCampo as never, c.arvore, c.novo)}
+                  <div className="mt-1.5 flex gap-2 flex-wrap">
+                    <button type="button" disabled={confirmado} onClick={() => setConfirmados((s) => new Set(s).add(`${c.campo.chave}=${c.novo}`))}
+                      className="px-2.5 py-1 rounded-md text-[12px] font-semibold bg-[var(--accent-primary)] text-white disabled:opacity-50">{confirmado ? "Confirmado" : "Confirmar"}</button>
+                    {c.origem === "data_evento" && (
+                      <button type="button" data-testid="atalho-data-do-registro" onClick={() => comoDataDoRegistro(c.novo)} className="px-2.5 py-1 rounded-md text-[12px] border border-[var(--border-default)]">É a data do registro</button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+
+            {aviso && <div data-testid="aviso-requerimento-enviado" className="mb-2 p-2.5 rounded-md border border-[var(--warning-text)]/40 text-[12.5px] text-[var(--warning-text)]">{aviso}</div>}
+
+            {ctx.passoConcluido && (
+              <div className="mb-3">
+                <label className={lab} htmlFor="edr-motivo">Motivo da correção (obrigatório — o registro já foi localizado)</label>
+                <textarea id="edr-motivo" data-testid="campo-motivo" className={cls} rows={2} maxLength={300} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ex.: a data do evento estava trocada com a data do registro" />
+              </div>
+            )}
+
+            {mudancas.length > 0 && <div className="mb-3 text-[11.5px] text-[var(--text-secondary)]">Vai para o histórico: {mudancas.map(mostrarMudanca).join(" · ")}</div>}
+            {erro && <div className="mb-2 text-[12px] text-[var(--warning-text)]">{erro}</div>}
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={onFechar} className="px-3 py-1.5 rounded-md text-[12px] border border-[var(--border-default)] text-[var(--text-primary)]">Cancelar</button>
+              <button type="button" data-testid="salvar-dados-registrais" disabled={!podeSalvar} onClick={() => void salvar()} className="px-3 py-1.5 rounded-md text-[12px] font-semibold bg-[var(--accent-primary)] text-white disabled:opacity-50">
+                {salvando ? "Salvando…" : aviso ? "Salvar mesmo assim" : "Salvar"}
+              </button>
+            </div>
+          </>
+        )}
+        {erro && !ctx && <div className="text-[12px] text-[var(--warning-text)]">{erro}</div>}
+      </div>
+    </div>,
+    document.body,
+  )
+}

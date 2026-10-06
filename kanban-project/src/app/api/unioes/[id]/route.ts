@@ -1,3 +1,4 @@
+import { edicaoRecusadaPorRegistro } from "@/src/services/genealogia/sincronizar-com-registro"
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
@@ -70,6 +71,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const body = await request.json()
+
+    // SENTIDO ÚNICO (06/10/2026): data/local do casamento que vieram do REGISTRO localizado não se editam na árvore — corrige-se nos Dados Registrais.
+    const travados = await edicaoRecusadaPorRegistro("UNIAO", id, body)
+    if (travados) {
+      return NextResponse.json(
+        { error: `${travados.join(", ")}: veio do registro localizado na Genealogia. Para corrigir, altere nos Dados Registrais da certidão.`, codigo: "CAMPO_DO_REGISTRO", campos: travados },
+        { status: 409 },
+      )
+    }
 
     const dataToUpdate: Prisma.UniaoUpdateInput = {}
 

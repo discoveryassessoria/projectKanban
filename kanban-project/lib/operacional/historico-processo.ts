@@ -30,6 +30,8 @@
 //   • O prazo NUNCA pausa por causa de terceiro: nenhuma frase daqui diz o
 //     contrário — esperar o cartório é um estado da tarefa, não uma pausa.
 // ============================================================================
+import { CAMPOS_EDITAVEIS } from '@/src/lib/genealogia/dados-registrais-edicao'
+import { dataBR } from '@/src/lib/genealogia/sincronizacao-registral'
 import { ordenarCertidoesDaFamilia, type ChaveDaCertidao } from './ordem-certidoes'
 import { ROTULO_STATUS } from '@/src/lib/home/rotulo-status-tarefa'
 import { apresentarTextoDoHistorico } from './historico-apresentacao'
@@ -58,7 +60,7 @@ export const ROTULO_TIPO_DE_FATO: Record<TipoDeFato, string> = {
 export const ROTULO_SUBTIPO = {
   abertura: 'Processo', edicao: 'Processo',
   avanco_fase: 'Fase', retorno_fase: 'Fase', movimento_fase: 'Fase', preparo_fase: 'Fase',
-  linhagem: 'Árvore', conferencia: 'Árvore', exigencia_criada: 'Exigência criada', exigencia_removida: 'Exigência removida', exigencia_reativada: 'Exigência reativada',
+  linhagem: 'Árvore', conferencia: 'Árvore', sincronizacao_registral: 'Árvore', sincronizacao_desfeita: 'Árvore', dados_registrais_editados: 'Dados registrais', exigencia_criada: 'Exigência criada', exigencia_removida: 'Exigência removida', exigencia_reativada: 'Exigência reativada',
   exigencia_sem_causa: 'Pede decisão', nao_exigida: 'Não exigida',
   localizada: 'Localizada', solicitada: 'Solicitada', confirmacao_pedido: 'Confirmada', recebida: 'Recebida', validada: 'Validada',
   reaberta: 'Reaberta', cancelada: 'Cancelamento', etapa_concluida: 'Etapa concluída',
@@ -389,6 +391,44 @@ function atomosDoLog(l: Extract<LinhaCrua, { fonte: 'LOG' }>, ctx: ContextoDoHis
         ? `tentou preparar a fase${faseRot ? ` ${faseRot}` : ''}, mas nenhum item se aplicava`
         : `preparou a fase${faseRot ? ` ${faseRot}` : ''}${ciclo && ciclo > 1 ? ` (ciclo ${ciclo})` : ''} com ${passos} ${porCertidao ? (passos === 1 ? 'certidão' : 'certidões') : (passos === 1 ? 'passo' : 'passos')}${porCertidao ? ' (a partir da árvore)' : ''}`
       return [atomoDoSistema(ctx, { ...origem, rank: 1, tipo: 'FASE', subtipo: 'preparo_fase' }, frase, { faseKey: fase, chaveExtra: fase ?? '' })]
+    }
+    // SINCRONIZAÇÃO ÁRVORE ⇄ DADOS REGISTRAIS (06/10/2026): o registro localizado na Genealogia venceu (ou preencheu) um campo da árvore — antes → depois, quem e quando.
+    case 'SINCRONIZACAO_REGISTRAL':
+    case 'SINCRONIZACAO_REGISTRAL_DESFEITA': {
+      const desfeita = l.acao === 'SINCRONIZACAO_REGISTRAL_DESFEITA'
+      if (num(d.logId) != null && txt(d.rotulo) == null) return 'descartar' // a linha de "campo destravado" é interna, não é fato do histórico
+      const rotulo = txt(d.rotulo) ?? 'campo'
+      const pessoa = txt(d.pessoaNome) ?? nomeDaPessoa(ctx, num(d.pessoaId)) ?? 'uma pessoa'
+      const a = novoAtomo(ctx, {
+        ...origem, rank: 2, tipo: 'ARVORE', subtipo: desfeita ? 'sincronizacao_desfeita' : 'sincronizacao_registral',
+        verbo: desfeita ? 'desfez a sincronização da árvore com a Genealogia' : 'sincronizou a árvore com a Genealogia',
+        complemento: `${rotulo} de ${pessoa}`,
+        motivo: desfeita ? null : txt(d.tipo) === 'CONFLITO' ? 'o registro localizado diferia da árvore (vale o da Genealogia)' : 'campo vazio na árvore preenchido pelo registro localizado',
+        mudancas: [{ campo: rotulo, antes: txt(d.antes) ?? null, depois: txt(d.depois) ?? null }],
+        chaveExtra: `${l.id}`,
+      }, { documentoId: num(d.documentoId) })
+      a.pessoaId = num(d.pessoaId) ?? a.pessoaId
+      return [a]
+    }
+    // DADOS REGISTRAIS CORRIGIDOS (06/10/2026): editar depois do "Localizar registro" — antes → depois, quem e quando; motivo; e se o pedido ao cartório já tinha saído.
+    case 'DADOS_REGISTRAIS_EDITADOS': {
+      const lista = Array.isArray(d.mudancas) ? (d.mudancas as Array<Record<string, unknown>>) : []
+      const fmt = (chave: unknown, v: unknown): string | null => {
+        const t = txt(v)
+        if (t == null) return null
+        const c = CAMPOS_EDITAVEIS.find((x) => x.chave === chave)
+        return c?.tipo === 'data' ? dataBR(t) : t
+      }
+      const a = novoAtomo(ctx, {
+        ...origem, rank: 2, tipo: 'CERTIDAO', subtipo: 'dados_registrais_editados', verbo: 'corrigiu os dados registrais',
+        motivo: txt(d.motivo),
+        efeito: d.requerimentoJaEnviado === true ? `o pedido ao cartório já tinha saído com os dados antigos${txt(d.avisoRequerimento) ? ` — ${txt(d.avisoRequerimento)}` : ''}` : null,
+        mudancas: lista.map((m) => ({ campo: txt(m.campo) ?? 'campo', antes: fmt(m.chave, m.antes), depois: fmt(m.chave, m.depois) })),
+        chaveExtra: `${l.id}`,
+      }, { documentoId: num(d.documentoId) })
+      a.objeto = sobre(ctx, resolverAlvo(ctx, { documentoId: num(d.documentoId) }), null)
+      a.pessoaId = num(d.pessoaId) ?? a.pessoaId
+      return [a]
     }
     case 'registral_linhagem_recalculada': {
       const m = /Linhagem recalculada:\s*([A-Z_]+)/.exec(l.descricao)
