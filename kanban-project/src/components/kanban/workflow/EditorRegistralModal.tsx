@@ -207,13 +207,13 @@ const docToForm = (doc: Documento): FormState => ({
   cartorio: doc.cartorio || "",
   orgao_emissor: doc.orgao_emissor || "",
   orgaoId: doc.orgaoId ?? null,
-  livro: doc.livro || "",
-  folha: doc.folha || "",
-  termo: doc.termo || "",
+  livro: (doc.livro || "").toUpperCase(),
+  folha: (doc.folha || "").toUpperCase(),
+  termo: (doc.termo || "").toUpperCase(),
   numero_registro: doc.numero_registro || "",
-  matricula: doc.matricula || "",
-  crc: doc.crc || "",
-  protocolo: doc.protocolo || "",
+  matricula: (doc.matricula || "").toUpperCase(),
+  crc: (doc.crc || "").toUpperCase(),
+  protocolo: (doc.protocolo || "").toUpperCase(),
   data_evento: doc.data_evento ? doc.data_evento.slice(0, 10) : "",
   nro_pedido: doc.nro_pedido || "",
   canal_solicitacao: doc.canal_solicitacao || "",
@@ -414,12 +414,12 @@ function ConteudoModal({
         orgao_emissor: form.orgao_emissor.trim() || null,
         orgaoId: form.orgaoId,
 
-        livro: form.livro.trim() || null,
-        folha: form.folha.trim() || null,
-        termo: form.termo.trim() || null,
-        matricula: form.matricula.trim() || null,
-        crc: form.crc.trim() || null,
-        protocolo: form.protocolo.trim() || null,
+        livro: form.livro.trim().toUpperCase() || null,
+        folha: form.folha.trim().toUpperCase() || null,
+        termo: form.termo.trim().toUpperCase() || null,
+        matricula: form.matricula.trim().toUpperCase() || null,
+        crc: form.crc.trim().toUpperCase() || null,
+        protocolo: form.protocolo.trim().toUpperCase() || null,
 
         data_evento: form.data_evento || null,
 
@@ -763,18 +763,21 @@ function ConteudoModal({
                 >
                   <div className="grid grid-cols-2 gap-3">
                     <Field
+                      maiuscula
                       label="Livro"
                       requiredToComplete={isModoBuscar}
                       value={form.livro}
                       onChange={(v) => setForm({ ...form, livro: v })}
                     />
                     <Field
+                      maiuscula
                       label="Folha"
                       requiredToComplete={isModoBuscar}
                       value={form.folha}
                       onChange={(v) => setForm({ ...form, folha: v })}
                     />
                     <Field
+                      maiuscula
                       label="Termo"
                       requiredToComplete={isModoBuscar}
                       value={form.termo}
@@ -783,17 +786,20 @@ function ConteudoModal({
                     {!isModoBuscar && (
                       <>
                         <Field
-                          label="Matrícula"
+                      maiuscula
+                      label="Matrícula"
                           value={form.matricula}
                           onChange={(v) => setForm({ ...form, matricula: v })}
                         />
                         <Field
-                          label="CRC"
+                      maiuscula
+                      label="CRC"
                           value={form.crc}
                           onChange={(v) => setForm({ ...form, crc: v })}
                         />
                         <Field
-                          label="Protocolo"
+                      maiuscula
+                      label="Protocolo"
                           value={form.protocolo}
                           onChange={(v) => setForm({ ...form, protocolo: v })}
                           colSpan={2}
@@ -976,6 +982,7 @@ function Field({
   requiredAlt,
   colSpan = 1,
   list,
+  maiuscula,
 }: {
   label: string
   value: string
@@ -987,6 +994,8 @@ function Field({
   colSpan?: 1 | 2
   /** id de um <datalist> com sugestões (autocomplete nativo, sem travar texto livre). */
   list?: string
+  /** O campo só aceita MAIÚSCULAS: o que se digita em minúscula já fica maiúsculo. */
+  maiuscula?: boolean
 }) {
   const isEmpty = !value.trim()
   const requiredEmpty = requiredToComplete && isEmpty
@@ -1042,9 +1051,9 @@ function Field({
         <input
           type={type}
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => onChange(maiuscula ? e.target.value.toUpperCase() : e.target.value)}
           list={list}
-          className={`w-full px-3 py-2 bg-[var(--surface-popover)]/5 border rounded-md text-sm text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:ring-1 ${
+          className={`${maiuscula ? "uppercase " : ""}w-full px-3 py-2 bg-[var(--surface-popover)]/5 border rounded-md text-sm text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:ring-1 ${
             requiredEmpty || requiredAltEmpty
               ? "border-[var(--accent-primary)]/40 focus:border-[var(--accent-primary)]/60 focus:ring-[var(--accent-primary)]/30"
               : "border-[var(--border-default)] focus:border-[var(--border-default)] focus:border-[var(--border-default)]"
