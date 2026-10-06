@@ -18,6 +18,7 @@ const ONDE_APARECE: Record<Aba, readonly Aba[]> = {
   radar: [],
   processos: ['visao', 'processos'],
   tarefas: ['visao', 'tarefas'],
+  minha: ['visao', 'tarefas', 'minha'],
   equipe: ['visao'],
   terceiros: ['visao'],
 }

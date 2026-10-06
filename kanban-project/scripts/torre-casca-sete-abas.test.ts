@@ -30,8 +30,8 @@ const req = (url: string, token: string) => new NextRequest(`http://localhost${u
 
 async function main() {
   secao("1 — SETE abas, na ORDEM EXATA do protótipo")
-  ok("Visão geral · Precisa de você · Radar · Processos · Tarefas · Equipe · Terceiros", ABAS_DA_TORRE.map(([, r]) => r).join(" · ") === "Visão geral · Precisa de você · Radar · Processos · Tarefas · Equipe · Terceiros")
-  ok("ids estáveis: visao · precisa · radar · processos · tarefas · equipe · terceiros", IDS_DAS_ABAS.join(",") === "visao,precisa,radar,processos,tarefas,equipe,terceiros")
+  ok("Visão geral · Precisa de você · Radar · Processos · Tarefas · Minha operação · Equipe · Terceiros", ABAS_DA_TORRE.map(([, r]) => r).join(" · ") === "Visão geral · Precisa de você · Radar · Processos · Tarefas · Minha operação · Equipe · Terceiros")
+  ok("ids estáveis: visao · precisa · radar · processos · tarefas · minha · equipe · terceiros", IDS_DAS_ABAS.join(",") === "visao,precisa,radar,processos,tarefas,minha,equipe,terceiros")
   const torre = ler("src/components/torre/Torre.tsx")
   ok("o casco usa a lista única (torre-abas.ts) — não reescreve a lista", /export const ABAS: Array<\[Aba, string\]> = ABAS_DA_TORRE/.test(torre) && !/\["precisa", "Precisa de você"\]/.test(torre))
   ok("a aba 'Certidões' não existe (é 'Tarefas'); nem 'Equipe e Terceiros'", !ABAS_DA_TORRE.some(([, r]) => /certid/i.test(r)) && !ABAS_DA_TORRE.some(([, r]) => /Equipe e Terceiros/i.test(r)) && rotuloDaAba("tarefas") === "Tarefas")

@@ -20,6 +20,8 @@ import { destinoDaAbaAntigaDaTorre } from "@/lib/operacional/navegacao"
 import { aplicarFiltros, filtrosDaQuery, filtrosIguais, type FiltrosTorre } from "@/lib/operacional/torre-filtros"
 import { AGRUPAR_TORRE, DENTRO_TORRE } from "@/lib/operacional/torre-visoes"
 import { aplicarBusca } from "@/src/components/operacao/operacao-v3-derivacoes"
+import { OperacaoV3 } from "@/src/components/operacao/operacao-v3"
+import { contagemDaVisao } from "@/lib/operacional/torre-tarefas-tela"
 import { api, erroDe, TorreProvider, type PermissoesTorre, type AlvoDoRelatorio } from "./torre-base"
 import type { LinhaTorre } from "./tipos"
 import type { ColunaDoRadar, ProcessoDaTorre } from "./tipos-processos"
@@ -101,6 +103,8 @@ export function Torre() {
   const urlInicial = lerUrl(params)
 
   const [aba, setAba] = useState<Aba>(urlInicial.aba ?? ABA_INICIAL)
+  // `?op=` — qual aba interna da Operação abrir dentro de "Minha operação" (links antigos de /operacao?aba=…). Lido uma vez, na montagem.
+  const [opInicial] = useState<string | null>(() => params.get("op"))
   // A fase que o link pediu para a aba PROCESSOS (`?aba=processos&fase=…`). A seleção em si mora na memória de Processos; `n` muda a cada
   // pedido novo para a aba remontar e aplicá-lo (mesmo já estando em Processos).
   const [pedidoFase, setPedidoFase] = useState<{ n: number }>(() => { if (urlInicial.faseProcessos) pedirFaseDeProcessos(urlInicial.faseProcessos); return { n: 0 } })
@@ -175,6 +179,7 @@ export function Torre() {
       const q = new URLSearchParams(atual.toString())
       for (const k of ["aba", "kpi", "visao", "pais", "q", "agrupar", "dentro"]) q.delete(k)
       if (aba !== ABA_INICIAL) q.set("aba", aba)
+      if (aba !== "minha") q.delete("op") // `?op=` (aba inicial da Minha operação) só vale nela
       if (kpi) q.set("kpi", kpi)
       if (pais) q.set("pais", pais)
       if (busca.trim()) q.set("q", busca.trim())
@@ -304,6 +309,8 @@ export function Torre() {
     if (!seloVisivel(k, aba)) return null // T004–T008: o selo só aparece nas telas do protótipo (torre-casca.ts)
     if (k === "precisa") return itensPrecisaPais ? { txt: String(itensPrecisaPais.length), cls: "red" } : null
     if (k === "tarefas") return linhas ? { txt: String(nTarefas), cls: "" } : null
+    // "Minha operação": as minhas tarefas ABERTAS — o MESMO predicado da visão "Minhas" da aba Tarefas (sem filtro de país/busca: é a minha fila inteira).
+    if (k === "minha") return linhas ? { txt: String(contagemDaVisao("minhas", linhas, permissoes?.usuarioId ?? null, agora)), cls: "" } : null
     if (k === "equipe") return nEquipe != null ? { txt: String(nEquipe), cls: "" } : null
     if (k === "processos") return procs ? { txt: String(processosDaAba.length), cls: "" } : null
     if (k === "terceiros") return linhas ? { txt: `${nCobrar} a cobrar`, cls: nCobrar ? "warn" : "" } : null
@@ -370,6 +377,8 @@ export function Torre() {
             agruparPedido={estadoTarefas.agrupar} dentroPedido={estadoTarefas.dentro} onEstadoUrl={onEstadoUrl}
           />
         )}
+        {/* O MESMO componente da Operação da equipe (não uma cópia): só as tarefas do usuário logado (`minha_fila` do token), com as mesmas ações. */}
+        {aba === "minha" && <OperacaoV3 gestor naTorre abaInicial={opInicial} />}
         {aba === "equipe" && <TorreEquipe versao={versao} pais={pais} />}
         {aba === "processos" && <TorreProcessos key={pedidoFase.n} processos={processosDaAba} carregando={!procs && !erroProcs} erro={erroProcs} backlog={filtrandoBacklogPais ? null : tend?.backlog ?? null} />}
         {aba === "terceiros" && <TorreTerceiros linhas={linhasPais} versao={versao} />}

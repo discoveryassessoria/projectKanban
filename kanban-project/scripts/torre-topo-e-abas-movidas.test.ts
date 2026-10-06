@@ -123,7 +123,7 @@ async function main() {
   const abas = /export const ABAS: Array<\[Aba, string\]> = \[([\s\S]*?)\n\]/.exec(torre)?.[1].match(/\["(\w+)", "([^"]+)"\]/g) ?? []
   const abasDoCasco = /export const ABAS: Array<\[Aba, string\]> = ABAS_DA_TORRE/.test(torre)
   ok("o casco usa a lista única de abas (lib/operacional/torre-abas.ts)", abasDoCasco)
-  ok("exatamente 7 abas, na ordem: Visão geral · Precisa de você · Radar · Processos · Tarefas · Equipe · Terceiros", ABAS_DA_TORRE.length === 7 && ABAS_DA_TORRE.map(([, r]) => r).join(" · ") === "Visão geral · Precisa de você · Radar · Processos · Tarefas · Equipe · Terceiros", ABAS_DA_TORRE.map(([, r]) => r).join(","))
+  ok("exatamente 8 abas, na ordem: Visão geral · Precisa de você · Radar · Processos · Tarefas · Minha operação · Equipe · Terceiros", ABAS_DA_TORRE.length === 8 && ABAS_DA_TORRE.map(([, r]) => r).join(" · ") === "Visão geral · Precisa de você · Radar · Processos · Tarefas · Minha operação · Equipe · Terceiros", ABAS_DA_TORRE.map(([, r]) => r).join(","))
   ok("a Torre não importa mais Regras/Integridade/Auditoria", !/TorreRegras|TorreIntegridade|TorreAuditoria|SaudeRegras/.test(torre) && !existsSync("src/components/torre/TorreRegras.tsx") && !existsSync("src/components/torre/TorreIntegridade.tsx") && !existsSync("src/components/torre/TorreAuditoria.tsx"))
   ok("a Torre redireciona a aba antiga com router.replace", /destinoDaAbaAntigaDaTorre\(params\.get\("aba"\)\)/.test(torre) && /router\.replace\(destinoAntigo\)/.test(torre))
   ok("?aba=regras → Gerenciamento › Saúde › Regras", destinoDaAbaAntigaDaTorre("regras") === "/administrator?screen=syshealth&sub=regras")

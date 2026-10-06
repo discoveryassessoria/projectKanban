@@ -31,15 +31,13 @@ export function destinoDaAbsorcao(rota: RotaAbsorvida, tipoUsuario: string | nul
 // (família, aba, tarefa). Os avisos JÁ GRAVADOS continuam funcionando — a tradução é feita na chegada em
 // `/operacao` e no clique do sino, nunca reescrevendo o que está no banco. Não-admin: tudo igual ao de antes.
 
-/** A aba da Operação (`?aba=`) → onde isso fica na Torre. */
-const ABA_DA_OPERACAO_NA_TORRE: Record<string, { aba: string; visao?: string }> = {
-  fila: { aba: 'tarefas', visao: 'minhas' },
-  aguardando: { aba: 'tarefas', visao: 'aguard' },
-  acompanhamento: { aba: 'tarefas', visao: 'acompvenc' },
-  familias: { aba: 'radar' },
-  radar: { aba: 'precisa' },
-  feito: { aba: 'tarefas', visao: 'feito' },
+/** Quem tem acesso à Torre (a MESMA regra de `/torre`): administrador ou `operacao.distribuirTarefas`. É quem `/operacao` leva à aba "Minha operação". */
+export function temAcessoATorre(tipoUsuario: string | null | undefined, pode: (chave: 'operacao.distribuirTarefas') => boolean): boolean {
+  return tipoUsuario === 'admin' || pode('operacao.distribuirTarefas')
 }
+
+/** A aba da Operação (`?aba=`) → a aba interna de "Minha operação" (`?op=`). Sem `?aba=` válida: abre em A fazer (sem `op`). */
+const ABAS_INTERNAS = ['aguardando', 'acompanhamento', 'familias', 'radar', 'feito'] as const
 
 const inteiro = (v: string | null | undefined): string | null => (v && /^\d+$/.test(v) ? v : null)
 
@@ -47,8 +45,8 @@ const inteiro = (v: string | null | undefined): string | null => (v && /^\d+$/.t
 const paginaDoProcesso = (processo: string): string => `/torre/processo/${processo}`
 
 /**
- * `/operacao?...` → `/torre?...` PARA O ADMIN. Preserva: `processo` (família → página do processo), `aba` (traduzida), e a
- * tarefa (`taskId` ou `tarefa` → drawer). Sem nada disso: a visão "Minhas tarefas".
+ * `/operacao?...` → `/torre?...` PARA QUEM TEM ACESSO À TORRE. Preserva: `processo` (família → página do processo), `aba` (vira a aba interna de
+ * "Minha operação", `op`), e a tarefa (`taskId` ou `tarefa` → drawer). Sem nada disso: a aba "Minha operação" (06/10/2026; antes: visão "Minhas" de Tarefas).
  */
 export function destinoDaOperacaoParaAdmin(query: URLSearchParams | string): string {
   const q = typeof query === 'string' ? new URLSearchParams(query.replace(/^\?/, '')) : query
@@ -60,9 +58,9 @@ export function destinoDaOperacaoParaAdmin(query: URLSearchParams | string): str
     destino.set('aba', 'tarefas')
     destino.set('tarefa', tarefa)
   } else {
-    const alvo = ABA_DA_OPERACAO_NA_TORRE[q.get('aba') ?? ''] ?? { aba: 'tarefas', visao: 'minhas' }
-    destino.set('aba', alvo.aba)
-    if (alvo.visao) destino.set('visao', alvo.visao)
+    destino.set('aba', 'minha')
+    const op = q.get('aba') ?? ''
+    if ((ABAS_INTERNAS as readonly string[]).includes(op)) destino.set('op', op)
   }
   if (processo) destino.set('processo', processo)
   return `/torre?${destino.toString()}`
