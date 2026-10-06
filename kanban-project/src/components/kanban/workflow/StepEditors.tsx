@@ -18,6 +18,7 @@
 
 "use client"
 
+import { REQUERIMENTO_ENVIADO_OBRIGATORIO } from "@/src/lib/process-stage/requerimento-opcional"
 import type { AlvoDoAnexo } from "@/src/lib/anexos/chave"
 import { leituraDoValor } from "@/src/lib/anexos/chave"
 import { LinkDeAnexo } from "@/src/lib/anexos/cliente"
@@ -968,7 +969,7 @@ function FormSolicitarCertidao({
     ? (() => {
         if (!canalConfig) return ["CANAL_INVALIDO"]
         const f: string[] = []
-        if (canalConfig.requires.attachment && !anexoDisponivel.trim()) f.push("REQUERIMENTO")
+        if (REQUERIMENTO_ENVIADO_OBRIGATORIO && canalConfig.requires.attachment && !anexoDisponivel.trim()) f.push("REQUERIMENTO")
         if (canalConfig.requires.trackingCode && !form.trackingCode.trim()) f.push("CODIGO_RASTREIO")
         if (canalConfig.requires.observation && !form.observacao.trim()) f.push("OBSERVACAO")
         return f
@@ -1255,7 +1256,7 @@ function FormSolicitarCertidao({
           {canalConfig && (
             <>
               <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-secondary)] mb-3">
-                2. Evidências obrigatórias para canal &quot;{canalConfig.label}&quot;
+                2. {REQUERIMENTO_ENVIADO_OBRIGATORIO ? "Evidências obrigatórias" : "Evidências"} para canal &quot;{canalConfig.label}&quot;
               </div>
 
               <div className="space-y-3 mb-5">
@@ -1270,8 +1271,8 @@ function FormSolicitarCertidao({
                           ? `📎 ${evidencia.documentoMestre.name}${evidencia.documentoMestre.publicCode ? ` · ${evidencia.documentoMestre.publicCode}` : ""}`
                           : `📎 ${canalConfig.requires.attachmentLabel}`
                       }
-                      required
-                      invalid={!form.attachmentUrl.trim() && !anexoJaRegistrado}
+                      required={REQUERIMENTO_ENVIADO_OBRIGATORIO}
+                      invalid={REQUERIMENTO_ENVIADO_OBRIGATORIO && !form.attachmentUrl.trim() && !anexoJaRegistrado}
                       value={form.attachmentUrl}
                       onChange={(url, meta) =>
                         setForm({
