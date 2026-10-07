@@ -16,6 +16,8 @@ import { ALARMES_DE_HOJE, linhasDoAlarme, numeroDoAlarme } from "../lib/operacio
 import { numeroDoKpi, linhasDoKpi } from "../lib/operacional/torre-kpis"
 import { contagemDaVisao, predicadoDaVisao } from "../lib/operacional/torre-tarefas-tela"
 import { aplicarFiltros, filtrosVazios } from "../lib/operacional/torre-filtros"
+import { passosDaFase, somaExibidaDosPassos } from "../lib/operacional/torre-fase"
+import { tarefasDaFaseDoProcesso } from "../lib/operacional/torre-processos"
 
 let passou = 0, falhou = 0
 const falhas: string[] = []
@@ -118,6 +120,29 @@ async function main() {
     ok("Abertas e Sem responsável do cabeçalho = a lista do processo", d.numeros.abertas === doProcesso.length && d.numeros.semResponsavel === doProcesso.filter((l) => l.responsavelId == null).length, JSON.stringify(d.numeros))
     ok("Próxima ação conta o MESMO conjunto do botão 'Distribuir as N'", (d.proximaAcao == null) || /1/.test(d.proximaAcao.titulo) || d.numeros.semResponsavel === 1, d.proximaAcao?.titulo)
     ok("o cartão 'Com quem' diz o mesmo número de sem dono da lista", d.cartoes.find((x) => x.rotulo === "Com quem")?.sub.includes(`${doProcesso.filter((l) => l.responsavelId == null).length} sem dono`) === true)
+
+    secao("L3 — Famílias › \"Onde estão as N certidões … por passo\": passos + sem responsável + concluídas = N (as de fase anterior entram)")
+    {
+      // 3 abertas na fase atual (2 com responsável no passo 1, 1 sem) + 2 da Genealogia reaberta com responsável (outro passo) + 1 sem responsável da Genealogia
+      const mk = (id: number, fase: string, resp: number | null, passo: string) => ({ taskId: id, faseMacroKey: fase, responsavelId: resp, passoCorrente: { label: passo }, etapaAtual: passo, passoAtual: { ordem: 0, total: 1 }, estadoOperacao: "FILA", esperandoDe: null, esperandoHaDias: null, documentoId: id }) as never
+      const daFase = [mk(1, "emissao_documental", 7, "Solicitar certidão"), mk(2, "emissao_documental", 7, "Solicitar certidão"), mk(3, "emissao_documental", null, "Solicitar certidão")]
+      const todas = [...daFase, mk(4, "genealogia", 8, "Localizar registro da certidão"), mk(5, "genealogia", 8, "Localizar registro da certidão"), mk(6, "genealogia", null, "Localizar registro da certidão")]
+      const t = tarefasDaFaseDoProcesso(daFase, 2, null, todas)
+      const cartao = passosDaFase([{ tarefasDaFase: t } as never], null)
+      ok(`passos (${cartao.caixas.filter((x) => x.chave !== "__concluidas").reduce((n, x) => n + x.n, 0)}) + sem responsável (${cartao.semResponsavel}) + concluídas = total ${cartao.total}`, somaExibidaDosPassos(cartao) === cartao.total && cartao.total === todas.length + 2, JSON.stringify(cartao.caixas.map((x) => [x.nome, x.n])))
+      ok("o passo da Genealogia reaberta (as 2 com responsável) aparece no cartão — não ficam de fora", cartao.caixas.some((x) => /Localizar registro/.test(x.nome) && x.n === 2))
+      ok("o título diz o que soma: 'dos processos desta fase'", /dos processos desta fase/.test(ler(`${DIR}/TorrePassosDaFase.tsx`)))
+    }
+
+    secao("L3 — o SELO da aba Tarefas é o total fixo das abertas; só o contador da visão muda com o filtro")
+    {
+      const total = numeroDoKpi("abertas", linhas, agora)
+      const semResp = contagemDaVisao("semdono", linhas as never, null, agora)
+      ok(`selo = total das abertas (${total}) mesmo com a visão 'Sem responsável' (${semResp}) ativa`, total === linhas.length && semResp < total && /const nTarefas = numeroDoKpi\("abertas", linhasPais, agora\)/.test(ler(`${DIR}/Torre.tsx`)))
+    }
+
+    secao("Equipe — o texto não cita tela que não existe")
+    ok("nenhum texto da aba Equipe manda 'para o Precisa de você' (agora: 'você atribui em Tarefas')", !/(ficam|fica|continuam) (para|no) (o )?"?Precisa de você/.test(ler(`${DIR}/equipe-visual.ts`) + ler(`${DIR}/EquipeTabela.tsx`) + ler(`${DIR}/TorreEquipe.tsx`)))
 
     secao("L3 — Canceladas: a aba Tarefas e a página do processo mostram o MESMO número (UMA consulta)")
     const canc = await listarCanceladasDaTorre({ processoId: t8.processoId }, agora)

@@ -69,7 +69,7 @@ function LinhaSemResponsavel({ dados, acoes }: { dados: DadosDaEquipe; acoes: Ac
       <div className="eqp-acoes">
         {sr.ativas > 0 && acoes.podeEditar && (
           <button className="eqp-btn pri" disabled={acoes.ocupado || !podeDistribuir}
-            title={podeDistribuir ? undefined : "Nenhuma tem apto comprovado com carga livre: continuam no Precisa de você"} onClick={acoes.onDistribuir}>
+            title={podeDistribuir ? undefined : "Nenhuma tem apto comprovado com carga livre: continuam sem responsável: você atribui em Tarefas"} onClick={acoes.onDistribuir}>
             Distribuir as {sr.ativas} por aptidão e carga
           </button>
         )}

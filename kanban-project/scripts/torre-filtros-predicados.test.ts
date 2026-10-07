@@ -208,7 +208,7 @@ secao("'Mostrando N de M' e contadores — a MESMA função da tabela")
   const t = ler("src/components/torre/TorreTarefas.tsx"), f = ler("src/components/torre/TorreFiltros.tsx")
   ok("estático: a tabela (trabalhoVisivel) e o texto leem `resumo` — o resultado de UM aplicarFiltros", /const resumo = useMemo\(\(\) => aplicarFiltros\(listaBase, filtros, ctxFiltro\)/.test(t) && /const l = resumo\.linhas/.test(t) && /mostrando=\{resumo\.mostrando\}/.test(t) && /Mostrando \{mostrando\} de \{total\}/.test(f))
   const torre = ler("src/components/torre/Torre.tsx")
-  ok("estático: o número da aba Tarefas também passa por aplicarFiltros", /const nTarefas = aplicarFiltros\(/.test(torre))
+  ok("estático: o SELO da aba Tarefas é o total FIXO das abertas (não muda com visão/filtro — o contador da visão e o \"Mostrando N de M\" é que mudam)", /const nTarefas = numeroDoKpi\("abertas", linhasPais, agora\)/.test(torre))
 }
 
 // ═══ URL ═══

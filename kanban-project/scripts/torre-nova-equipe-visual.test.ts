@@ -95,7 +95,7 @@ ok("o trecho 'N certidões de X para Y' vai em destaque (negrito)", sug.filter((
 const semNada = pedacosDaSugestao({ movimentos: [], semResponsavel: { total: 0, porPessoa: [], semApto: 0, seguradas: 0 }, temAcao: false }, nomes)
 ok("sem o que sugerir, a frase diz isso (e o botão Redistribuir não aparece — teste da tela abaixo)", /^Sugestão automática: nenhuma/.test(semNada[0].texto))
 const semApto = pedacosDaSugestao({ movimentos: [], semResponsavel: { total: 5, porPessoa: [], semApto: 5, seguradas: 0 }, temAcao: false }, nomes)
-ok("sem apto comprovado: as sem responsável ficam para o Precisa de você", /ficam para o Precisa de você/.test(semApto.map((p) => p.texto).join("")))
+ok("sem apto comprovado: as sem responsável ficam para você atribuir em Tarefas", /ficam para você atribuir em Tarefas/.test(semApto.map((p) => p.texto).join("")))
 ok("singular: '1 certidão de Lucas para Priscila'", pedacosDaSugestao({ movimentos: [{ deNome: "Lucas Ferraz", paraNome: "Priscila Tavares", quantidade: 1 }], semResponsavel: { total: 0, porPessoa: [], semApto: 0, seguradas: 0 }, temAcao: true }, ["Lucas Ferraz", "Priscila Tavares"]).map((p) => p.texto).join("").includes("1 certidão de Lucas para Priscila"))
 
 secao("T337/T339/T340/T343/T348/T351 — toasts (textos do protótipo)")
@@ -104,8 +104,8 @@ ok("'184 tarefas movidas de Daniela Brait'", toastCarteiraMovida("Daniela Brait"
 ok("…e o que ficou, quando o destino não é apto a tudo", toastCarteiraMovida("Daniela Brait", { movidas: 10, naoAptas: 3, falhas: 1 }) === "10 tarefas movidas de Daniela Brait · 3 ficaram (destino não apto) · 1 não passaram")
 ok("'Ausência marcada e carteira de Daniela Brait movida'", toastSimulacaoAplicada("Daniela Brait") === "Ausência marcada e carteira de Daniela Brait movida")
 ok("'96 certidões distribuídas por aptidão e carga: Rafael 51 · Priscila 45'", toastDistribuicao({ atribuidas: 96, porPessoa: [{ nome: "Rafael Souza", quantidade: 51 }, { nome: "Priscila Tavares", quantidade: 45 }], semApto: 0, seguradas: 0 }, nomes) === "96 certidões distribuídas por aptidão e carga: Rafael 51 · Priscila 45")
-ok("distribuição parcial diz quantas ficaram para o Precisa de você", /· 4 ficam para o Precisa de você/.test(toastDistribuicao({ atribuidas: 2, porPessoa: [{ nome: "Rafael Souza", quantidade: 2 }], semApto: 3, seguradas: 1 }, nomes)))
-ok("nada distribuído: diz que ficaram para o Precisa de você (não finge)", /^Nenhuma certidão distribuída: 5 sem apto/.test(toastDistribuicao({ atribuidas: 0, porPessoa: [], semApto: 5, seguradas: 0 }, nomes)))
+ok("distribuição parcial diz quantas ficaram para você atribuir em Tarefas", /· 4 ficam para você atribuir em Tarefas/.test(toastDistribuicao({ atribuidas: 2, porPessoa: [{ nome: "Rafael Souza", quantidade: 2 }], semApto: 3, seguradas: 1 }, nomes)))
+ok("nada distribuído: diz que ficaram para você atribuir em Tarefas (não finge)", /^Nenhuma certidão distribuída: 5 sem apto/.test(toastDistribuicao({ atribuidas: 0, porPessoa: [], semApto: 5, seguradas: 0 }, nomes)))
 ok("'40 certidões de Daniela movidas para Priscila · 96 sem dono distribuídas'", toastRedistribuicao({ movimentos: [{ deNome: "Daniela Brait", paraNome: "Priscila Tavares", movidas: 40 }], atribuidas: 96, semApto: 0, seguradas: 0 }, nomes) === "40 certidões de Daniela movidas para Priscila · 96 sem dono distribuídas")
 
 secao("T338/T342/T344/T347 — modais e cartão de simulação (literais)")
