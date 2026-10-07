@@ -3,6 +3,7 @@
 // GET  → estado atual da análise (pro painel da Fase 4)
 // POST → roda a análise: compara árvore × documentos e grava as divergências
 
+import { formatarDataPura } from "@/src/lib/datas-br"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
@@ -28,8 +29,9 @@ const TIPOS_ANALISADOS = Object.keys(DOC_LABEL) as TipoDocumento[]
 const nomeCompleto = (nome: string, sobrenome: string | null) =>
   `${nome}${sobrenome ? " " + sobrenome : ""}`.trim()
 
+// DATA PURA: dia do calendário sem fuso (função única em datas-br).
 const fmtData = (d: Date | null | undefined): string | null =>
-  d ? new Date(d).toLocaleDateString("pt-BR") : null
+  d ? formatarDataPura(d) : null
 
 const camposCount = (tipo: string): number => {
   if (tipo.includes("NASCIMENTO")) return 4
@@ -127,7 +129,7 @@ export async function POST(
         maeRegistrada: d.mae_registrada ?? null,
         conjugeRegistrado: d.conjuge_registrado ?? null,
         cidadeRegistro: d.cidade_registro ?? null,
-        dataDocumento: fmtData(d.data_evento_documento ?? d.data_evento ?? d.data_registro),
+        dataDocumento: fmtData(d.data_evento_documento ?? d.data_evento),
       })),
     }))
 

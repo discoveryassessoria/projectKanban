@@ -1,5 +1,6 @@
 "use client"
 
+import { formatarDataPura } from "@/src/lib/datas-br"
 import { LinkDeAnexo } from "@/src/lib/anexos/cliente"
 import { ImagemDeAnexo, MiniaturaPdfDeAnexo, IframeDeAnexo } from "@/src/lib/anexos/visores"
 import { useState, useEffect, useRef, useMemo } from "react"
@@ -2143,7 +2144,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("pt-BR")
+    return formatarDataPura(dateString)
   }
 
   return (

@@ -61,7 +61,7 @@ const TIPOS_DE_COLUNA = [
   },
 ]
 
-const COLUNAS_FIXAS = ["Data", "Local", "Dados do registro", "Cônjuge", "Genitores", "Observação"]
+const COLUNAS_FIXAS = ["Data do evento", "Data do registro", "Local", "Dados do registro", "Cônjuge", "Genitores", "Observação"]
 
 export function ConfiguracaoPlanilhaDocumental() {
   const [colunas, setColunas] = useState<Coluna[]>([])

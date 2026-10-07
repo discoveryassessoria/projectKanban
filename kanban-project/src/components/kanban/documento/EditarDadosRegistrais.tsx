@@ -6,6 +6,7 @@
 // ============================================================================
 "use client"
 
+import { CampoDataTexto } from "@/src/components/ui/campo-data-texto"
 import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import { Loader2 } from "lucide-react"
@@ -122,8 +123,12 @@ export function EditarDadosRegistrais({ documentoId, onFechar, onSaved }: { docu
                   {CAMPOS_EDITAVEIS.filter((c) => c.grupo === g).map((c) => (
                     <div key={c.chave} className={c.chave === "cartorio" ? "col-span-2" : ""}>
                       <label className={lab} htmlFor={`edr-${c.chave}`}>{c.rotulo}</label>
-                      <input id={`edr-${c.chave}`} data-testid={`campo-${c.chave}`} className={cls} type={c.tipo === "data" ? "date" : "text"} value={form[c.chave] ?? ""} maxLength={c.max}
-                        onChange={(e) => mudar(c.chave, c.maiuscula ? e.target.value.toUpperCase() : e.target.value)} />
+                      {c.tipo === "data" ? (
+                        <CampoDataTexto id={`edr-${c.chave}`} className={cls} value={form[c.chave] ?? ""} onChange={(v) => mudar(c.chave, v)} />
+                      ) : (
+                        <input id={`edr-${c.chave}`} data-testid={`campo-${c.chave}`} className={cls} type="text" value={form[c.chave] ?? ""} maxLength={c.max}
+                          onChange={(e) => mudar(c.chave, c.maiuscula ? e.target.value.toUpperCase() : e.target.value)} />
+                      )}
                     </div>
                   ))}
                 </div>

@@ -14,6 +14,7 @@
 // ("a fase não tem competência para isso"), que é informação para o operador, não
 // erro de sistema. O que acontece depois de escolher é do motor.
 
+import { CampoDataTexto } from "@/src/components/ui/campo-data-texto"
 import { useCallback, useEffect, useState } from "react"
 import { correlacaoLimitada } from "@/src/lib/motor/correlacao"
 
@@ -325,8 +326,11 @@ export default function PainelDeclarativoDaEtapa({
                             <option value="">— escolher —</option>
                             {c.opcoes.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                           </select>
+                        ) : c.tipo === "data" ? (
+                          <CampoDataTexto className={inp} value={String(vals[c.key] ?? "")}
+                            onChange={(v) => setValoresDaSub({ ...valoresDaSub, [st.key]: { ...vals, [c.key]: v } })} />
                         ) : (
-                          <input className={inp} type={c.tipo === "data" ? "date" : c.tipo === "numero" ? "number" : "text"}
+                          <input className={inp} type={c.tipo === "numero" ? "number" : "text"}
                             value={String(vals[c.key] ?? "")}
                             onChange={(e) => setValoresDaSub({ ...valoresDaSub, [st.key]: { ...vals, [c.key]: e.target.value } })} />
                         )}
@@ -428,10 +432,12 @@ export default function PainelDeclarativoDaEtapa({
                   <input type="checkbox" checked={!!valores[c.key]} onChange={(e) => setValores({ ...valores, [c.key]: e.target.checked })} />
                   {c.label}
                 </label>
+              ) : c.tipo === "data" ? (
+                <CampoDataTexto className={inp} value={String(valores[c.key] ?? "")} onChange={(v) => setValores({ ...valores, [c.key]: v })} />
               ) : (
                 <input
                   className={inp}
-                  type={c.tipo === "numero" || c.tipo === "moeda" ? "number" : c.tipo === "data" ? "date" : "text"}
+                  type={c.tipo === "numero" || c.tipo === "moeda" ? "number" : "text"}
                   value={String(valores[c.key] ?? "")}
                   onChange={(e) => setValores({ ...valores, [c.key]: e.target.value })}
                 />

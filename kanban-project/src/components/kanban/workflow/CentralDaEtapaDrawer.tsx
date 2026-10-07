@@ -14,6 +14,7 @@
 
 "use client"
 
+import { formatarDataPura, formatarDataHoraBrasilia } from "@/src/lib/datas-br"
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useApi } from "@/src/lib/dados"
 import { useFecharComEsc } from "@/src/lib/ui/escape-stack"
@@ -183,28 +184,10 @@ const STATUS_PILL_CLS: Record<StatusStep, string> = {
   cancelada: "bg-[var(--surface-secondary)]0/20 text-[var(--text-muted)] border-[var(--border-default)]",
 }
 
-const fmtDateTime = (iso: string | null): string => {
-  if (!iso) return "—"
-  try {
-    const d = new Date(iso)
-    return (
-      d.toLocaleDateString("pt-BR") +
-      " " +
-      d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
-    )
-  } catch {
-    return "—"
-  }
-}
+// DATA COM HORÁRIO: fuso de Brasília. DATA PURA: dia do calendário sem fuso (datas-br).
+const fmtDateTime = (iso: string | null): string => formatarDataHoraBrasilia(iso)
 
-const fmtDate = (iso: string | null): string => {
-  if (!iso) return "—"
-  try {
-    return new Date(iso).toLocaleDateString("pt-BR")
-  } catch {
-    return "—"
-  }
-}
+const fmtDate = (iso: string | null): string => formatarDataPura(iso)
 
 /**
  * Editor da etapa. Preferimos SEMPRE o que o servidor resolveu (fonte única); a

@@ -14,13 +14,14 @@
 // cidadania italiana e fica nos Estados Unidos — as duas coisas ao mesmo tempo,
 // e as duas legítimas. Por isso são filtros separados, com fontes separadas.
 
+import { formatarDataPura } from "@/src/lib/datas-br"
 import { prisma } from "@/lib/prisma"
 import { FINALIDADES_DE_PROTOCOLO, SITUACOES_DE_PROTOCOLO } from "@/src/services/protocolo-canonico"
 import { fimDoDia, inicioDoDia } from "../datas"
 import type { DominioDef, ValorDeFiltro } from "../tipos"
 
 const dataBR = (d: Date | string | null | undefined) =>
-  d ? new Date(d).toLocaleDateString("pt-BR") : null
+  d ? formatarDataPura(d) : null
 
 /** Catálogo FECHADO do negócio (não é cadastro): vem do módulo canônico. */
 const opcoesDe = (o: Record<string, string>) =>

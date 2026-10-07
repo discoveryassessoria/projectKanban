@@ -1,6 +1,7 @@
 // src/components/kanban/ProcessoAnalise.tsx
 "use client"
 
+import { formatarDataPura } from "@/src/lib/datas-br"
 import { LinkDeAnexo, abrirAnexo } from "@/src/lib/anexos/cliente"
 import { ImagemDeAnexo, IframeDeAnexo } from "@/src/lib/anexos/visores"
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
@@ -129,7 +130,7 @@ const ini = (nome: string) => {
   const p = nome.trim().split(/\s+/)
   return ((p[0]?.[0] || "") + (p.length > 1 ? p[p.length - 1][0] : "")).toUpperCase()
 }
-const fmtDia = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString("pt-BR") : "—")
+const fmtDia = (iso?: string | null) => formatarDataPura(iso)
 const fmtDiaHora = (iso?: string | null) => (iso ? new Date(iso).toLocaleString("pt-BR") : "—")
 
 export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: Props) {

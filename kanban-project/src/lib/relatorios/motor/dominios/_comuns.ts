@@ -6,12 +6,13 @@
 // intervalo é mecânica; "quais são os status" ou "quais são os países" é
 // cadastro, e cada domínio busca na fonte canônica dele.
 
+import { formatarDataPura } from "@/src/lib/datas-br"
 import { fimDoDia, inicioDoDia } from "../datas"
 import { idadeEmAnos } from "@/src/lib/documentos/maioridade"
 import type { FonteDeOpcoes, ValorDeFiltro } from "../tipos"
 
 export const dataBR = (d: Date | string | null | undefined) =>
-  d ? new Date(d).toLocaleDateString("pt-BR") : null
+  d ? formatarDataPura(d) : null
 
 /** Intervalo de datas → cláusula Prisma, com `ate` inclusivo (23:59:59.999). */
 export function periodo(campo: string, v: ValorDeFiltro) {

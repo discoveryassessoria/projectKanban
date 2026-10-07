@@ -11,6 +11,7 @@
 
 "use client"
 
+import { formatarDataPura } from "@/src/lib/datas-br"
 import { ImagemDeAnexo, IframeDeAnexo } from "@/src/lib/anexos/visores"
 import { LinkDeAnexo, baixarAnexo } from "@/src/lib/anexos/cliente"
 import { useState, useEffect } from "react"
@@ -424,7 +425,7 @@ function PlaceholderTab({ title, msg }: { title: string; msg: string }) {
 // só mostra aqui, pra não ter dois lugares escrevendo o mesmo dado.
 // ============================================================
 
-const fmtDateReg = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("pt-BR") : null)
+const fmtDateReg = (iso: string | null) => (iso ? formatarDataPura(iso) : null)
 
 function RegField({ label, value }: { label: string; value: string | null | undefined }) {
   return (

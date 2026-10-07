@@ -25,6 +25,7 @@
 // ============================================================================
 "use client"
 
+import { formatarDataPura } from "@/src/lib/datas-br"
 import { useState } from "react"
 import { Pencil, RotateCcw } from "lucide-react"
 import { useApi } from "@/src/lib/dados"
@@ -53,6 +54,7 @@ interface Linha {
   documentoId?: number
   tipoDocumentoId: number | null
   tipoRegistro: string | null
+  dataEvento: string | null
   dataRegistro: string | null
   local: string | null
   cartorio: string | null
@@ -84,17 +86,12 @@ interface Planilha {
 }
 
 /** Rótulos das colunas fixas — a ordem é a da referência. */
-const CABECALHOS_FIXOS = ["Geração", "Registro", "Data", "Local", "Dados do registro", "Cônjuge", "Genitores"]
+const CABECALHOS_FIXOS = ["Geração", "Registro", "Data do evento", "Data do registro", "Local", "Dados do registro", "Cônjuge", "Genitores"]
 
 const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
 
-/**
- * Data de registro em UTC — NUNCA no fuso do navegador. A data de uma certidão
- * é fato de calendário, não instante: no fuso local `1868-07-14T00:00:00Z`
- * vira 13/07 e a planilha passa a discordar da certidão que está na mão.
- */
-const dataBR = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—"
+/** DATA PURA (evento/registro): função única de datas-br — dia do calendário, sem fuso. «—» se vazia. */
+const dataBR = (iso: string | null) => formatarDataPura(iso)
 
 /** «0» e vazio não são dado (valor padrão de cadastro): viram «—». O servidor já os limpa; aqui é a rede de segurança. */
 const semZero = (v: string | null | undefined): string | null => { const t = (v ?? "").trim(); return t === "" || /^0+$/.test(t) ? null : t }
@@ -439,12 +436,12 @@ function BlocoPessoa({
         {/* Largura mínima: o suficiente para o Total caber sem rolagem no painel
             do processo. Acima disso a tabela ocupa o que houver; abaixo, o
             container rola — que é como o Discovery trata tabela larga. */}
-        {/* SEM VALORES (aba Documentos): as 7 colunas essenciais CABEM na largura da tela — larguras proporcionais e texto que quebra linha, sem rolagem lateral
+        {/* SEM VALORES (aba Documentos): as 8 colunas essenciais CABEM na largura da tela — larguras proporcionais e texto que quebra linha, sem rolagem lateral
             no desktop. Com valores (Custos) a tabela é mais larga e o container rola, como sempre. */}
         <table className={`w-full border-collapse text-xs ${semValores ? "table-fixed" : "min-w-[860px]"}`}>
           {semValores && (
             <colgroup>
-              {["6%", "16%", "10%", "17%", "19%", "16%", "16%"].map((w, i) => <col key={i} style={{ width: w }} />)}
+              {["5%", "13%", "9%", "9%", "15%", "17%", "16%", "16%"].map((w, i) => <col key={i} style={{ width: w }} />)}
             </colgroup>
           )}
           <thead>
@@ -466,6 +463,7 @@ function BlocoPessoa({
               >
                 <td className="px-2 py-1 text-[var(--text-muted)]">{bloco.geracao ?? "—"}</td>
                 <td className={`${semValores ? "break-words" : "whitespace-nowrap"} px-2 py-1 text-[var(--text-primary)]`}>{l.tipoRegistro ?? "—"}</td>
+                <td className="whitespace-nowrap px-2 py-1 tabular-nums">{dataBR(l.dataEvento)}</td>
                 <td className="whitespace-nowrap px-2 py-1 tabular-nums">{dataBR(l.dataRegistro)}</td>
                 <td className={`${semValores ? "break-words" : "min-w-[90px]"} px-2 py-1`}>{l.local ?? l.cartorio ?? "—"}</td>
                 <td className={`${semValores ? "break-words " : ""}px-2 py-1`}>{dadosDoRegistro(l)}</td>

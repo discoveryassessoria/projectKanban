@@ -168,6 +168,7 @@ export interface LinhaPlanilha {
   tipoDocumentoId: number | null
   tipoDocumentoNome: string | null
   tipoRegistro: string | null
+  dataEvento: string | null
   dataRegistro: string | null
   local: string | null
   cartorio: string | null
@@ -250,8 +251,8 @@ interface PrecoDaColuna {
 }
 
 // ── O QUE CADA COLUNA LÊ (07/10/2026, caso Ilaine Fogli) ──────────────────────────────────────────────────────────────────────────
-//   Data       Documento.data_registro → Documento.data_evento → (sem documento) a árvore: nascimento = Pessoa.data_nasc, óbito = Pessoa.data_obito,
-//              casamento = União.data_registro → União.data_inicio. Datas de calendário: UTC, sem deslocamento de fuso.
+//   Data do evento    Documento.data_evento → a árvore: nascimento = Pessoa.data_nasc, óbito = Pessoa.data_obito, casamento = União.data_inicio.
+//   Data do registro  Documento.data_registro → (casamento) União.data_registro. NUNCA o evento no lugar do registro, nem o contrário. Datas de calendário: UTC.
 //   Local      Documento (cidade - estado) → a árvore: nascimento = Pessoa.local_nasc/estado_nasc, casamento = União.local/estado.
 //   Dados do registro  Documento.cartório/livro/folha/termo → (casamento) União.cartório/livro/folha/termo. «0» e vazio = sem dado.
 //   Cônjuge    Documento.conjuge_registrado → (casamento) o outro cônjuge da União. Só a linha de casamento traz cônjuge.
@@ -301,6 +302,7 @@ export interface LinhaEstrutural {
   tipoDocumentoId: number | null
   tipoDocumentoNome: string | null
   tipoRegistro: string | null
+  dataEvento: string | null
   dataRegistro: string | null
   local: string | null
   cartorio: string | null
@@ -445,8 +447,11 @@ export async function montarEstruturaDocumental(processoId: number): Promise<Blo
         tipoDocumentoId: tipoLinha.id,
         tipoDocumentoNome: tipoLinha.name,
         tipoRegistro: tipoLinha.name,
-        // DATA: a do registro; sem ela, a do evento; sem documento, a que a ÁRVORE já tem (nunca inventada).
-        dataRegistro: iso(d?.data_registro ?? d?.data_evento ?? (categoria === 'NASCIMENTO' ? p.data_nasc : categoria === 'OBITO' ? p.data_obito : categoria === 'CASAMENTO' ? uniao?.data_registro ?? uniao?.data_inicio : null)),
+        // DATA DO EVENTO e DATA DO REGISTRO são duas colunas e nunca uma no lugar da outra. Evento: a do cadastro; sem ela, a que a ÁRVORE já tem
+        // (nascimento = Pessoa.data_nasc, óbito = Pessoa.data_obito, casamento = União.data_inicio). Registro: só a do cadastro; casamento sem documento usa
+        // União.data_registro. Pessoa não tem data de registro: fica «—». Nada é inventado.
+        dataEvento: iso(d?.data_evento ?? (categoria === 'NASCIMENTO' ? p.data_nasc : categoria === 'OBITO' ? p.data_obito : categoria === 'CASAMENTO' ? uniao?.data_inicio : null)),
+        dataRegistro: iso(d?.data_registro ?? (categoria === 'CASAMENTO' ? uniao?.data_registro : null)),
         // LOCAL: o do registro; sem ele, o da pessoa (nascimento) ou o da união (casamento). Óbito não tem local na árvore: fica «—».
         local: lugar(d?.cidade_registro, d?.estado_registro) ?? (categoria === 'NASCIMENTO' ? lugar(p.local_nasc, p.estado_nasc) : categoria === 'CASAMENTO' ? lugar(uniao?.local, uniao?.estado) : null),
         // DADOS DO REGISTRO: «0» e vazio não são dado. O casamento sem documento usa o que está na União.

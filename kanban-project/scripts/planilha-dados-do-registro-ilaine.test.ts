@@ -1,7 +1,7 @@
 // scripts/planilha-dados-do-registro-ilaine.test.ts
 // ============================================================================
 // PLANILHA DOCUMENTAL — DADOS DO REGISTRO (07/10/2026, caso Ilaine Fogli, processo 683). Data, Cônjuge, Local e Dados do registro vinham vazios:
-//   • Data lia só `Documento.data_registro` (a certidão traz `data_evento`; sem documento, a árvore tem a data);
+//   • Data lia só `Documento.data_registro` (a certidão traz `data_evento`; sem documento, a árvore tem a data) — hoje são DUAS colunas, evento e registro, sem uma no lugar da outra;
 //   • Cônjuge lia só `Documento.conjuge_registrado` (vazio) — a árvore sabe quem é o cônjuge;
 //   • a CERTIDÃO DE CASAMENTO é da UNIÃO e fica num dos cônjuges (a `pessoa1`): a OUTRA pessoa via a linha de casamento vazia;
 //   • livro/folha/termo «0» (valor padrão) apareciam como «Livro 0 / Folhas 0 / Termo 0».
@@ -54,21 +54,21 @@ async function main() {
     const cas = linha(ilaine.id, tCas)
     ok("o CASAMENTO da Ilaine mostra o registro da união (o documento está no Sebastião)", cas.documentoId === docCas.id && cas.cartorio === "Santo André 1 Subdistrito" && cas.livro === "B 62" && cas.folha === "141" && cas.termo === "17356", JSON.stringify([cas.documentoId, cas.livro, cas.folha, cas.termo]))
     ok("com o LOCAL do registro", cas.local === "Santo André - São Paulo", String(cas.local))
-    ok("e a DATA (do evento, pois o registro não tem data de registro) sem deslocamento de fuso: 16/07/2019", dia(cas.dataRegistro) === "2019-07-16", String(cas.dataRegistro))
+    ok("DATA DO EVENTO sem deslocamento de fuso: 16/07/2019 — e a DATA DO REGISTRO fica vazia (nunca o evento no lugar)", dia(cas.dataEvento) === "2019-07-16" && cas.dataRegistro === null, JSON.stringify([cas.dataEvento, cas.dataRegistro]))
     ok("e o CÔNJUGE vem da árvore: Sebastião", /Sebastião/.test(cas.conjuge ?? ""), String(cas.conjuge))
-    ok("o Sebastião (dono do documento) mostra o MESMO registro, com a Ilaine de cônjuge", linha(sebastiao.id, tCas).documentoId === docCas.id && /Ilaine/.test(linha(sebastiao.id, tCas).conjuge ?? "") && dia(linha(sebastiao.id, tCas).dataRegistro) === "2019-07-16")
+    ok("o Sebastião (dono do documento) mostra o MESMO registro, com a Ilaine de cônjuge", linha(sebastiao.id, tCas).documentoId === docCas.id && /Ilaine/.test(linha(sebastiao.id, tCas).conjuge ?? "") && dia(linha(sebastiao.id, tCas).dataEvento) === "2019-07-16")
     const nasc = linha(ilaine.id, tNasc)
-    ok("NASCIMENTO da Ilaine: sem data de registro, mostra a data do EVENTO (13/10/1937)", dia(nasc.dataRegistro) === "1937-10-13", String(nasc.dataRegistro))
+    ok("NASCIMENTO da Ilaine: data do EVENTO 13/10/1937 e data do REGISTRO vazia", dia(nasc.dataEvento) === "1937-10-13" && nasc.dataRegistro === null, JSON.stringify([nasc.dataEvento, nasc.dataRegistro]))
     ok("local e dados do nascimento seguem aparecendo", nasc.local === "Santo André - São Paulo" && nasc.livro === "19" && nasc.folha === "003")
     ok("«0» no termo não vira dado (sem «Termo 0»)", nasc.termo === null)
     const obito = linha(ilaine.id, tObito)
-    ok("ÓBITO da Ilaine (viva): nada inventado — data, local e dados vazios", obito.dataRegistro === null && obito.local === null && obito.livro === null && obito.conjuge === null)
+    ok("ÓBITO da Ilaine (viva): nada inventado — data, local e dados vazios", obito.dataEvento === null && obito.dataRegistro === null && obito.local === null && obito.livro === null && obito.conjuge === null)
 
     secao("2) Sem documento: vale o que a ÁRVORE já sabe")
-    ok("nascimento sem documento: data = Pessoa.data_nasc e local = Pessoa.local_nasc/estado_nasc", dia(linha(solteira.id, tNasc).dataRegistro) === "1970-02-02" && linha(solteira.id, tNasc).local === "Santos - SP", JSON.stringify([linha(solteira.id, tNasc).dataRegistro, linha(solteira.id, tNasc).local]))
+    ok("nascimento sem documento: data = Pessoa.data_nasc e local = Pessoa.local_nasc/estado_nasc", dia(linha(solteira.id, tNasc).dataEvento) === "1970-02-02" && linha(solteira.id, tNasc).dataRegistro === null && linha(solteira.id, tNasc).local === "Santos - SP", JSON.stringify([linha(solteira.id, tNasc).dataEvento, linha(solteira.id, tNasc).local]))
     await prisma.documento.delete({ where: { id: docCas.id } })
     const semDoc = (await montarEstruturaDocumental(proc.id)).find((b) => b.pessoaId === ilaine.id)!.linhas.find((l) => l.tipoDocumentoId === tCas)!
-    ok("casamento sem documento: data = União.data_inicio (20/07/1961) e local = União.local/estado", dia(semDoc.dataRegistro) === "1961-07-20" && semDoc.local === "Santo André - SP", JSON.stringify([semDoc.dataRegistro, semDoc.local]))
+    ok("casamento sem documento: data = União.data_inicio (20/07/1961) e local = União.local/estado", dia(semDoc.dataEvento) === "1961-07-20" && semDoc.dataRegistro === null && semDoc.local === "Santo André - SP", JSON.stringify([semDoc.dataEvento, semDoc.local]))
     ok("e o cônjuge continua vindo da união", /Sebastião/.test(semDoc.conjuge ?? ""))
     ok("sem documento, a linha diz documentoId = 0 (nada de registro inventado)", semDoc.documentoId === 0)
 
@@ -78,7 +78,7 @@ async function main() {
     ok("dadoDoRegistro: «0», «00», vazio e espaços = sem dado; «B 62» e «003» valem", dadoDoRegistro("0") === null && dadoDoRegistro("00") === null && dadoDoRegistro("  ") === null && dadoDoRegistro(null) === null && dadoDoRegistro("B 62") === "B 62" && dadoDoRegistro("003") === "003")
     const view = readFileSync("src/components/financeiro/v3/PlanilhaDocumentalView.tsx", "utf8")
     ok("a tela também protege: «0» vira «—» (semZero)", /const semZero/.test(view) && /dadosDoRegistro = \(l: Linha\)/.test(view) && /semZero\(l\.livro\)/.test(view))
-    ok("a data da tela é de calendário: UTC, sem deslocamento de fuso", /timeZone: "UTC"/.test(view))
+    ok("a data da tela é de calendário: UTC, sem deslocamento de fuso", /formatarDataPura/.test(view))
     ok("categoriaDoRegistro reconhece nascimento, casamento e óbito", categoriaDoRegistro("Certidão de nascimento") === "NASCIMENTO" && categoriaDoRegistro("Certidão de casamento") === "CASAMENTO" && categoriaDoRegistro("Certidão de óbito") === "OBITO")
 
     secao("4) Documentos e Custos mostram as MESMAS pessoas e registros")
@@ -87,7 +87,7 @@ async function main() {
     const a = await montarEstruturaDocumental(proc.id)
     const b = (await montarPlanilhaDocumental(proc.id)).pessoas
     const norm = (blocos: Array<{ pessoaId: number | null; nome: string; geracao: number | null; linhagemPrincipal: boolean; linhas: Array<Record<string, unknown>> }>) =>
-      JSON.stringify(blocos.map((x) => [x.pessoaId, x.nome, x.geracao, x.linhagemPrincipal, x.linhas.map((l) => [l.documentoId, l.documentoProprioId, l.tipoDocumentoId, l.tipoRegistro, l.dataRegistro, l.local, l.cartorio, l.livro, l.folha, l.termo, l.conjuge, l.paiNome, l.maeNome, l.localizado])]))
+      JSON.stringify(blocos.map((x) => [x.pessoaId, x.nome, x.geracao, x.linhagemPrincipal, x.linhas.map((l) => [l.documentoId, l.documentoProprioId, l.tipoDocumentoId, l.tipoRegistro, l.dataEvento, l.dataRegistro, l.local, l.cartorio, l.livro, l.folha, l.termo, l.conjuge, l.paiNome, l.maeNome, l.localizado])]))
     ok("as duas planilhas têm exatamente as mesmas pessoas, registros, datas, locais, dados e cônjuges", norm(a as never) === norm(b as never) && a.length === 4, `${a.length} pessoas`)
     ok("a única diferença são os valores: Custos tem células e totais; a estrutura não tem nada financeiro", b.every((x) => x.linhas.every((l) => Array.isArray(l.celulas))) && a.every((x) => x.linhas.every((l) => !("celulas" in l) && !("totalBrl" in l))))
     const fonte = readFileSync("lib/financeiro/leitura/planilha-documental.ts", "utf8")
