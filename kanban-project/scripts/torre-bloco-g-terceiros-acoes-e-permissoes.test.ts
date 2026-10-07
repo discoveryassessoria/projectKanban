@@ -156,7 +156,7 @@ async function main() {
     ok("cada pedido sabe o órgão a quem foi pedido (cadastro de órgãos)", pedidos.find((p) => p.taskId === a1.tarefaId)?.orgaoId === o1.id && pedidos.find((p) => p.taskId === a3.tarefaId)?.orgaoId === o2.id && pedidos.find((p) => p.taskId === a5.tarefaId)?.orgaoId === null)
     ok("o pedido carrega 'pedida há' e 'cobrar em' (sem placar: nada de média, ranking ou 'sem resposta' por órgão)", pedidos.every((p) => typeof p.pedidaHa === "string" && typeof p.cobrarEm.texto === "string" && !("semResposta" in p) && !("naoLocalizada" in p) && !("regua" in p)))
     const resumo = resumoDeTerceiros(linhasTer, agoraTer)
-    ok("cartão 'aguardando terceiros' = o MESMO número da Visão geral / aba Tarefas (numeroDoKpi cartorio)", resumo.aguardando === numeroDoKpi("cartorio", linhasTer, agoraTer))
+    ok("cartão 'aguardando terceiros' = o MESMO número da visão 'Aguardando terceiros' da aba Tarefas (numeroDoKpi aguard: com ou sem responsável)", resumo.aguardando === numeroDoKpi("aguard", linhasTer, agoraTer))
     ok("cartões 2–4 repartem o cartão 1", resumo.comCartorios + resumo.comOCliente + resumo.tradutora + resumo.juizo + resumo.consulado === resumo.aguardando)
     ok("'para cobrar hoje ou vencidas' cobre pelo menos as vencidas da Operação (a1, a2)", resumo.paraCobrar >= linhasTer.filter((l) => l.cobravelVencida).length)
 

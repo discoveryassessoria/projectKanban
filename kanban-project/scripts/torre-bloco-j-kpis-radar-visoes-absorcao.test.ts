@@ -193,7 +193,7 @@ async function main() {
     const menu = fonte("src/components/bitrix-sidebar.tsx")
     const iOp = menu.indexOf('title: "Operação"'), iTorre = menu.indexOf('title: "Torre de Controle"'), iCal = menu.indexOf('title: "Calendário"')
     ok("menu: 'Torre de Controle' entre Operação e Calendário, e SÓ para administrador", iOp > 0 && iOp < iTorre && iTorre < iCal && /title: "Torre de Controle",[\s\S]{0,260}soAdmin: true/.test(menu))
-    ok("'Tarefas e Projetos' e 'Distribuição' continuam no menu (nada apagado)", menu.includes('title: "Tarefas e Projetos"') && menu.includes('title: "Distribuição"'))
+    ok("'Tarefas e Projetos' e 'Distribuição' SAÍRAM do menu (06/10/2026, Lei da Torre L4); as rotas só redirecionam", !menu.includes('title: "Tarefas e Projetos"') && !menu.includes('title: "Distribuição"') && !menu.includes('url: "/tarefas"') && !menu.includes('url: "/operacao/distribuicao"'))
     void outro
     await prisma.familia.deleteMany({ where: { nome: { startsWith: MARCA } } })
     await prisma.catalogoPais.delete({ where: { id: semOferta.id } }).catch(() => {})

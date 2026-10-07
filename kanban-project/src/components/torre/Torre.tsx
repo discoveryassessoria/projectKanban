@@ -1,12 +1,11 @@
 "use client"
-// src/components/torre/Torre.tsx — o CASCO da Torre de Controle (Bloco J; reorganizado na Torre nova, Etapa A, 01/10/2026).
-// Cabeçalho (nacionalidade, busca, Briefing do dia MANUAL, Revisar o dia) · 7 abas, na ordem do protótipo, com contadores:
-// Visão geral · Precisa de você · Radar · Processos · Tarefas · Equipe · Terceiros. O Processo (detalhe) é uma PÁGINA
-// (`/torre/processo/[id]`).
-// O topo (frase + faixas Situação e Agenda) agora mora na Visão geral (`TorreVisaoGeral`), não acima das abas.
-// Regras, Integridade e Auditoria NÃO são da Torre (ela serve só à gestão de processo): moram em Gerenciamento › Saúde do sistema.
-// Uma fonte por dado: as linhas de tarefa vêm de UMA leitura (`/api/torre/tarefas`, a projeção da Operação) e alimentam os KPIs,
-// a aba Tarefas, os contadores e a aba Terceiros — o número do cartão é sempre o tamanho da lista que ele filtra.
+// src/components/torre/Torre.tsx — o CASCO da Torre de Controle (consolidação da Torre, 06/10/2026).
+// CINCO abas, cada uma com a sua pergunta (Lei da Torre, docs/architecture/33-torre-consolidada-inventario.md):
+//   Hoje · Tarefas · Famílias (lista ⇄ matriz, o antigo Radar) · Equipe · Terceiros. O Processo (detalhe) é a PÁGINA `/torre/processo/[id]`.
+// Antigos `?aba=visao|precisa|processos|radar` continuam válidos (traduzidos em `torre-abas.ts`); `minha` saiu da Torre (vai para /operacao).
+// Regras, Integridade e Auditoria NÃO são da Torre: moram em Gerenciamento › Saúde do sistema.
+// Uma fonte por dado: as linhas de tarefa vêm de UMA leitura (`/api/torre/tarefas`, a projeção da Operação) e alimentam os alarmes de Hoje, a aba
+// Tarefas, os contadores e a aba Terceiros — o número de qualquer cartão é sempre o tamanho da lista que ele abre (L3).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { KPIS, KPI_POR_CHAVE, emRiscoCritico, linhasDoKpi, numeroDoKpi, processosEmRisco, type ChaveKpi } from "@/lib/operacional/torre-kpis"
@@ -22,11 +21,10 @@ import { aplicarFiltros, filtrosDaQuery, filtrosIguais, type FiltrosTorre } from
 import { AGRUPAR_TORRE, DENTRO_TORRE } from "@/lib/operacional/torre-visoes"
 import { aplicarBusca } from "@/src/components/operacao/operacao-v3-derivacoes"
 import { api, erroDe, TorreProvider, type PermissoesTorre, type AlvoDoRelatorio } from "./torre-base"
-import type { LinhaTorre } from "./tipos"
+import type { LinhaTorre, Tendencias } from "./tipos"
 import type { ColunaDoRadar, ProcessoDaTorre } from "./tipos-processos"
 import type { ItemPrecisa } from "./tipos-precisa"
 import { TorreCabecalho, type PaisDaTorre } from "./TorreCabecalho"
-import type { Tendencias } from "./TorreKpis"
 import { TorreHoje } from "./TorreHoje"
 import { TorreFamilias } from "./TorreFamilias"
 import { pedirFaseDeProcessos } from "./torre-fase-memoria"

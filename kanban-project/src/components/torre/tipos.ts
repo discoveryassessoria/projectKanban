@@ -44,3 +44,6 @@ export function riscoDe(l: LinhaOperacaoV3): { txt: string; cls: Pill } {
 /** A tarefa tem acompanhamento a adiar — a MESMA condição da aba Acompanhamento da Operação (`acompanhamentoPasso` com prazo). */
 export const temAcompanhamento = (l: Pick<LinhaOperacaoV3, "acompanhamentoPasso">): boolean =>
   !!l.acompanhamentoPasso && !l.acompanhamentoPasso.semPrazo
+
+/** A tendência (backlog abre/fecha) que a aba Famílias usa (o Funil e a Visão geral saíram: consolidação 06/10/2026). */
+export interface Tendencias { backlog: { abertas: number; fechadas: number }; referencia: unknown | null; fotosNaSerie: number }

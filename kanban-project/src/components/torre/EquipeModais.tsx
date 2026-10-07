@@ -6,6 +6,7 @@ import { LAYER } from "@/src/lib/ui/layers"
 import { api, erroDe, useEscFecha, type Desfazer } from "./torre-base"
 import { TIPOS_DE_AUSENCIA, TEXTO_MARCAR_AUSENCIA } from "./equipe-visual"
 import type { PessoaDaEquipe } from "./equipe-tipos"
+import { useConfirmarAtribuicao } from "./ConfirmarAtribuicao"
 import "./equipe.css"
 
 function ModalDaEquipe({ titulo, texto, ocupado, onFechar, children, cancelar, confirmar }: {
@@ -73,11 +74,13 @@ export function MoverModal({ origem, pessoas, onFechar, onFeito }: {
 }) {
   const [para, setPara] = useState("")
   const [naoAptas, setNaoAptas] = useState("nao")
+  // PROPOSTA: a prévia ("Mover N tarefas de A para B?") só grava depois da confirmação explícita.
+  const { postar: postarComConfirmacao, modal: modalConfirmacao } = useConfirmarAtribuicao()
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const enviar = async () => {
     setEnviando(true); setErro(null)
-    const r = await api<RespostaMover>("/api/torre/equipe/mover-carteira", "POST", { deUsuarioId: origem.usuarioId, paraUsuarioId: para ? Number(para) : null, incluirNaoAptas: naoAptas === "sim" })
+    const r = await postarComConfirmacao<RespostaMover>("/api/torre/equipe/mover-carteira", { deUsuarioId: origem.usuarioId, paraUsuarioId: para ? Number(para) : null, incluirNaoAptas: naoAptas === "sim" })
     setEnviando(false)
     if (r.data && typeof r.data.movidas === "number") onFeito({ movidas: r.data.movidas, naoAptas: r.data.naoAptas ?? 0, falhas: r.data.falhas ?? 0, desfazer: r.data.desfazer ?? null })
     else setErro(erroDe(r.data))
@@ -98,6 +101,7 @@ export function MoverModal({ origem, pessoas, onFechar, onFeito }: {
         </select>
       </label>
       {erro && <div className="eqp-erro" role="alert">{erro}</div>}
+      {modalConfirmacao}
     </ModalDaEquipe>
   )
 }

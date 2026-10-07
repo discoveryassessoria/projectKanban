@@ -1,7 +1,8 @@
 // scripts/torre-casca-sete-abas.test.ts
 // ============================================================================
-// TORRE NOVA, ETAPA A (01/10/2026) — A CASCA: 7 abas na ordem do protótipo, contrato de URL, contadores, cabeçalho, país em todas as
-// abas, Briefing SÓ manual, a rota do Processo (página), a Visão geral e a aba Terceiros sem placar por cartório.
+// TORRE NOVA, ETAPA A (01/10/2026), consolidada em 06/10/2026 — A CASCA: 5 abas (Hoje · Tarefas · Famílias · Equipe · Terceiros), contrato de URL
+// (ids antigos traduzidos), contadores, cabeçalho, país em todas as abas, Hoje só com alarmes, a rota do Processo (página) e a aba
+// Terceiros (órgãos, sem placar por cartório). (O nome do arquivo ficou: é o mesmo teste do casco.)
 //
 //   npx tsx scripts/torre-casca-sete-abas.test.ts   (banco de teste)
 // ============================================================================
@@ -13,7 +14,9 @@ import { NextRequest } from "next/server"
 import { prisma } from "../lib/prisma"
 import { signAuthToken } from "../lib/auth-jwt"
 import { montarCenario } from "./_fixture-torre-gh"
-import { ABAS_DA_TORRE, ABA_INICIAL, IDS_DAS_ABAS, IDS_ANTIGOS_DAS_ABAS, abaDaUrl, ehAbaDaTorre, rotuloDaAba } from "../lib/operacional/torre-abas"
+import { ABAS_DA_TORRE, ABA_INICIAL, ABA_ANTIGA_PARA_NOVA, IDS_DAS_ABAS, IDS_ANTIGOS_DAS_ABAS, PERGUNTA_DA_ABA, abaDaUrl, destinoDeAbaQueSaiu, ehAbaDaTorre, rotuloDaAba } from "../lib/operacional/torre-abas"
+import { seloVisivel } from "../lib/operacional/torre-casca"
+import { ALARMES_DE_HOJE } from "../lib/operacional/torre-hoje"
 import { itensDoPais, mapaDePaisPorProcesso, contagemDeProcessosPorPais } from "../lib/operacional/torre-pais"
 import { destinoDaAbaAntigaDaTorre } from "../lib/operacional/navegacao"
 import { destinoDaOperacaoParaAdmin, linkDoAvisoParaAdmin } from "../src/lib/torre-absorcao"
@@ -29,54 +32,58 @@ const semComentarios = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace
 const req = (url: string, token: string) => new NextRequest(`http://localhost${url}`, { headers: { Authorization: `Bearer ${token}` } })
 
 async function main() {
-  secao("1 — SETE abas, na ORDEM EXATA do protótipo")
-  ok("Visão geral · Precisa de você · Radar · Processos · Tarefas · Minha operação · Equipe · Terceiros", ABAS_DA_TORRE.map(([, r]) => r).join(" · ") === "Visão geral · Precisa de você · Radar · Processos · Tarefas · Minha operação · Equipe · Terceiros")
-  ok("ids estáveis: visao · precisa · radar · processos · tarefas · minha · equipe · terceiros", IDS_DAS_ABAS.join(",") === "visao,precisa,radar,processos,tarefas,minha,equipe,terceiros")
+  secao("1 — CINCO abas, na ORDEM EXATA da consolidação (Lei da Torre)")
+  ok("Hoje · Tarefas · Famílias · Equipe · Terceiros", ABAS_DA_TORRE.map(([, r]) => r).join(" · ") === "Hoje · Tarefas · Famílias · Equipe · Terceiros")
+  ok("ids estáveis: hoje · tarefas · familias · equipe · terceiros", IDS_DAS_ABAS.join(",") === "hoje,tarefas,familias,equipe,terceiros")
+  ok("cada aba responde UMA pergunta (L2), a do cabeçalho dela", PERGUNTA_DA_ABA.hoje === "O que está pegando hoje?" && PERGUNTA_DA_ABA.tarefas === "Quem faz o quê?" && PERGUNTA_DA_ABA.familias === "Como está cada família?" && PERGUNTA_DA_ABA.equipe === "A equipe dá conta?" && PERGUNTA_DA_ABA.terceiros === "O que estamos esperando de fora?" && IDS_DAS_ABAS.every((a) => !!PERGUNTA_DA_ABA[a]))
   const torre = ler("src/components/torre/Torre.tsx")
   ok("o casco usa a lista única (torre-abas.ts) — não reescreve a lista", /export const ABAS: Array<\[Aba, string\]> = ABAS_DA_TORRE/.test(torre) && !/\["precisa", "Precisa de você"\]/.test(torre))
-  ok("a aba 'Certidões' não existe (é 'Tarefas'); nem 'Equipe e Terceiros'", !ABAS_DA_TORRE.some(([, r]) => /certid/i.test(r)) && !ABAS_DA_TORRE.some(([, r]) => /Equipe e Terceiros/i.test(r)) && rotuloDaAba("tarefas") === "Tarefas")
-  ok("cada aba do casco tem a sua tela montada (visao → TorreVisaoGeral, precisa, radar, processos, tarefas, equipe, terceiros)", ["visao", "precisa", "radar", "processos", "tarefas", "equipe", "terceiros"].every((a) => new RegExp(`aba === "${a}"`).test(torre)) && /<TorreVisaoGeral/.test(torre))
+  ok("as abas antigas não existem mais: nada de 'Visão geral', 'Precisa de você', 'Radar', 'Processos', 'Minha operação', 'Certidões' nem 'Equipe e Terceiros' na lista", !ABAS_DA_TORRE.some(([, r]) => /Vis[aã]o geral|Precisa de voc|Radar|^Processos$|Minha opera|certid|Equipe e Terceiros/i.test(r)) && rotuloDaAba("tarefas") === "Tarefas" && rotuloDaAba("familias") === "Famílias")
+  ok("cada aba do casco tem a sua tela montada (hoje → TorreHoje, tarefas, equipe, familias → TorreFamilias, terceiros)", ["hoje", "tarefas", "equipe", "familias", "terceiros"].every((a) => new RegExp(`aba === "${a}"`).test(torre)) && /<TorreHoje/.test(torre) && /<TorreFamilias/.test(torre) && !/aba === "(visao|precisa|radar|processos|minha)"/.test(torre))
+  ok("'Minha operação' não é mais montada na Torre (OperacaoV3 saiu); mora só em /operacao", !/OperacaoV3|MinhaOperacao/.test(torre))
 
-  secao("2 — contrato de URL: ?aba= estável, valores ANTIGOS continuam, sem aba → Visão geral")
-  ok("sem ?aba= → visao", ABA_INICIAL === "visao" && abaDaUrl(null) === "visao" && abaDaUrl(undefined) === "visao" && abaDaUrl("") === "visao")
-  ok("valor desconhecido → visao (não quebra)", abaDaUrl("xyz") === "visao" && abaDaUrl("Radar") === "visao")
-  ok("TODOS os valores antigos continuam válidos (links antigos, avisos gravados, favoritos)", IDS_ANTIGOS_DAS_ABAS.join(",") === "precisa,radar,tarefas,equipe,processos,terceiros" && IDS_ANTIGOS_DAS_ABAS.every((a) => ehAbaDaTorre(a) && abaDaUrl(a) === a))
-  ok("'visao' é a aba nova", ehAbaDaTorre("visao") && abaDaUrl("visao") === "visao")
+  secao("2 — contrato de URL: ?aba= estável, valores ANTIGOS traduzidos, sem aba → Hoje")
+  ok("sem ?aba= → hoje", ABA_INICIAL === "hoje" && abaDaUrl(null) === "hoje" && abaDaUrl(undefined) === "hoje" && abaDaUrl("") === "hoje")
+  ok("valor desconhecido → hoje (não quebra)", abaDaUrl("xyz") === "hoje" && abaDaUrl("Radar") === "hoje")
+  ok("ids ANTIGOS continuam válidos e são TRADUZIDOS (visao/precisa → hoje · processos → familias · radar → familias com ?vista=matriz · minha → /operacao)", IDS_ANTIGOS_DAS_ABAS.join(",") === "visao,precisa,radar,processos,minha" && abaDaUrl("visao") === "hoje" && abaDaUrl("precisa") === "hoje" && abaDaUrl("processos") === "familias" && abaDaUrl("radar") === "familias" && ABA_ANTIGA_PARA_NOVA.radar && "vista" in ABA_ANTIGA_PARA_NOVA.radar && ABA_ANTIGA_PARA_NOVA.radar.vista === "matriz")
+  ok("'minha' sai da Torre: não é aba, cai na inicial e leva a /operacao", !ehAbaDaTorre("minha") && abaDaUrl("minha") === "hoje" && destinoDeAbaQueSaiu("minha") === "/operacao" && destinoDeAbaQueSaiu("hoje") === null && destinoDeAbaQueSaiu("radar") === null)
+  ok("os ids antigos NÃO são abas (só os 5 novos são)", ["visao", "precisa", "radar", "processos", "minha"].every((a) => !ehAbaDaTorre(a)) && IDS_DAS_ABAS.every(ehAbaDaTorre))
   ok("?aba=regras|integridade|auditoria seguem indo para o Gerenciamento", ["regras", "integridade", "auditoria"].every((a) => !ehAbaDaTorre(a) && destinoDaAbaAntigaDaTorre(a) !== null))
-  ok("o casco lê a aba pela lista única e abre em ABA_INICIAL; a URL omite 'aba' só na inicial", /ehAbaDaTorre\(abaUrl\)/.test(torre) && /useState<Aba>\(urlInicial\.aba \?\? ABA_INICIAL\)/.test(torre) && /if \(aba !== ABA_INICIAL\) q\.set\("aba", aba\)/.test(torre))
-  ok("os links que o sistema GERA (sino, absorção) continuam apontando para abas válidas", [destinoDaOperacaoParaAdmin("aba=radar"), destinoDaOperacaoParaAdmin("aba=familias"), destinoDaOperacaoParaAdmin("aba=aguardando"), linkDoAvisoParaAdmin("/tarefas", "admin")].every((u) => { const a = new URL(`http://x${u}`).searchParams.get("aba"); return ehAbaDaTorre(a) }))
+  ok("o casco lê a aba pela lista única e abre em ABA_INICIAL; a URL omite 'aba' só na inicial; traduz os ids antigos e a matriz", /ehAbaDaTorre\(abaUrl\)/.test(torre) && /ABA_ANTIGA_PARA_NOVA\[abaUrl\]/.test(torre) && /useState<Aba>\(urlInicial\.aba \?\? ABA_INICIAL\)/.test(torre) && /if \(aba !== ABA_INICIAL\) q\.set\("aba", aba\)/.test(torre) && /q\.set\("vista", "matriz"\)/.test(torre))
+  ok("os links que o sistema GERA (sino, absorção) apontam para abas válidas da Torre — ou, no caso da Operação, para /operacao (fora da Torre)", [destinoDaOperacaoParaAdmin("tarefa=5"), linkDoAvisoParaAdmin("/tarefas", "admin"), linkDoAvisoParaAdmin("/operacao/distribuicao", "admin")].every((u) => ehAbaDaTorre(new URL(`http://x${u}`).searchParams.get("aba"))) && ["aba=radar", "aba=familias", "aba=aguardando", ""].every((q) => destinoDaOperacaoParaAdmin(q).startsWith("/operacao")))
   ok("?tarefa= / ?visao= / ?processo= continuam levando à aba Tarefas", /tarefa != null \? "tarefas"/.test(torre) && /\(visao \|\| processo != null \? "tarefas"/.test(torre))
 
   secao("3 — contadores nas abas (números reais, o mesmo que a aba mostra)")
-  ok("Precisa de você N = as decisões do país escolhido; Tarefas N = a lista filtrada; Processos N; Equipe N; Terceiros 'N a cobrar'", /k === "precisa"\) return itensPrecisaPais \? \{ txt: String\(itensPrecisaPais\.length\)/.test(torre) && /k === "tarefas"\) return linhas \? \{ txt: String\(nTarefas\)/.test(torre) && /k === "processos"\) return procs \? \{ txt: String\(processosDaAba\.length\)/.test(torre) && /k === "equipe"\) return nEquipe != null/.test(torre) && /`\$\{nCobrar\} a cobrar`/.test(torre))
-  ok("Visão geral e Radar não têm contador (como no protótipo)", /return null\n  \}/.test(torre) && !/k === "visao"\) return \{/.test(torre) && !/k === "radar"\) return \{/.test(torre))
+  ok("Tarefas N = a lista filtrada; Famílias N = processos da aba; Equipe N; Terceiros 'N aguardando' (a visão 'Aguardando terceiros')", /k === "tarefas"\) return linhas \? \{ txt: String\(nTarefas\)/.test(torre) && /k === "familias"\) return procs \? \{ txt: String\(processosDaAba\.length\)/.test(torre) && /k === "equipe"\) return nEquipe != null/.test(torre) && /k === "terceiros"\) return linhas \? \{ txt: String\(nTerceiros\)/.test(torre) && /nTerceiros = numeroDoKpi\("aguard"/.test(torre))
+  ok("Hoje não tem contador (os números ficam DENTRO da aba, clicáveis)", !/k === "hoje"\) return \{/.test(torre) && seloVisivel("hoje", "tarefas") === false)
 
-  secao("4 — cabeçalho: país (botões), busca, Briefing do dia SÓ manual, Revisar o dia")
+  secao("4 — cabeçalho: país (botões) e busca; 'Briefing do dia' virou a frase de Hoje e 'Revisar o dia' saiu")
   const cab = ler("src/components/torre/TorreCabecalho.tsx")
-  ok("botão 'Briefing do dia' e botão 'Revisar o dia (N)'", /☀ Briefing do dia/.test(cab) && /Revisar o dia \(\{nPrecisa/.test(cab))
+  ok("NÃO há mais botão 'Briefing do dia' nem 'Revisar o dia' no cabeçalho", !/Briefing do dia|Revisar o dia|onBriefing|onRevisar/.test(semComentarios(cab)) && !existsSync("src/components/torre/TorreBriefing.tsx") && !existsSync("src/components/torre/TorreRevisao.tsx"))
   ok("a busca existe, com o placeholder de sempre", /placeholder="Buscar família, pessoa, cartório…"/.test(cab))
-  ok("o país são botões 'Todos' + um por país cadastrado, com a contagem de processos", /Todos/.test(cab) && /paises\.map/.test(cab) && /p\.n != null/.test(cab) && /aria-pressed/.test(cab))
+  ok("o país são botões 'Todos' + um por país cadastrado, com a contagem de processos", /Todos/.test(cab) && /paises\)\.map|paises\.map/.test(cab) && /p\.n != null/.test(cab) && /aria-pressed/.test(cab))
   ok("todo botão do cabeçalho tem handler", [...cab.matchAll(/<button\b[^>]*>/g)].every((m) => /onClick=/.test(m[0])))
   const torreCod = semComentarios(torre)
-  ok("o Briefing NÃO abre sozinho: nada de sessionStorage 'torre-briefing-visto' e setBriefingAberto(true) só no clique do botão", !/sessionStorage|torre-briefing-visto/.test(torreCod) && (torreCod.match(/setBriefingAberto\(true\)/g) ?? []).length === 1 && /onBriefing=\{\(\) => setBriefingAberto\(true\)\}/.test(torreCod))
-  ok("o modal só renderiza com briefingAberto", /\{briefingAberto && precisa && \(/.test(torreCod))
+  ok("o briefing não abre sozinho nem em modal: sem sessionStorage 'torre-briefing-visto', sem briefingAberto; a frase do dia é texto de Hoje (<TorreHoje frase=…>)", !/sessionStorage|torre-briefing-visto|briefingAberto|setBriefingAberto/.test(torreCod) && /<TorreHoje[^>]*frase=\{textoDoBriefing\}/.test(torreCod))
   ok("o sino é o do cabeçalho global da página (HeaderBarApp) — a Torre não duplica", /<HeaderBarApp/.test(ler("src/app/torre/page.tsx")) && !/sino/i.test(semComentarios(cab)))
 
   secao("5 — o PAÍS filtra TODAS as abas (regras puras)")
   const itens = [{ processoId: 1, t: "a" }, { processoId: 2, t: "b" }, { processoId: null, t: "carga" }, { processoId: 3, t: "c" }]
   const mapa = mapaDePaisPorProcesso([{ processoId: 1, pais: "Itália" }, { processoId: 2, pais: "Espanha" }], [{ processoId: 3, pais: "Itália" }, { processoId: 1, pais: "Outro" }])
   ok("o país do processo vem da lista de processos, e das linhas de tarefa quando o processo não está na lista (a 1ª fonte vence)", mapa.get(1) === "Itália" && mapa.get(3) === "Itália" && mapa.get(2) === "Espanha")
-  ok("Precisa de você: só as decisões de processos do país; a sem processo (Carga) some", itensDoPais(itens, "Itália", mapa).map((i) => i.t).join() === "a,c" && itensDoPais(itens, "Espanha", mapa).map((i) => i.t).join() === "b")
+  ok("Decisões de Hoje: só as de processos do país; a sem processo (Carga) some", itensDoPais(itens, "Itália", mapa).map((i) => i.t).join() === "a,c" && itensDoPais(itens, "Espanha", mapa).map((i) => i.t).join() === "b")
   ok("sem país escolhido: todas (inclusive as sem processo)", itensDoPais(itens, null, mapa).length === 4)
   ok("contagem de processos por país (botões 'Itália 280')", (() => { const c = contagemDeProcessosPorPais([{ pais: "Itália" }, { pais: "Itália" }, { pais: "Espanha" }, { pais: null }]); return c.get("Itália") === 2 && c.get("Espanha") === 1 && c.size === 2 })())
-  ok("Tarefas · Terceiros · KPIs recortam as linhas por país; Radar · Processos os processos; Equipe pelo servidor", /linhasPais = useMemo/.test(torre) && /<TorreTerceiros linhas=\{linhasPais\}/.test(torre) && /processosFiltrados/.test(torre) && /<TorreEquipe versao=\{versao\} pais=\{pais\}/.test(torre) && /itensPrecisaPais/.test(torre))
+  ok("Hoje · Tarefas · Terceiros recortam as linhas por país; Famílias (lista e matriz) os processos; Equipe pelo servidor; decisões de Hoje pelo país", /linhasPais = useMemo/.test(torre) && /<TorreHoje linhas=\{linhasPais\}/.test(torre) && /<TorreTerceiros linhas=\{linhasPais\}/.test(torre) && /processosFiltrados/.test(torre) && /<TorreFamilias[\s\S]{0,200}processos=\{processosDaAba\} processosTodos=\{processosFiltrados\}/.test(torre) && /<TorreEquipe versao=\{versao\} pais=\{pais\}/.test(torre) && /itensPrecisaPais/.test(torre))
 
-  secao("6 — Visão geral: renderiza o topo de hoje (frase + Situação + Agenda via TorreKpis)")
-  const visao = ler("src/components/torre/TorreVisaoGeral.tsx")
-  ok("TorreVisaoGeral existe e delega ao TorreKpis (frase + faixas SITUAÇÃO e AGENDA)", /<TorreKpis/.test(visao) && /export function TorreVisaoGeral/.test(visao))
-  ok("o contrato de props já traz o que o dono da aba vai precisar (linhas e processos do país, decisões, tendência, navegação)", ["linhas", "processos", "itensPrecisa", "agora", "tend", "filtrandoPais", "kpiAtivo", "onEscolherKpi", "onProcessos", "onRisco", "irParaAba"].every((p) => new RegExp(`\\b${p}\\b`).test(visao)))
-  ok("o topo NÃO fica mais acima das abas (só na Visão geral)", !/<TorreKpis/.test(torre) && /<TorreVisaoGeral/.test(torre))
-  ok("a Visão geral não usa relógio no render (hidratação)", !/new Date\(|Date\.now\(/.test(semComentarios(visao)))
+  secao("6 — Hoje: só alarmes (no máx. 6 números clicáveis, sem botão de ação) e a frase do dia")
+  const hoje = ler("src/components/torre/TorreHoje.tsx")
+  ok("TorreHoje existe, mostra a pergunta da aba e a frase do dia", /export function TorreHoje/.test(hoje) && /PERGUNTA_DA_ABA\.hoje/.test(hoje) && /data-testid="frase-do-dia"/.test(hoje))
+  ok("no máximo SEIS números, todos clicáveis e saídos da lista única de alarmes", ALARMES_DE_HOJE.length <= 6 && /ALARMES_DE_HOJE\.map/.test(hoje) && /onClick=\{\(e\) => \{ e\.preventDefault\(\); onAlarme\(a\.chave\) \}\}/.test(hoje))
+  ok("Hoje NÃO tem botão de ação (L4): nenhum <button>; as decisões são LINHAS COM LINK para onde se resolve", !/<button\b/.test(semComentarios(hoje)) && /<Link className="onde"/.test(hoje))
+  ok("a Visão geral, o 'Precisa de você', os KPIs e o Funil saíram: nenhum componente deles existe mais", ["TorreVisaoGeral", "TorrePrecisaDeVoce", "TorreKpis", "TorreFunil"].every((f) => !existsSync(`src/components/torre/${f}.tsx`)) && !/<TorreKpis|<TorreFunil/.test(torre))
+  ok("o topo NÃO fica acima das abas", !/<TorreKpis/.test(torre))
+  ok("Hoje não usa relógio no render (hidratação): o 'agora' vem do casco", !/new Date\(|Date\.now\(/.test(semComentarios(hoje)))
 
   secao("7 — o Processo é uma PÁGINA (/torre/processo/[id]) com o mesmo portão da Torre")
   const rota = "src/app/torre/processo/[id]/page.tsx"
@@ -85,18 +92,19 @@ async function main() {
   ok("mesmo portão: useIsClient antes de renderizar; só admin/gerência operacional; volta para /operacao", /const mounted = useIsClient\(\)/.test(pag) && /if \(!mounted \|\| carregando \|\| !autorizado\) return CARREGANDO/.test(pag) && /user\.tipo === "admin" \|\| pode\("operacao\.distribuirTarefas"\)/.test(pag) && /router\.push\("\/operacao"\)/.test(pag))
   ok("nada é renderizado antes do portão (cabeçalho e página do processo)", pag.indexOf("<HeaderBarApp") > pag.indexOf("if (!mounted") && pag.indexOf("<TorreProcessoPagina") > pag.indexOf("if (!mounted"))
   const detalhe = ler("src/components/torre/TorreProcessoPagina.tsx") + ler("src/components/torre/ProcessoCabecalho.tsx")
-  ok("o Detalhe mostra dados reais (/api/torre/foco/{id}?detalhe=1), a trilha, o selo 'Pausado' e a página completa (a casca da Etapa A foi preenchida pela frente H)", /\/api\/torre\/foco\/\$\{processoId\}\?detalhe=1/.test(detalhe) && /href="\/torre\?aba=processos"|\/torre\?aba=processos/.test(detalhe) && /Pausado/.test(detalhe) && /<ProcessoCabecalho/.test(detalhe) && /<ProcessoCertidoes/.test(detalhe))
+  ok("o Detalhe mostra dados reais (/api/torre/foco/{id}?detalhe=1), a trilha até Famílias, o selo 'Pausado' e a página completa (cabeçalho + decisões + TorreTarefas + encerradas)", /\/api\/torre\/foco\/\$\{processoId\}\?detalhe=1/.test(detalhe) && /\/torre\?aba=familias/.test(detalhe) && !/\/torre\?aba=processos/.test(detalhe) && /Pausado/.test(detalhe) && /<ProcessoCabecalho/.test(detalhe) && /<ProcessoDecisoes/.test(detalhe) && /<TorreTarefas/.test(detalhe) && /<ProcessoEncerradas/.test(detalhe))
+  ok("'ProcessoCertidoes' saiu: a página embute a MESMA tabela da aba Tarefas (L1) em vez de uma segunda lista de certidões", !existsSync("src/components/torre/ProcessoCertidoes.tsx") && !/ProcessoCertidoes/.test(detalhe))
   ok("o Foco é a PÁGINA do processo: mostra 'Pausado' e os 4 números (Abertas, Vencidas, Aguardando terceiros, Sem responsável)", /Pausado/.test(ler("src/components/torre/ProcessoCabecalho.tsx")) && /"Aguardando terceiros", d\.numeros\.comCartorio/.test(ler("src/components/torre/ProcessoCabecalho.tsx")))
   ok("a janela 'Foco da família' foi removida: nem o arquivo, nem o 'abrirFoco', e '?processo=' sozinho redireciona à página", !existsSync("src/components/torre/FocoFamilia.tsx") && !/FocoFamilia|abrirFoco/.test(torre) && /router\.replace\(`\/torre\/processo\/\$\{paraPaginaDoProcesso\}`\)/.test(torre))
 
-  secao("8 — aba Terceiros: SEM placar por cartório (nem ranking, nem média por órgão)")
+  secao("8 — aba Terceiros: lista ÓRGÃOS (não tarefas), SEM placar por cartório (nem ranking, nem média por órgão)")
   const terc = ler("src/components/torre/TorreTerceiros.tsx")
   ok("saíram as colunas 'Sem resposta (dias)' e 'Não localizada' por cartório", !/Sem resposta \(dias\)/.test(terc) && !/Não localizada/.test(semComentarios(terc)) && !/semResposta\.tarefas|naoLocalizada/.test(semComentarios(terc).replace(/interface OrgaoTerceiro[\s\S]*?\n\}/, "")))
-  ok("a nota diz que não há ranking nem média por cartório", /não há ranking nem média por cartório/.test(terc))
+  ok("a nota diz que a aba lista ÓRGÃOS, não tarefas, e que não há ranking nem média por cartório", /lista ÓRGÃOS, não tarefas/.test(terc) && /Não há ranking nem média por cartório/.test(terc))
   const reguaTsx = ler("src/components/torre/TerceirosRegua.tsx")
   ok("saíram as colunas 'Sem resposta (dias)' e 'Não localizada' por cartório (também da régua)", !/Sem resposta \(dias\)/.test(terc + reguaTsx) && !/Não localizada/.test(semComentarios(terc + reguaTsx)) && !/semResposta|naoLocalizada/.test(semComentarios(terc + reguaTsx)))
   ok("a Régua, os Contatos do órgão, o tempo médio e o backlog continuam na aba", /<TerceirosRegua/.test(terc) && /Régua de cobrança por órgão/.test(reguaTsx) && /abrirContatos\(o\)/.test(reguaTsx) && /Tempo médio real por fase/.test(reguaTsx) && /Backlog/.test(reguaTsx))
-  ok("a lista é POR PEDIDO e as ações (Cobrar / Ver / Contatos) seguem lá, ligadas", /setCobrar\(p\)/.test(terc) && /setContatos\(p\)/.test(terc) && /\/api\/torre\/terceiros\/cobrar/.test(terc) && /Ver<\/button>/.test(terc))
+  ok("a lista é POR ÓRGÃO (data-testid terceiros-orgaos, 'Órgão · Pedidos · A cobrar · Escaladas'); os pedidos (tarefas) moram em Tarefas via link; 'Cobrar este órgão' e 'Cobrar todos os vencidos' seguem ligados", /data-testid="terceiros-orgaos"/.test(terc) && /<span>Órgão<\/span><span>Pedidos<\/span><span>A cobrar<\/span><span>Escaladas<\/span>/.test(terc) && /\/torre\?aba=tarefas&visao=aguard&orgao=\$\{g\.orgaoId\}/.test(terc) && /cobrarCartorio\(g\.orgaoId!/.test(terc) && /\/api\/torre\/terceiros\/cobrar/.test(terc) && /\/api\/torre\/terceiros\/\$\{orgaoId\}\/cobrar/.test(terc))
 
   secao("9 — Equipe pelo país: o servidor recorta as MESMAS linhas antes de somar a carga")
   const c = await montarCenario(MARCA)

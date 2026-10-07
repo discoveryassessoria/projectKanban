@@ -1,8 +1,9 @@
 // scripts/torre-admin-absorve-operacao.test.ts
 // ============================================================================
-// TUDO DO ADMINISTRADOR MORA NA TORRE (30/09/2026).
-//   • Admin: menu sem "Operação"; /operacao → Torre (traduzindo família/aba/tarefa); aviso de família → página do processo; aviso
-//     de tarefa → drawer; aviso de distribuição → Sem responsável. Avisos JÁ GRAVADOS continuam funcionando.
+// A GESTÃO DO ADMINISTRADOR MORA NA TORRE (30/09/2026); "Minha operação" SAIU da Torre (06/10/2026).
+//   • Admin: aviso de família → página do processo; aviso de tarefa → drawer; aviso de distribuição → Sem responsável. Avisos JÁ GRAVADOS
+//     continuam funcionando. A Operação (/operacao) é a tela de quem executa: aparece no menu do admin TAMBÉM e NÃO redireciona mais
+//     para a Torre (`destinoDaOperacaoParaAdmin` devolve /operacao para o caso "minha").
 //   • Não-admin: menu, /operacao e links IDÊNTICOS aos de antes.
 //   • "Minhas tarefas" do admin = a mesma fila (ids e contagens) que a Operação mostrava.
 //   • Acomp. vencidos ≠ Cobranças vencidas (dois números, dois nomes, cada um = sua lista).
@@ -30,16 +31,17 @@ const ok = (n: string, c: boolean, extra = "") => { if (c) { passou++; console.l
 const MARCA = "TADMOP"
 
 async function main() {
-  console.log("Links do ADMIN: /operacao → Torre")
-  ok("sem parâmetro → aba Minha operação", destinoDaOperacaoParaAdmin("") === "/torre?aba=minha")
-  ok("?aba=fila → Minha operação (A fazer)", destinoDaOperacaoParaAdmin("aba=fila") === "/torre?aba=minha")
-  ok("?aba=aguardando → Minha operação, aba Aguardando", destinoDaOperacaoParaAdmin("aba=aguardando") === "/torre?aba=minha&op=aguardando")
-  ok("?aba=acompanhamento → Minha operação, aba Acompanhamento", destinoDaOperacaoParaAdmin("aba=acompanhamento") === "/torre?aba=minha&op=acompanhamento")
-  ok("?aba=feito → Minha operação, aba Feito", destinoDaOperacaoParaAdmin("aba=feito") === "/torre?aba=minha&op=feito")
-  ok("?aba=familias e ?aba=radar → as abas internas de Minha operação", destinoDaOperacaoParaAdmin("aba=familias") === "/torre?aba=minha&op=familias" && destinoDaOperacaoParaAdmin("aba=radar") === "/torre?aba=minha&op=radar")
+  console.log("Links do ADMIN: /operacao fica em /operacao (Minha operação saiu da Torre)")
+  ok("sem parâmetro → /operacao (não /torre?aba=minha)", destinoDaOperacaoParaAdmin("") === "/operacao")
+  ok("?aba=fila → /operacao (A fazer é a aba inicial)", destinoDaOperacaoParaAdmin("aba=fila") === "/operacao")
+  ok("?aba=aguardando → /operacao?aba=aguardando", destinoDaOperacaoParaAdmin("aba=aguardando") === "/operacao?aba=aguardando")
+  ok("?aba=acompanhamento → /operacao?aba=acompanhamento", destinoDaOperacaoParaAdmin("aba=acompanhamento") === "/operacao?aba=acompanhamento")
+  ok("?aba=feito → /operacao?aba=feito", destinoDaOperacaoParaAdmin("aba=feito") === "/operacao?aba=feito")
+  ok("?aba=familias e ?aba=radar → as abas internas da própria Operação", destinoDaOperacaoParaAdmin("aba=familias") === "/operacao?aba=familias" && destinoDaOperacaoParaAdmin("aba=radar") === "/operacao?aba=radar")
+  ok("nenhum destino do caso 'minha' aponta para a Torre", ["", "aba=fila", "aba=aguardando", "aba=acompanhamento", "aba=feito", "aba=familias", "aba=radar", "aba=lixo"].every((q) => !destinoDaOperacaoParaAdmin(q).startsWith("/torre")))
   ok("aviso de família (?processo=&aba=) → página do processo", destinoDaOperacaoParaAdmin("processo=651&aba=acompanhamento") === "/torre/processo/651")
   ok("?taskId= → drawer da tarefa", destinoDaOperacaoParaAdmin("taskId=3834") === "/torre?aba=tarefas&tarefa=3834")
-  ok("parâmetro não numérico é ignorado (nada de injeção na URL)", destinoDaOperacaoParaAdmin("processo=1%26aba%3Dx&taskId=abc") === "/torre?aba=minha")
+  ok("parâmetro não numérico é ignorado (nada de injeção na URL)", destinoDaOperacaoParaAdmin("processo=1%26aba%3Dx&taskId=abc") === "/operacao")
 
   console.log("\nAvisos JÁ GRAVADOS (as formas reais geradas pelo sistema)")
   const admin = (l: string) => linkDoAvisoParaAdmin(l, "admin")
@@ -62,20 +64,20 @@ async function main() {
   ok("link nulo continua nulo", linkDoAvisoParaAdmin(null, "admin") === null && linkDoAvisoParaAdmin(undefined, "assistente") === null)
 
   console.log("\nMenu")
-  const operacao = { permissao: "tarefas.ver", escondeParaAdmin: true }
+  const operacao = { permissao: "tarefas.ver" }
   const operacaoAntes = { permissao: "tarefas.ver" }
   const adm = { pode: () => true, isAdmin: true }, daniela = { pode: (p: string) => p === "tarefas.ver", isAdmin: false }, semNada = { pode: () => false, isAdmin: false }
-  ok("admin NÃO vê 'Operação'", !itemDeMenuVisivel(operacao, adm))
+  ok("admin VÊ 'Operação' (06/10/2026: a Operação é a tela de quem executa e aparece para todos)", itemDeMenuVisivel(operacao, adm))
   ok("Daniela (não-admin) vê 'Operação' exatamente como antes", itemDeMenuVisivel(operacao, daniela) === itemDeMenuVisivel(operacaoAntes, daniela) && itemDeMenuVisivel(operacao, daniela))
   ok("quem não tem permissão continua sem ver", itemDeMenuVisivel(operacao, semNada) === itemDeMenuVisivel(operacaoAntes, semNada))
   const side = readFileSync("src/components/bitrix-sidebar.tsx", "utf8")
   const blocoOp = side.slice(side.indexOf('url: "/operacao"'), side.indexOf('url: "/operacao"') + 400)
-  ok("o item do menu está marcado escondeParaAdmin", /escondeParaAdmin: true/.test(blocoOp))
+  ok("o item do menu NÃO está marcado escondeParaAdmin nem soAdmin", !/escondeParaAdmin|soAdmin/.test(blocoOp.split("},")[0]))
 
   console.log("\nPáginas e Torre")
   const pg = readFileSync("src/app/operacao/page.tsx", "utf8")
-  ok("/operacao continua existindo e só redireciona quem tem acesso à Torre (admin ou operacao.distribuirTarefas)", existsSync("src/app/operacao/page.tsx") && /temAcessoATorre\(user\.tipo, pode\) \? destinoDaOperacaoParaAdmin\(parametros\) : null/.test(pg) && /router\.replace\(paraTorre\)/.test(pg))
-  ok("a tela da Operação (OperacaoV3) continua montada para o não-admin", pg.includes("<OperacaoV3 gestor="))
+  ok("/operacao existe e NÃO redireciona mais ninguém para a Torre (nem o admin): sem temAcessoATorre, sem destinoDaOperacaoParaAdmin, sem router.replace", existsSync("src/app/operacao/page.tsx") && !/temAcessoATorre|destinoDaOperacaoParaAdmin|router\.replace/.test(pg))
+  ok("a tela da Operação (OperacaoV3) é montada para todos, inclusive o admin", pg.includes("<OperacaoV3 gestor="))
   const sino = readFileSync("src/components/sino-notificacoes.tsx", "utf8")
   ok("o clique do sino traduz o link só para admin", /linkDoAvisoParaAdmin\(a\.link, usuarioSalvo\?\.tipo\)/.test(sino))
   const torre = readFileSync("src/components/torre/Torre.tsx", "utf8")

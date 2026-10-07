@@ -37,6 +37,7 @@ import {
   type Agrupar, type AcaoDaLinha, type VisaoTarefas,
 } from "@/lib/operacional/torre-tarefas-tela"
 import { useConfirmarAtribuicao } from "./ConfirmarAtribuicao"
+import { PerguntaDaAba } from "./PerguntaDaAba"
 import "./tarefas.css"
 
 export type { VisaoTarefas }
@@ -359,6 +360,7 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
 
   return (
     <div className="tf">
+      <PerguntaDaAba aba="tarefas" />
       <div className="tf-head">
         <div className="tf-bread"><Link href="/torre">Torre de Controle</Link> › Tarefas</div>
         <div className="tf-titulo">

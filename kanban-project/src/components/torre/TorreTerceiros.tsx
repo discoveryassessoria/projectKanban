@@ -16,6 +16,7 @@ import {
 import { useAgora } from "@/src/lib/torre-agora"
 import { api, erroDe, useTorre, type Desfazer } from "./torre-base"
 import type { LinhaTorre } from "./tipos"
+import { PerguntaDaAba } from "./PerguntaDaAba"
 import { TerceirosRegua } from "./TerceirosRegua"
 import { CobrarTodosModal, type DadosDaCobranca } from "./TerceirosModais"
 import "./terceiros.css"
@@ -65,6 +66,7 @@ export function TorreTerceiros({ linhas, versao }: { linhas: LinhaTorre[]; versa
 
   return (
     <div>
+      <PerguntaDaAba aba="terceiros" />
       <div className="ter-cab">
         <div className="ter-trilha"><Link href="/torre?aba=hoje">Torre de Controle</Link> › Terceiros</div>
         <h1 className="ter-titulo">Terceiros · quem de fora está nos devendo resposta</h1>

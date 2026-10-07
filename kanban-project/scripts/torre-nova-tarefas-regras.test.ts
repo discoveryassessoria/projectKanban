@@ -11,6 +11,7 @@ import {
   type LinhaParaVisao,
 } from "../lib/operacional/torre-tarefas-tela"
 import { aplicarFiltros, filtrosVazios, normalizarFiltros, aplicarFiltrosNaQuery, filtrosDaQuery, filtrosIguais, chipsDoFiltro, type FiltrosTorre } from "../lib/operacional/torre-filtros"
+import { numeroDoKpi } from "../lib/operacional/torre-kpis"
 import { limparSpec } from "../lib/operacional/torre-visoes"
 import { justificativaValida } from "../src/services/torre-tarefas-justificativa"
 
@@ -38,7 +39,8 @@ secao("Visões — as oito do protótipo, na ordem, e os mesmos predicados dos c
     base({ coluna: "BLOQUEADA" }),                                                 // bloqueada de verdade
   ]
   const n = (v: Parameters<typeof contagemDaVisao>[0]) => contagemDaVisao(v, L, 1, AGORA)
-  ok("Todas = 6 · Minhas = 2 · Vencidas = 1 · Sem responsável = 2 · Aguardando terceiros = 1 · Cobrar hoje = 1 · Bloqueadas = 1", n("todas") === 6 && n("minhas") === 2 && n("vencidas") === 1 && n("semdono") === 2 && n("aguard") === 1 && n("cobranca") === 1 && n("bloqueadas") === 1, [n("todas"), n("minhas"), n("vencidas"), n("semdono"), n("aguard"), n("cobranca"), n("bloqueadas")].join())
+  ok("Todas = 6 · Minhas = 2 · Vencidas = 1 · Sem responsável = 2 · Aguardando terceiros = 2 (TODO pedido com a bola com terceiro, com ou sem responsável) · Cobrar hoje = 1 · Bloqueadas = 1", n("todas") === 6 && n("minhas") === 2 && n("vencidas") === 1 && n("semdono") === 2 && n("aguard") === 2 && n("cobranca") === 1 && n("bloqueadas") === 1, [n("todas"), n("minhas"), n("vencidas"), n("semdono"), n("aguard"), n("cobranca"), n("bloqueadas")].join())
+  ok("a partição «Aguardando terceiros» (cartorio) segue só COM responsável = 1; o sem responsável conta em «Sem responsável»", numeroDoKpi("cartorio", L as never, AGORA) === 1 && numeroDoKpi("aguard", L as never, AGORA) === n("aguard"))
   ok("Minhas sem usuário logado = 0 (nunca 'todas')", contagemDaVisao("minhas", L, null, AGORA) === 0)
   ok("espera de terceiro NÃO é Bloqueada (coluna AGUARDANDO_TERCEIRO fica em Aguardando terceiros)", predicadoDaVisao("bloqueadas", 1, AGORA)(L[3]) === false && predicadoDaVisao("aguard", 1, AGORA)(L[3]) === true)
   ok("vencida = prazo antes de HOJE no dia operacional (ontem entra, hoje não)", predicadoDaVisao("vencidas", 1, AGORA)(base({ dataPrazo: iso(-1) })) === true && predicadoDaVisao("vencidas", 1, AGORA)(base({ dataPrazo: iso(0) })) === false)

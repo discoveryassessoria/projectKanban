@@ -125,6 +125,7 @@ export async function focoDaFamilia(processoId: number, agora = new Date()): Pro
   // AS CANCELADAS = a MESMA consulta da aba Tarefas (`listarCanceladasDaTorre`, src/services/torre-canceladas.ts): o número do card é o tamanho desta lista (L3).
   // As certidões inativas SEM tarefa cancelada (ex.: "não exigida" pela árvore, que nunca teve tarefa) ficam à parte, como "sem tarefa": nunca somadas às canceladas.
   const canceladasDaTorre = await listarCanceladasDaTorre({ processoId }, agora)
+  const statusDoInativo = new Map(inativos.map((d) => [d.id, String(d.status)]))
   const docsDasCanceladas = new Set(canceladasDaTorre.map((l) => l.documentoId).filter((x): x is number => x != null))
   const encerradasCanceladas: CertidaoEncerradaDoFoco[] = canceladasDaTorre.map((l) => ({
     documentoId: l.documentoId ?? null, titulo: l.titulo.split(' · ')[0].trim(), pessoa: l.pessoaNome ?? l.casalNomes ?? null,
@@ -132,7 +133,8 @@ export async function focoDaFamilia(processoId: number, agora = new Date()): Pro
     encerramento: encerramentos.get(l.documentoId ?? -1) ?? (l.encerramento
       ? { tipo: 'CANCELADA' as const, quando: l.encerramento.quando, quandoRotulo: l.encerramento.quandoRotulo, porId: null, porNome: l.encerramento.porNome, motivo: l.encerramento.motivo, justificativa: null, tarefaReabrivelId: null, observacao: null }
       : null),
-    tipo: 'CANCELADA' as const,
+    // O rótulo da linha segue o Documento (cancelada por decisão × não exigida pela árvore); a CONTA (card) é a da lista de tarefas canceladas.
+    tipo: (l.documentoId != null && statusDoInativo.get(l.documentoId) === 'NAO_EXIGIDO' ? 'NAO_EXIGIDA' : 'CANCELADA') as 'CANCELADA' | 'NAO_EXIGIDA',
     pessoaId: l.pessoaId ?? null, ordemArvore: null, tarefaId: l.taskId, faseMacroKey: l.faseMacroKey ?? null,
   }))
   const encerradasSemTarefa: CertidaoEncerradaDoFoco[] = inativos.filter((d) => !docsDasCanceladas.has(d.id)).map((d) => ({

@@ -28,7 +28,7 @@ import { cobrarPedidos, cobrarOrgao } from "../src/services/torre-terceiros"
 import { definirRegra } from "../lib/operacional/regras-torre"
 import { pausarProcesso } from "../src/services/processo-pausa"
 import { pedidosDeTerceiros, resumoDeTerceiros, idsParaCobrar } from "../lib/operacional/terceiros-pedidos"
-import { numeroDoKpi, totaisDaSituacao } from "../lib/operacional/torre-kpis"
+import { numeroDoKpi } from "../lib/operacional/torre-kpis"
 import { POST as postCobrar } from "../src/app/api/torre/terceiros/cobrar/route"
 import { POST as postCobrarOrgao } from "../src/app/api/torre/terceiros/[orgaoId]/cobrar/route"
 import { GET as getContatos } from "../src/app/api/torre/terceiros/pedidos/[tarefaId]/contatos/route"
@@ -121,7 +121,7 @@ async function main() {
     const agora = new Date()
     const linhas = (await listarTarefasDaTorre()).linhas
     const resumo = resumoDeTerceiros(linhas, agora)
-    ok("'aguardando terceiros' = totaisDaSituacao.comCartorio = numeroDoKpi('cartorio') (Visão geral = Tarefas = Terceiros)", resumo.aguardando === totaisDaSituacao(linhas, agora).comCartorio && resumo.aguardando === numeroDoKpi("cartorio", linhas, agora))
+    ok("'aguardando terceiros' = numeroDoKpi('aguard') (TODO pedido com a bola com terceiro, com ou sem responsável = visão 'Aguardando terceiros' da aba Tarefas = Terceiros)", resumo.aguardando === numeroDoKpi("aguard", linhas, agora))
     ok("cartões 2–4 repartem o cartão 1", resumo.comCartorios + resumo.comOCliente + resumo.tradutora + resumo.juizo + resumo.consulado === resumo.aguardando)
     const ped = pedidosDeTerceiros(linhas, agora)
     ok("o pedido cobrado (a1) deixou 'para cobrar': a próxima data é futura", ped.find((p) => p.taskId === a1.tarefaId)?.cobrar === false && ped.find((p) => p.taskId === a1.tarefaId)?.cobrarEm.dias === 7)

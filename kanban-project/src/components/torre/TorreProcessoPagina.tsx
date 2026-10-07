@@ -1,7 +1,7 @@
 "use client"
 // src/components/torre/TorreProcessoPagina.tsx — o DETALHE DO PROCESSO (`/torre/processo/[id]`) — Torre nova, frente H.
 // Uma só leitura (`GET /api/torre/foco/{id}?detalhe=1`: o MESMO objeto do Foco da família + o que a página precisa) e as portas
-// canônicas para agir: distribuir (`/api/torre/processos/{id}/distribuir`), atribuir (`atribuir-sugerido`), pausar/reativar
+// canônicas para agir: distribuir como PROPOSTA com prévia e confirmação (`/api/torre/processos/{id}/distribuir`), pausar/reativar
 // (`processo-pausa.ts`), reabrir certidão (`reabrir-certidao`), avanço forçado (`advance/force`), comentários (`/api/comentarios`).
 // Nada daqui calcula regra: o servidor entrega os textos e os números; esta página desenha, filtra a tabela e chama as portas.
 import { useConfirmarAtribuicao } from "./ConfirmarAtribuicao"

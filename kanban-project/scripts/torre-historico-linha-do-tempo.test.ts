@@ -128,8 +128,8 @@ async function main() {
   const certidaoX: FiltrosDaLinhaDoTempo = { ...FILTRO, certidao: { documentoId: 200, tarefaId: 100, rotulo: "Nascimento · Pessoa 0" } }
   ok("'Histórico' da certidão: só os fatos dela (inclusive dentro de um lote)", prio.length === 12 && r.fatos.filter((f) => passaNaLinhaDoTempo(f, certidaoX, AGORA)).length === 1 && cancel8.fatos.filter((f) => passaNaLinhaDoTempo(f, certidaoX, AGORA)).length === 1 && cancel8.fatos.filter((f) => passaNaLinhaDoTempo(f, { ...certidaoX, certidao: { documentoId: 299, tarefaId: null, rotulo: "x" } }, AGORA)).length === 0)
   ok("a busca está sempre à vista; período/quem/tipo/pessoa ficam atrás de 'Filtrar'", /aria-label="Buscar no histórico"/.test(readFileSync("src/components/torre/HistoricoLinhaDoTempo.tsx", "utf8")) && /\{painel && \(/.test(readFileSync("src/components/torre/HistoricoLinhaDoTempo.tsx", "utf8")))
-  const certidoes = readFileSync("src/components/torre/ProcessoCertidoes.tsx", "utf8")
-  ok("cada certidão da lista tem 'Histórico' (abre a janela já filtrada nela)", (certidoes.match(/onHistorico\(l\)/g) ?? []).length >= 2 && /certidao: \{ documentoId: l\.documentoId/.test(readFileSync("src/components/torre/TorreProcessoPagina.tsx", "utf8")))
+  const certidoes = readFileSync("src/components/torre/ProcessoEncerradas.tsx", "utf8")
+  ok("cada certidão encerrada da lista tem 'Histórico' (abre a janela já filtrada nela)", (certidoes.match(/onHistorico\(l\)/g) ?? []).length >= 1 && /certidao: \{ documentoId: l\.documentoId/.test(readFileSync("src/components/torre/TorreProcessoPagina.tsx", "utf8")))
 
   secao("8) SÓ LEITURA: nenhuma ação que altere dado dentro do histórico")
   const comp = readFileSync("src/components/torre/HistoricoLinhaDoTempo.tsx", "utf8")

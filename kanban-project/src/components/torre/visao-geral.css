@@ -87,7 +87,6 @@
 .tvg-card-proc .tvg-card-n { padding-right: 84px; }
 
 /* HOJE (consolidação 06/10/2026): pergunta da aba, seis números clicáveis e as decisões como linhas com link. */
-.tor-aba-pergunta { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin: 2px 0 10px; }
 .tor-hoje-frase { font-size: 14px; margin: 0 0 12px; }
 .tor-hoje-numeros { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 18px; }
 .tor-hoje-num { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 10px; background: var(--surface-tertiary); text-decoration: none; color: inherit; border: 1px solid var(--border-default); }

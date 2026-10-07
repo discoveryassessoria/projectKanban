@@ -50,7 +50,7 @@ const menuItems = [
     textOffset: "",
     iconOffset: "translate-y-[0.5px]",
     permissao: "tarefas.ver",
-    escondeParaAdmin: true, // a Torre de Controle absorve a Operação do administrador; /operacao segue existindo e o leva à Torre
+    // 06/10/2026: "Minha operação" saiu da Torre — a Operação é a tela de quem executa e aparece para TODOS (inclusive o administrador), sem redirecionar.
   },
   {
     // TORRE DE CONTROLE — a tela do ADMINISTRADOR que responde pela operação inteira (Bloco J, 30/09/2026):
@@ -64,34 +64,8 @@ const menuItems = [
     permissao: "tarefas.ver",
     soAdmin: true,
   },
-  {
-    // TAREFAS E PROJETOS — a MESMA Tarefa canônica, vista por quem responde
-    // pela operação inteira. Entra logo depois de Operação porque é a mesma
-    // matéria com outro alcance: lá se executa, aqui se enxerga e se distribui.
-    // `tarefas.editar` sozinho não prova gestão — também autoriza editar a
-    // PRÓPRIA tarefa —, então esta aba exige admin.
-    title: "Tarefas e Projetos",
-    url: "/tarefas",
-    icon: BoardIcon,
-    textOffset: "",
-    iconOffset: "",
-    permissao: "tarefas.editar",
-    soAdmin: true,
-    escondeParaAdmin: true, // a Torre de Controle substitui esta tela; a rota /tarefas segue existindo e redireciona
-  },
-  {
-    // DISTRIBUIÇÃO — tela própria de "quem decide de quem é o trabalho"
-    // (mandato "ultra fiel ao desenho", 24/09/2026 — confirmado em dois
-    // mockups distintos). Mesma permissão da própria tela
-    // (`/operacao/distribuicao`): `tarefas.editar`.
-    title: "Distribuição",
-    url: "/operacao/distribuicao",
-    icon: DistributeIcon,
-    textOffset: "",
-    iconOffset: "",
-    permissao: "tarefas.editar",
-    escondeParaAdmin: true, // a Torre substitui a tela para o admin; não-admin com tarefas.editar segue vendo
-  },
+  // "Tarefas e Projetos" e "Distribuição" saíram do menu (06/10/2026, Lei da Torre L4): quem gerencia e atribui usa a aba Tarefas da Torre; as rotas
+  // antigas (/tarefas, /operacao/distribuicao) redirecionam para lá.
   {
     // CALENDÁRIO — agendamentos consulares (mandato 24/09/2026). Item PRÓPRIO,
     // ícone distinto de Eventos: são telas diferentes, nunca a mesma rota

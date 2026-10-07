@@ -9,10 +9,10 @@
 //   • pedido = tarefa AGUARDANDO; certidão (sem "- Inteiro Teor · pessoa") · pessoa (casal quando há) · família · "pedida há" · "cobrar em";
 //   • "cobrar em": ontem (vermelho) · hoje (âmbar) · "há N d" (vencida antiga) · dd/mm (futura) · "—" (sem data) — fuso de São Paulo;
 //   • "Cobrar" (primário) só quando a data é hoje/passada ou o acompanhamento venceu; Genealogia nunca; "Ver" nos demais;
-//   • os cartões repartem EXATAMENTE o "aguardando terceiros" da Visão geral (`numeroDoKpi('cartorio')`);
+//   • os cartões repartem EXATAMENTE o "aguardando terceiros" (`numeroDoKpi('aguard')`: com ou sem responsável — o mesmo da visão da aba Tarefas);
 //   • agrupado: ordenado por órgão (pt-BR), "<n> pedido(s) · um e-mail só, com todas as certidões", SEM número comparativo;
 //   • o texto de um contato ("Priscila cobrou por e-mail · sem resposta") e do pedido ("… enviou o pedido pelo CRC · protocolo X");
-//   • a tela: sem Régua/tempo médio/backlog/“Sem resposta (dias)”/“Não localizada”; rodapé e modais com os textos do protótipo.
+//   • a tela (consolidação 06/10/2026): lista ÓRGÃOS agrupados — sem 'Ver: por pedido', sem Cobrar/Contatos por pedido; 'Cobrar este órgão (n)' e 'Ver os n em Tarefas'.
 // ============================================================================
 import { readFileSync } from "node:fs"
 import {
@@ -91,17 +91,18 @@ async function main() {
   ok("o grupo NÃO carrega número comparativo (nada de média, ranking, sem resposta)", grupos.every((g) => Object.keys(g).sort().join(",") === "nome,orgaoId,pedidos"))
   ok("cartórios distintos para o texto do modal", cartoriosDistintos(doGrupo) === 5 && cartoriosDistintos(doGrupo.filter((p) => p.orgaoId === 3)) === 1)
 
-  secao("OS SEIS CARTÕES — fecham com a Visão geral")
+  secao("OS SEIS CARTÕES — fecham com a visão 'Aguardando terceiros' da aba Tarefas")
   const mix: LinhaParaTerceiros[] = [
     L({ bolaCom: "Cartório" }), L({ bolaCom: "Cartório", responsavelId: 8, cobrarEm: dia(0) }), L({ bolaCom: "Cliente" }), L({ bolaCom: "Tradutor" }), L({ bolaCom: "Tradutor" }),
     L({ bolaCom: "Juízo" }), L({ bolaCom: "Consulado" }), L({ bolaCom: "Cartório", responsavelId: null }),            // sem responsável: lista sim, cartão 1 não
     L({ bolaCom: "Equipe", estadoOperacao: "FILA" }), L({ bolaCom: "Cartório", escalada: true }), L({ bolaCom: "Cartório", cobravelVencida: true, cobrarEm: dia(3) }),
   ]
   const r = resumoDeTerceiros(mix, AGORA)
-  ok("cartão 1 = numeroDoKpi('cartorio') — o MESMO número da Visão geral e da aba Tarefas", r.aguardando === numeroDoKpi("cartorio", mix, AGORA) && r.aguardando === 9)
+  ok("cartão 1 = numeroDoKpi('aguard') — TODO pedido com a bola com terceiro, o MESMO número da visão 'Aguardando terceiros' da aba Tarefas", r.aguardando === numeroDoKpi("aguard", mix, AGORA) && r.aguardando === 10)
   ok("cartões 2–4 repartem o cartão 1 (cartórios + cliente + tradutora·juízo·consulado)", r.comCartorios + r.comOCliente + r.tradutora + r.juizo + r.consulado === r.aguardando, JSON.stringify(r))
-  ok("cada tipo: cartórios 4 · cliente 1 · tradutora 2 · juízo 1 · consulado 1", r.comCartorios === 4 && r.comOCliente === 1 && r.tradutora === 2 && r.juizo === 1 && r.consulado === 1)
-  ok("a LISTA mostra também o pedido sem responsável (cobrar um terceiro não depende de a tarefa ter dono)", pedidosDeTerceiros(mix, AGORA).length === 10 && r.aguardando === 9)
+  ok("cada tipo: cartórios 5 · cliente 1 · tradutora 2 · juízo 1 · consulado 1", r.comCartorios === 5 && r.comOCliente === 1 && r.tradutora === 2 && r.juizo === 1 && r.consulado === 1)
+  ok("o cartão 1 e a LISTA (agrupada por órgão) contam o MESMO conjunto, inclusive o pedido sem responsável (cobrar um terceiro não depende de a tarefa ter dono)", pedidosDeTerceiros(mix, AGORA).length === 10 && r.aguardando === 10)
+  ok("o KPI 'cartorio' (partição da Visão de situação) continua só COM responsável — 9 (o sem responsável conta em 'Sem responsável')", numeroDoKpi("cartorio", mix, AGORA) === 9)
   ok("para cobrar hoje ou vencidas = pedidos com Cobrar (também o N do botão 'Cobrar todos os vencidos')", r.paraCobrar === pedidosDeTerceiros(mix, AGORA).filter((p) => p.cobrar).length && idsParaCobrar(mix, AGORA).length === r.paraCobrar)
   ok("escaladas = pedidos escalados", r.escaladas === 1)
   ok("milhar pt-BR sem depender do ambiente", milhar(2328) === "2.328" && milhar(94) === "94" && milhar(1234567) === "1.234.567" && milhar(0) === "0")
@@ -113,23 +114,24 @@ async function main() {
   ok("quem não consta no registro não é inventado", /^Alguém da equipe cobrou por WhatsApp · não localizou$/.test(textoDoContato({ quem: null, canal: "WHATSAPP", resultado: "NAO_LOCALIZOU", observacao: "  " })))
   ok("o envio do pedido, com protocolo quando há", textoDoPedido({ quem: "Daniela Brait", canal: "CRC", protocolo: "2026-0819-441" }) === "Daniela Brait enviou o pedido pelo CRC · protocolo 2026-0819-441" && textoDoPedido({ quem: "Daniela Brait", canal: "BALCAO", protocolo: null }) === "Daniela Brait enviou o pedido pelo balcão")
 
-  secao("A TELA — textos do protótipo, sem placar por cartório, sem relógio no render")
-  const tela = ler("src/components/torre/TorreTerceiros.tsx"), modais = ler("src/components/torre/TerceirosModais.tsx"), css = ler("src/components/torre/terceiros.css")
-  const rodape = 'A lista é por pedido. "Agrupado por cartório" serve só para cobrar junto o que está no mesmo lugar; não há ranking nem média por cartório, porque a maioria aparece uma vez só. Quem decide quando cobrar é a data de cobrança de cada pedido (padrão: 7 dias depois do pedido ou da última cobrança). "Cobrar" registra no histórico da certidão e marca a próxima data.'
-  ok("T363 trilha e título", tela.includes("Torre de Controle</Link> › Terceiros") && tela.includes("Terceiros · quem de fora está nos devendo resposta"))
-  ok("T364–T366 os seis cartões e seus rótulos", ["aguardando terceiros", "com cartórios", "com o cliente", "tradutora · juízo · consulado", "para cobrar hoje ou vencidas", "escaladas (sem resposta após 2 cobranças)"].every((t) => tela.includes(t)))
-  ok("T367–T370 título do cartão, 'Ver:', os dois botões, 'Cobrar todos os vencidos (N)', colunas", ["Pedidos esperando resposta", "Ver:", "por pedido", "agrupado por cartório (para cobrar junto)", "Cobrar todos os vencidos (", "Certidão · pessoa · família", "Pedida a", "Pedida há", "Cobrar em", "Ações"].every((t) => tela.includes(t)))
-  ok("T378 'Cobrar' (primário) × 'Ver' (leva ao Detalhe do Processo) + 'Contatos'", /className="tor-btn pri" onClick=\{\(\) => setCobrar\(p\)\}>Cobrar</.test(tela) && /router\.push\(`\/torre\/processo\/\$\{p\.processoId\}`\)/.test(tela) && />Ver</.test(tela) && />Contatos</.test(tela))
-  ok("T388 'Cobrar este cartório (n)' e o toast do grupo", tela.includes("Cobrar este cartório (") && tela.includes("registrada em cada uma") && tela.includes("Cobrança registrada para "))
-  ok("T380 toast 'Cobrança registrada · <pessoa>' (sem 'enviada')", tela.includes("`Cobrança registrada · ${p.pessoa}`") && !/Cobrança enviada|cobranças? enviadas?/.test(tela))
-  ok("T386 toast do lote", tela.includes("cobranças registradas"))
-  ok("T390 rodapé do cartão, palavra por palavra", tela.replace(/\s+/g, " ").includes(rodape))
-  ok("T391 nenhum filtro, ordenação ou paginação na tela", !/<select|type="search"|placeholder=|pagina|ordenar/i.test(semComentarios(tela)))
-  ok("T379 modal Cobrar: texto, campos, botões", modais.includes("Registra a cobrança no histórico da certidão e marca a próxima. O sistema não envia a mensagem: o canal abaixo é o que você usou.") && modais.includes("Canal usado") && modais.includes("Registrar cobrança · ") && modais.includes("Próxima cobrança em (dias)") && modais.includes("Cancelar") && modais.includes('"Registrar cobrança"') && !modais.includes("Enviar e registrar") && !modais.includes("O sistema envia pelo canal"))
-  ok("T386 modal lote: título, texto, botão 'Registrar N cobranças'", modais.includes("Cobrar todos os vencidos") && modais.includes("de cobrança vencida ou de hoje, em") && modais.includes("Registra uma cobrança em cada certidão, pelo canal cadastrado dela. O sistema não envia a mensagem.") && modais.includes("Registrar ${n}") && !modais.includes("Enviar ${n}"))
-  ok("T381 modal Contatos: 'Contatos · <certidão> · <pessoa>', 'Pedido a <órgão> · <cobranças> até agora', botão único Fechar", modais.includes("`Contatos · ${pedido.certidao} · ${pedido.pessoa}`") && modais.includes("até agora") && (modais.match(/>Fechar</g) ?? []).length === 1)
-  ok("a próxima cobrança vai ao servidor (porta única), padrão 7 dias", tela.includes("proximaEmDias") && modais.includes("DIAS_PADRAO_DA_COBRANCA") && tela.includes("/api/torre/terceiros/cobrar"))
+  secao("A TELA — a aba lista ÓRGÃOS (não pedidos), sem placar por cartório, sem relógio no render")
+  const tela = ler("src/components/torre/TorreTerceiros.tsx"), css = ler("src/components/torre/terceiros.css")
+  const modais = ler("src/components/torre/TerceirosModais.tsx")
   const regua = ler("src/components/torre/TerceirosRegua.tsx")
+  ok("trilha e título", tela.includes("Torre de Controle</Link> › Terceiros") && tela.includes("Terceiros · quem de fora está nos devendo resposta"))
+  ok("os seis cartões e seus rótulos", ["aguardando terceiros", "com cartórios", "com o cliente", "tradutora · juízo · consulado", "para cobrar hoje ou vencidas", "escaladas (sem resposta após 2 cobranças)"].every((t) => tela.includes(t)))
+  ok("o cartão 1 vem de resumoDeTerceiros (numeroDoKpi('aguard')) — não há contagem própria na tela", tela.includes("resumoDeTerceiros(linhas, agora)") && !/numeroDoKpi/.test(semComentarios(tela)))
+  ok("a lista é de ÓRGÃOS agrupados (agruparPorOrgao) com as colunas Órgão · Pedidos · A cobrar · Escaladas · Ações", tela.includes("agruparPorOrgao(pedidos)") && tela.includes("Órgãos que nos devem resposta") && ["Órgão", "Pedidos", "A cobrar", "Escaladas", "Ações"].every((t) => tela.includes(`<span>${t}</span>`)))
+  ok("NÃO lista mais pedidos/tarefas: sem 'Ver: por pedido', sem colunas de certidão/pessoa/família, sem Cobrar/Contatos por pedido", !/por pedido|agrupado por cart[óo]rio/.test(semComentarios(tela)) && !/Certidão · pessoa · família|Pedida a|Pedida há|Cobrar em/.test(semComentarios(tela)) && !/CobrarPedidoModal|ContatosDoPedidoModal|>Contatos</.test(semComentarios(tela)))
+  ok("botão 'Cobrar este órgão (n)' (porta do órgão com o recorte da tela) e o toast do grupo", tela.includes("Cobrar este órgão (") && tela.includes("/api/torre/terceiros/${orgaoId}/cobrar") && tela.includes("tarefaIds: doGrupo.map") && tela.includes("registrada em cada uma") && tela.includes("Cobrança registrada para "))
+  ok("link 'Ver os n em Tarefas' leva à aba Tarefas, visão aguard, filtrada pelo órgão (L1: os pedidos moram em Tarefas)", tela.includes("Ver os {g.pedidos.length} em Tarefas") && tela.includes("/torre?aba=tarefas&visao=aguard&orgao=${g.orgaoId}"))
+  ok("'Cobrar todos os vencidos (N)' continua no cartão, com o N de resumo.paraCobrar", tela.includes("Cobrar todos os vencidos (") && tela.includes("resumo.paraCobrar") && tela.includes("CobrarTodosModal"))
+  ok("toast do lote: 'cobranças registradas' (sem 'enviada')", tela.includes("cobranças registradas") && !/Cobrança enviada|cobranças? enviadas?/.test(tela))
+  ok("nota do rodapé: a aba lista órgãos, não tarefas; sem ranking nem média; quem decide é a data de cobrança", tela.replace(/\s+/g, " ").includes("Esta aba lista ÓRGÃOS, não tarefas") && tela.includes("Não há ranking nem média por cartório") && tela.includes("Quem decide quando cobrar é a data de cobrança"))
+  ok("nenhum filtro, ordenação ou paginação na tela", !/<select|type="search"|placeholder=|pagina|ordenar/i.test(semComentarios(tela)))
+  ok("modal do lote: título, texto, botão 'Registrar N cobranças' (nada de 'Enviar')", modais.includes("Cobrar todos os vencidos") && modais.includes("de cobrança vencida ou de hoje, em") && modais.includes("Registra uma cobrança em cada certidão, pelo canal cadastrado dela. O sistema não envia a mensagem.") && modais.includes("Registrar ${n}") && !modais.includes("Enviar ${n}"))
+  ok("o modal do pedido (Cobrar/Contatos) segue registrando, nunca 'enviando' (textos do protótipo preservados no arquivo)", modais.includes("Registra a cobrança no histórico da certidão e marca a próxima. O sistema não envia a mensagem: o canal abaixo é o que você usou.") && modais.includes('"Registrar cobrança"') && !modais.includes("Enviar e registrar") && !modais.includes("O sistema envia pelo canal") && modais.includes("`Contatos · ${pedido.certidao} · ${pedido.pessoa}`"))
+  ok("a próxima cobrança vai ao servidor (porta única), padrão 7 dias", tela.includes("proximaEmDias") && tela.includes("DIAS_PADRAO_DA_COBRANCA") && tela.includes("/api/torre/terceiros/cobrar"))
   ok("NÃO há placar por cartório: nada de 'sem resposta (dias)', 'não localizada', ranking ou média por órgão", !/Sem resposta \(dias\)|Não localizada|naoLocalizada|semResposta/i.test(semComentarios(tela) + semComentarios(modais) + semComentarios(regua)))
   ok("o que JÁ EXISTIA fica na aba, abaixo da lista: Régua por órgão, Contatos do órgão, Tempo médio real por fase e Backlog", tela.includes("<TerceirosRegua versao={versao} />") && ["Régua de cobrança por órgão", "Tempo médio real por fase", "Backlog", "/api/torre/terceiros/${o.orgaoId}/contatos", "/api/operacao/tempo-medio-por-fase", "/api/torre/tendencias", "Régua = o que o Gerenciamento cadastrou"].every((t) => regua.includes(t)))
   ok("a régua mostra só o cadastro (nunca 'tempo aprendido')", !/aprendid|mediana|pior caso/i.test(semComentarios(regua)))
