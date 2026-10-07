@@ -934,3 +934,26 @@ input[type="number"].time-white {
 div[data-radix-select-viewport] ~ div {
   display: none !important;
 }
+/* BOTÃO PRIMÁRIO DESABILITADO LEGÍVEL (07/10/2026). Os botões primários são azul-marinho com texto branco e `disabled:opacity-50`: com 50% de opacidade sobre o
+   fundo claro o marinho vira cinza-azulado e o branco some («Salvando…», «Salvar» sem motivo). Desabilitado não pode ser ilegível: mantém o texto escuro,
+   fundo de superfície e borda — claramente inativo, mas lido. Vale para todo botão com o fundo primário (--accent-primary ou --action-primary), sem mexer em cada tela. */
+button:disabled[class*="bg-[var(--accent-primary)]"],
+button:disabled[class*="bg-[var(--action-primary)]"],
+button[disabled][class*="bg-[var(--accent-primary)]"],
+button[disabled][class*="bg-[var(--action-primary)]"] {
+  opacity: 1 !important;
+  background-color: var(--surface-secondary) !important;
+  color: var(--text-secondary) !important;
+  border: 1px solid var(--border-default) !important;
+  cursor: not-allowed;
+}
+
+/* TEXTO BRANCO SOBRE O FUNDO PRIMÁRIO (07/10/2026). Neste tema `text-white` é a TINTA do vidro (graphite #10273a), não o branco: num botão
+   `bg-[var(--accent-primary)] text-white` (azul-marinho) o texto saía graphite sobre marinho — ilegível. O branco de verdade é `text-pure`; aqui garantimos
+   que todo botão com fundo primário o use, sem depender de cada tela lembrar. */
+[class*="bg-[var(--accent-primary)]"].text-white,
+[class*="bg-[var(--action-primary)]"].text-white,
+[class*="bg-[var(--accent-primary)]"] > .text-white,
+[class*="bg-[var(--action-primary)]"] > .text-white {
+  color: var(--color-pure) !important;
+}
