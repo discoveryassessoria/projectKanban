@@ -114,7 +114,7 @@ ok("a rota de vínculo só valida, resolve o ator e chama a porta pública",
 ok("a rota de vínculo repassa o ator para o domínio (auditoria do evento)",
   /actorId,?\s*\n?\s*\}\)/.test(rotaVinculo) || /actorId,/.test(rotaVinculo))
 ok("POST /api/pessoas não emite (a Pessoa nunca nasce requerente por lá)",
-  !/enfileirar|emitirEDrenar/.test(rotaPessoaPost) && /requerente:\s*ehRequerente\(requerente\)\s*\?\s*'nao'/.test(rotaPessoaPost))
+  !/enfileirar|emitirEDrenar/.test(rotaPessoaPost) && /requerente:\s*'nao'/.test(rotaPessoaPost))
 ok("PUT /api/pessoas/[id] delega a transição ao serviço canônico",
   /registrarTransicaoParaRequerenteTx\(/.test(rotaPessoaPut) && !/enfileirarEventoRequerente\(/.test(rotaPessoaPut))
 ok("PUT /api/pessoas/[id] usa o pós-commit canônico, não o seu próprio",
@@ -179,8 +179,9 @@ ok("ninguém dispara o motor por requerente fora da fila e do reprocesso de câm
 secao("7) O ponteiro Requerente→Pessoa só é escrito pelos dois donos do ciclo")
 // ═══════════════════════════════════════════════════════════════════════════
 const DONOS_PONTEIRO: Record<string, string> = {
-  [CANONICO]: "cria o nó e grava o vínculo (invariante de dedup)",
-  "src/services/pessoa-ciclo-vida.ts": "desfaz o ponteiro ao remover da árvore",
+  // 07/10/2026: o ponteiro é escrito SÓ pelo dono único do vínculo (`definirPessoaDoRequerente`); vincular-requerente e ciclo de vida o chamam.
+  "src/services/processo-requerentes.ts": "dono único do vínculo requerente × pessoa × processo (guarda: o requerente tem de estar no processo da árvore)",
+  "scripts/vinculo-requerente-servico-unico.test.ts": "controle positivo do INT-004 e limpeza do próprio cenário de teste",
   "scripts/pessoa-tortura.test.ts": "limpeza do próprio cenário de teste",
   "scripts/pessoa-equivalencia-rotas.test.ts": "limpeza do próprio cenário de teste",
   "scripts/reconciliacao-derivada-requerente.test.ts": "limpeza do próprio cenário de teste",

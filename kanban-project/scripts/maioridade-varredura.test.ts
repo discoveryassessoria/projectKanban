@@ -74,6 +74,7 @@ const FILTRA = /requerente\s*:\s*['"](maior|menor)['"]/
 const EXCECOES: Record<string, string> = {
   "src/app/api/processos/[processoId]/estatisticas/route.ts": "lê o requerente PRINCIPAL (marcador 'maior' = principal), não a maioridade",
   "lib/genealogia/vincular-requerente.ts": "atribui/consulta o requerente PRINCIPAL (auto-principal)",
+  "src/services/processo-requerentes.ts": "dono único do vínculo: consulta o requerente PRINCIPAL (auto-principal ao marcar)",
 }
 const infratores: string[] = []
 for (const arq of CODIGO) {

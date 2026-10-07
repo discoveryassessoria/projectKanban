@@ -269,7 +269,7 @@ export async function POST(request: NextRequest) {
         // genérico — requerente é definido só pelo vínculo com o Processo
         // (ProcessoRequerente, via lib/genealogia/vincular-requerente). Aqui normaliza
         // qualquer tentativa para 'nao'. Fonte única de requerente = ProcessoRequerente.
-        requerente: ehRequerente(requerente) ? 'nao' : (requerente || 'nao'),
+        requerente: 'nao',
         // Nº Linhagem nasce vazio: `dispararMaterializacaoPorArvore` (chamado logo
         // abaixo) já calcula e grava o valor certo — nunca é digitado.
         linhaReta: linhaReta ?? true,

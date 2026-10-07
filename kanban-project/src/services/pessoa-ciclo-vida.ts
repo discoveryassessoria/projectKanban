@@ -38,6 +38,7 @@
 // Nunca há meia exclusão: qualquer erro faz ROLLBACK da transação inteira.
 // ============================================================================
 
+import { apagarVinculosDoRequerente, definirFlagDaPessoa, definirPessoaDoRequerente, reativarVinculo, retirarDoProcesso } from "@/src/services/processo-requerentes"
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
 import { removerNecessidadesDoSujeito } from "@/src/services/necessidade-documental"
@@ -528,13 +529,10 @@ export async function desvincularRequerenteMantendoPessoa(
   const requerenteId = plano.requerenteId
   const processoIds = plano.processoIds
   await prisma.$transaction(async (tx) => {
-    if (processoIds.length) {
-      await tx.processoRequerente.deleteMany({
-        where: { requerenteId, processoId: { in: processoIds } },
-      })
-    }
-    await tx.requerente.update({ where: { id: requerenteId }, data: { personId: null } })
-    await tx.pessoa.update({ where: { id: pessoaId }, data: { requerente: "nao" } })
+    // O vínculo requerente × pessoa × processo é escrito SÓ pelo dono único (`processo-requerentes.ts`).
+    await apagarVinculosDoRequerente(tx, requerenteId, processoIds)
+    await definirPessoaDoRequerente(tx, requerenteId, null)
+    await definirFlagDaPessoa(tx, pessoaId, "nao")
     await tx.arvore.updateMany({ where: { pessoaPrincipalId: pessoaId }, data: { pessoaPrincipalId: null } })
     await tx.logAuditoria.create({
       data: {
@@ -940,12 +938,10 @@ async function executarHard(ctx: ContextoPessoa, tx: Prisma.TransactionClient): 
   // 5) Vínculo pessoa↔processo. É ESTE passo que a exclusão antiga não tinha —
   //    e por isso o requerente sobrevivia à pessoa e duplicava na reinserção.
   if (ctx.requerenteId != null && ctx.processoIds.length) {
-    out.vinculoProcesso = (await tx.processoRequerente.deleteMany({
-      where: { requerenteId: ctx.requerenteId, processoId: { in: ctx.processoIds } },
-    })).count
+    out.vinculoProcesso = await apagarVinculosDoRequerente(tx, ctx.requerenteId, ctx.processoIds)
     // O CADASTRO do requerente permanece: ele pode existir em outro processo, no
     // histórico ou como cliente. Só o PONTEIRO para o nó da árvore é desfeito.
-    await tx.requerente.update({ where: { id: ctx.requerenteId }, data: { personId: null } })
+    await definirPessoaDoRequerente(tx, ctx.requerenteId, null)
   }
 
   // 6) O nó da árvore.
@@ -991,10 +987,7 @@ async function executarDesativacao(
   // Vínculo pessoa↔processo: marcado como removido, nunca apagado — é ele que
   // amarra o fato financeiro preservado ao processo.
   if (ctx.requerenteId != null && ctx.processoIds.length) {
-    out.vinculoProcesso = (await tx.processoRequerente.updateMany({
-      where: { requerenteId: ctx.requerenteId, processoId: { in: ctx.processoIds }, removidoEm: null },
-      data: { removidoEm: agora, removidoPorId: input.actorUserId ?? null, motivoRemocao: motivo },
-    })).count
+    out.vinculoProcesso = await retirarDoProcesso(tx, ctx.processoIds, ctx.requerenteId, { porId: input.actorUserId ?? null, motivo })
   }
 
   // O nó sai da árvore ATIVA. A linha permanece porque os fatos apontam para ela.
@@ -1004,9 +997,9 @@ async function executarDesativacao(
       removidaEm: agora,
       removidaPorId: input.actorUserId ?? null,
       motivoRemocao: motivo,
-      requerente: "nao",
     },
   })
+  await definirFlagDaPessoa(tx, ctx.pessoa.id, "nao")
   await tx.arvore.updateMany({
     where: { pessoaPrincipalId: ctx.pessoa.id },
     data: { pessoaPrincipalId: null },
@@ -1036,15 +1029,12 @@ export async function reativarVinculoDaPessoa(
   })
   if (!requerente) return { reativado: false, requerenteId: null }
 
-  const r = await db.processoRequerente.updateMany({
-    where: { processoId: args.processoId, requerenteId: requerente.id, removidoEm: { not: null } },
-    data: { removidoEm: null, removidoPorId: null, motivoRemocao: null },
-  })
+  const reativados = await reativarVinculo(db, args.processoId, requerente.id)
 
   await db.pessoa.updateMany({
     where: { id: args.pessoaId, removidaEm: { not: null } },
     data: { removidaEm: null, removidaPorId: null, motivoRemocao: null },
   })
 
-  return { reativado: r.count > 0, requerenteId: requerente.id }
+  return { reativado: reativados > 0, requerenteId: requerente.id }
 }

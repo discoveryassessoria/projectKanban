@@ -29,6 +29,7 @@
 //     então não há como simulá-lo sem escrever;
 //   • não decide nada sobre documento. Quem decide é a regra publicada.
 
+import { definirFlagDaPessoa } from "@/src/services/processo-requerentes"
 import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { materializarGenealogia } from "@/src/services/genealogia/materializar-genealogia"
@@ -443,7 +444,8 @@ async function aplicarMudancaProposta(db: DB, entrada: EntradaSimulacao): Promis
       await removerNecessidadesDaUniao(u.id, db)
       await db.uniao.delete({ where: { id: u.id } })
     }
-    await db.pessoa.update({ where: { id: pessoaId }, data: { removidaEm: new Date(), requerente: "nao" } })
+    await db.pessoa.update({ where: { id: pessoaId }, data: { removidaEm: new Date() } })
+    await definirFlagDaPessoa(db, pessoaId, "nao")
   }
 }
 

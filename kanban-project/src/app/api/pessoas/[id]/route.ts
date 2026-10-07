@@ -1,5 +1,6 @@
 // src/app/api/pessoas/[id]/route.ts
 
+import { VinculoRecusado, definirFlagDaPessoa } from "@/src/services/processo-requerentes"
 import { edicaoRecusadaPorRegistro } from "@/src/services/genealogia/sincronizar-com-registro"
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
@@ -138,6 +139,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // Assim, requerente na Árvore tem ProcessoRequerente como única fonte de verdade —
     // não se cria identidade de requerente por edição livre. Trocar o principal
     // (maior/menor/sim) entre requerentes JÁ vinculados e desmarcar ('nao') seguem ok.
+    let flagNovo: string | undefined
     if (body.requerente !== undefined) {
       if (ehRequerente(body.requerente) && !ehRequerente(antes?.requerente)) {
         const vinculo = await prisma.requerente.findFirst({ where: { personId: id }, select: { id: true } })
@@ -148,7 +150,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           )
         }
       }
-      dataToUpdate.requerente = body.requerente
+      // A marca de requerente só é escrita pelo dono único do vínculo (`processo-requerentes.ts`), na mesma transação da atualização.
+      if (String(body.requerente ?? 'nao').toLowerCase() !== String(antes?.requerente ?? 'nao').toLowerCase()) flagNovo = String(body.requerente ?? 'nao')
     }
     // Nº Linhagem NÃO é mais escrito aqui: é CALCULADO por `recalcularNumerosLinhagemDaArvore`,
     // disparado por `efeitosDoVinculoPosCommit` logo abaixo — toda edição que pode afetar a
@@ -208,6 +211,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           data: dataToUpdate,
           include: { pai: true, mae: true, arvore: true, documentos: { orderBy: { createdAt: 'desc' } } },
         })
+        if (flagNovo !== undefined) p.requerente = await definirFlagDaPessoa(tx, id, flagNovo)
         // "maior"/"menor" são classificação de MAIORIDADE de CADA requerente — fato
         // independente por pessoa (idade, não liderança). (Sem rebaixamento
         // automático: ver histórico desta rota.)
@@ -238,6 +242,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     return NextResponse.json(pessoaAtualizada)
   } catch (error) {
+    if (error instanceof VinculoRecusado) {
+      return NextResponse.json({ error: error.message, code: error.codigo }, { status: 409 })
+    }
     if (error instanceof PropagacaoPosCommitError) {
       return NextResponse.json({ error: error.message, salvo: true }, { status: 500 })
     }

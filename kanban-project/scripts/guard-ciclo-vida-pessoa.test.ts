@@ -76,14 +76,10 @@ const ALVOS: Alvo[] = [
   {
     modelo: "processoRequerente",
     tabela: "ProcessoRequerente",
-    donos: [
-      "src/services/pessoa-ciclo-vida.ts",
-      "lib/genealogia/vincular-requerente.ts",
-      "src/services/criar-processo.ts",
-      // Edição do processo troca o CONJUNTO de requerentes (deleteMany+createMany).
-      "src/app/api/processos/[processoId]/route.ts",
-    ],
-    saida: "o vínculo pessoa↔processo sai por removerPessoaDaArvore()",
+    // 07/10/2026: o vínculo requerente × pessoa × processo tem UM dono — o serviço único. Ciclo de vida, vincular-requerente, criar-processo, a rota do
+    // processo e a coleta CHAMAM o serviço; nenhum deles escreve o modelo (guard: scripts/vinculo-requerente-servico-unico.test.ts).
+    donos: ["src/services/processo-requerentes.ts"],
+    saida: "o vínculo pessoa↔processo sai por removerPessoaDaArvore(), que chama src/services/processo-requerentes.ts",
   },
   {
     modelo: "documento",
@@ -111,6 +107,8 @@ const ALVOS: Alvo[] = [
  * regra "tudo em scripts/ pode".
  */
 const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
+  "scripts/vinculo-requerente-servico-unico.test.ts":
+    "Vínculo requerente × pessoa × processo (dono único): cria e derruba as PRÓPRIAS pessoas/requerentes/processos (marca VINCSU) só no banco de teste efêmero — nenhuma pessoa real é removida",
   "scripts/arvore-pessoa-repetida-rota-etapa6.test.ts":
     "Aviso de pessoa parecida (Etapa 6): cria e derruba as PRÓPRIAS pessoas/árvores/processos (marca ARVREP6) só no " +
     "banco de teste efêmero, para provar a rota de leitura — nenhuma pessoa real é removida",
@@ -602,8 +600,8 @@ ok("hard delete contra fato protegido é RECUSADO, não degradado",
   /FATO_PROTEGIDO_IMPEDE_HARD_DELETE/.test(servico))
 ok("a necessidade sai pelo serviço canônico dela", /removerNecessidadesDoSujeito\(/.test(servico))
 ok("o documento sai pelo serviço canônico dele", /removerDocumentosDoSujeito\(/.test(servico))
-ok("o vínculo pessoa↔processo é removido no hard delete",
-  /processoRequerente\.deleteMany\(/.test(servico))
+ok("o vínculo pessoa↔processo é removido no hard delete (pelo dono único)",
+  /apagarVinculosDoRequerente\(/.test(servico))
 ok("toda remoção é auditada", /logAuditoria\.create\(/.test(servico))
 
 const rota = ler("src/app/api/pessoas/[id]/route.ts")
@@ -668,7 +666,7 @@ secao("6) Reinserção: criar → excluir → recriar")
 
 const vinc = ler("lib/genealogia/vincular-requerente.ts")
 ok("o nó removido é REATIVADO, não recriado", /removidaEm:\s*null/.test(vinc))
-ok("o vínculo do processo volta junto", /processoRequerente\.updateMany\(/.test(vinc))
+ok("o vínculo do processo volta junto (pelo dono único)", /reativarVinculosNaArvore\(/.test(vinc))
 
 // ── 7) As constraints estruturais existem no schema ────────────────────────
 secao("7) Constraints que tornam a duplicação impossível")

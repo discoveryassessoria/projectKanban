@@ -16,6 +16,7 @@
 // Reusa os serviços canônicos (instanciarWorkflowDaFase, garantirTarefaDePasso,
 // montarEventoEntered) — NÃO cria um segundo motor e NÃO escreve fase fora daqui.
 
+import { vincularNaCriacaoDoProcesso } from "@/src/services/processo-requerentes"
 import { randomUUID } from "crypto"
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
@@ -210,10 +211,7 @@ export async function criarProcessoV2(input: CriarProcessoInput): Promise<CriarP
         })
       }
       if (input.requerenteIds?.length) {
-        await tx.processoRequerente.createMany({
-          data: input.requerenteIds.map((requerenteId) => ({ processoId: processo.id, requerenteId })),
-          skipDuplicates: true,
-        })
+        await vincularNaCriacaoDoProcesso(tx, processo.id, input.requerenteIds)
       }
 
       // 3.1) instanciar o Workflow Interno da 1ª fase (passos versionados). Vê o

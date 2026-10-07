@@ -117,7 +117,7 @@ const criamRequerenteNaArvore = quemUsa(
 ok("nenhum runtime cria nó REQUERENTE fora do serviço canônico",
   criamRequerenteNaArvore.length === 0, criamRequerenteNaArvore.join(", ") || "nenhum desvio")
 ok("POST /api/pessoas normaliza requerente para 'nao' (ascendente não é requerente)",
-  /requerente:\s*ehRequerente\(requerente\)\s*\?\s*'nao'/.test(ler("src/app/api/pessoas/route.ts")),
+  /requerente:\s*'nao'/.test(ler("src/app/api/pessoas/route.ts")),
   "requerente é definido pelo vínculo com o Processo, não por este endpoint")
 ok("PUT /api/pessoas/[id] recusa marcar requerente sem vínculo com o Processo",
   /Requerente é definido pelo vínculo com o Processo/.test(ler("src/app/api/pessoas/[id]/route.ts")))

@@ -54,6 +54,9 @@ async function main() {
   ok("passos cancelados e tarefa CANCELADA com 'deixou de ser requerente'", d.passosVivos === 0 && d.tarefasAbertas === 0 && /deixou de ser requerente/.test(d.tarefas[0].causaRemovidaMotivo ?? ""), d.tarefas[0].causaRemovidaMotivo ?? "")
 
   secao("IDA 2 — vincular de novo reativa o mesmo")
+  // O desvincular tirou o requerente do processo; para ligá-lo de novo à árvore ele precisa estar no processo (regra do dono único do vínculo) —
+  // é o que salvar a lista de requerentes do processo faz.
+  await (await import("../src/services/processo-requerentes")).incluirNoProcesso(prisma, c.processoId, [requerente.id])
   const r3 = await P.postVincularRequerente(c.arvoreId, { requerenteId: requerente.id, pessoaId: c.titularId })
   ok("vincular de novo responde 200", r3.status === 200, String(r3.status))
   f = await P.foto(c.processoId)
