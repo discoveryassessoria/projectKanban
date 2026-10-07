@@ -27,6 +27,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { FASES, phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
+import { ehFaseAguardandoFechamento } from "@/src/lib/process-stage/fase-pre-contrato"
 import { resolveOperationalProjection } from "@/src/lib/process-stage/operational-projection"
 import { resolverRotuloDaFase } from "@/src/lib/process-stage/escopo-operacional-da-fase"
 import { resolverMacroWorkflowDoProcesso } from "@/src/lib/motor/resolver-macro-workflow"
@@ -164,7 +165,8 @@ export async function GET(
       const cycles = porFase.get(f.phaseKey) ?? [] // já ordenado por ciclo desc
       const latest = cycles[0] ?? null
       const alcancada = f.ordem <= ordemAtual
-      const concluida = alcancada && latest?.status === "CONCLUIDO"
+      // "Aguardando fechamento" (pré-trabalho) fica com a instância ATIVA por desenho: depois que o processo a deixa, é fase CONCLUÍDA (a barra e o Caminho concordam).
+      const concluida = alcancada && (latest?.status === "CONCLUIDO" || (ehFaseAguardandoFechamento(f.phaseKey) && f.phaseKey !== faseAtualKey))
       const state: PhaseState =
         f.phaseKey === faseAtualKey ? "ACTIVE"
         : concluida ? "COMPLETED"

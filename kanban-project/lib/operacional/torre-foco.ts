@@ -64,7 +64,8 @@ export interface FocoDaFamilia {
 }
 
 export interface CertidaoEncerradaDoFoco {
-  documentoId: number
+  /** `null` = tarefa cancelada que não tem Documento (a lista da aba Tarefas também a mostra). */
+  documentoId: number | null
   titulo: string
   pessoa: string | null
   encerramento: EncerramentoDoDocumento | null
@@ -118,15 +119,25 @@ export async function focoDaFamilia(processoId: number, agora = new Date()): Pro
   const tituloDoDoc = new Map<number, string>()
   const tarefaDoDoc = new Map<number, { id: number; faseMacroKey: string | null }>()
   for (const t of tarefasDosInativos) if (t.documentoId != null && !tituloDoDoc.has(t.documentoId)) { tituloDoDoc.set(t.documentoId, t.titulo.split(' · ')[0].trim()); tarefaDoDoc.set(t.documentoId, { id: t.id, faseMacroKey: t.faseMacroKey }) }
-  const encerradas: CertidaoEncerradaDoFoco[] = inativos.map((d) => ({
+  // A MESMA lista da aba Tarefas (tarefas CANCELADAS do processo, de qualquer fase): as que não têm Documento inativo entram aqui também.
+  const { linhas: canceladasDaTorre } = await listarTarefasDaTorre({ processoId, status: ['CANCELADA'], incluirEncerradas: true }, agora, { incluirPausados: true })
+  const docsInativos = new Set(idsInativos)
+  const soTarefa: CertidaoEncerradaDoFoco[] = canceladasDaTorre
+    .filter((l) => l.statusTarefa === 'CANCELADA' && (l.documentoId == null || !docsInativos.has(l.documentoId)))
+    .map((l) => ({
+      documentoId: l.documentoId ?? null, titulo: l.titulo.split(' · ')[0].trim(), pessoa: l.pessoaNome ?? null, encerramento: null, tipo: 'CANCELADA' as const,
+      pessoaId: l.pessoaId ?? null, ordemArvore: null, tarefaId: l.taskId, faseMacroKey: l.faseMacroKey ?? null,
+    }))
+  const encerradasDosDocs: CertidaoEncerradaDoFoco[] = inativos.map((d) => ({
     documentoId: d.id,
     titulo: tituloDoDoc.get(d.id) ?? (d.tipo ? TIPO_DOCUMENTO_LABELS[d.tipo] ?? String(d.tipo) : `Documento #${d.id}`),
     pessoa: d.pessoa ? [d.pessoa.nome, d.pessoa.sobrenome].filter(Boolean).join(' ') : null,
     encerramento: encerramentos.get(d.id) ?? null,
-    tipo: String(d.status) === 'NAO_EXIGIDO' ? 'NAO_EXIGIDA' : 'CANCELADA',
+    tipo: (String(d.status) === 'NAO_EXIGIDO' ? 'NAO_EXIGIDA' : 'CANCELADA') as 'CANCELADA' | 'NAO_EXIGIDA',
     pessoaId: d.pessoaId, ordemArvore: d.pessoa?.numeroLinhagem ?? null,
     tarefaId: tarefaDoDoc.get(d.id)?.id ?? null, faseMacroKey: tarefaDoDoc.get(d.id)?.faseMacroKey ?? null,
   }))
+  const encerradas: CertidaoEncerradaDoFoco[] = [...encerradasDosDocs, ...soTarefa]
 
   return {
     processoId, familiaId: proc.familiaId, familiaNome: proc.familia?.nome ?? proc.nome,
@@ -213,7 +224,7 @@ function linhaEncerrada(e: CertidaoEncerradaDoFoco, info: Map<number, InfoDaPess
     ? `Cancelada ${porQuem(enc?.porNome)}${enc?.motivo ? ` · ${motivoLegivel(enc.motivo)}` : ''}${enc?.justificativa ? ` (${enc.justificativa})` : ''}`
     : `Não exigida: ${motivoLegivel(enc?.motivo) ?? 'a árvore deixou de exigir'}${enc?.observacao ? `. ${enc.observacao}` : ''}`
   return {
-    chave: `d${e.documentoId}`, tarefaId: enc?.tarefaReabrivelId ?? e.tarefaId ?? null, documentoId: e.documentoId, tipo: e.tipo,
+    chave: e.documentoId != null ? `d${e.documentoId}` : `t${e.tarefaId}`, tarefaId: enc?.tarefaReabrivelId ?? e.tarefaId ?? null, documentoId: e.documentoId, tipo: e.tipo,
     titulo: e.titulo, pessoaId: e.pessoaId ?? null, pessoa: e.pessoa,
     geracao: e.pessoaId != null ? info.get(e.pessoaId)?.rotulo ?? null : null,
     geracaoNum: e.pessoaId != null ? info.get(e.pessoaId)?.geracao ?? null : null,
@@ -334,8 +345,10 @@ export async function detalheDoProcesso(processoId: number, agora = new Date()):
   const faseDaAtual = faseDe(faseAtualKey ?? null)
   const trabalho: LinhaDaTabela[] = [...foco.tarefas.map((l) => linhaAberta(l, info, faseDe)), ...concluidas.map((l) => linhaConcluida(l, info, faseDaAtual))]
   const faseEhDocumental = trabalho.some((l) => l.documentoId != null)
-  const encerradasDaFase = foco.encerradas.filter((e) => (e.faseMacroKey ? e.faseMacroKey === faseAtualKey : faseEhDocumental))
-  const tabela = [...trabalho, ...encerradasDaFase.map((e) => linhaEncerrada(e, info, agora, faseDaAtual))]
+  // As canceladas / não exigidas do PROCESSO (todas as fases): o card e a lista leem ESTE conjunto (o mesmo da aba Tarefas).
+  const encerradasDaFase = foco.encerradas
+  void faseEhDocumental
+  const tabela = [...trabalho, ...encerradasDaFase.map((e) => linhaEncerrada(e, info, agora, e.faseMacroKey ? faseDe(e.faseMacroKey) : faseDaAtual))]
 
   // OS CARTÕES (Passo atual · Com quem · Prazo · Cartórios) leem a MESMA lista da tabela (todas as abertas do processo): L3 da Lei da Torre.
   const cartoes = cartoesDaFase({

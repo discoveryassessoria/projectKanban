@@ -14,6 +14,7 @@ import { exigirBancoDeTeste } from "./_banco-de-teste"
 import { criarPalco } from "./_fixture-arvore-fonte"
 import { filtrarEOrdenar, tituloDaTabela, type LinhaDaTabela } from "../lib/operacional/torre-processo-puro"
 import { montarCaminho, textosDaFase } from "../lib/operacional/torre-caminho"
+import { cartoesDaFase } from "../lib/operacional/torre-processo-puro"
 import { proximaAcaoDoProcesso } from "../lib/operacional/torre-proxima-acao"
 
 const MARCA = "RFIX"
@@ -155,6 +156,21 @@ async function main() {
   ok("os cartões laterais leem a MESMA lista da tabela (todas as abertas do processo)", /cartoesDaFase\(\{\s*linhas: foco\.tarefas,/.test(foco))
   ok("'Passo atual' de passo único (sem subtarefa) mostra o nome do passo, nunca '—'", /PASSO ÚNICO, SEM SUBTAREFA/.test(ler("lib/operacional/tarefa-projecoes.ts")))
   ok("o registro consolidado é AÇÃO DO SISTEMA (sem 'pede decisão humana')", /NECESSIDADE_ATENDIDA_SEM_CAUSA_CONSOLIDADO': \{[\s\S]*atomoDoSistema/.test(ler("lib/operacional/historico-processo.ts")))
+
+
+  // ── complemento 06/10 (2): "Aguardando fechamento" nunca é fase reaberta; o card das canceladas = a lista ─────────────────
+  secao("Fase 'Aguardando fechamento' fica concluída; o número do card é o tamanho da lista que ele abre (L3)")
+  ok("Caminho: 'Aguardando fechamento' é excluída da regra de fase reaberta (só a Genealogia reabre)", /ehFaseAguardandoFechamento\(key\)/.test(ler("lib/operacional/torre-caminho-leitura.ts")))
+  ok("Barra de fases: 'Aguardando fechamento' depois de deixada é COMPLETED (mesma fonte do Caminho)", /ehFaseAguardandoFechamento\(f\.phaseKey\) && f\.phaseKey !== faseAtualKey/.test(ler("src/app/api/processos/[processoId]/phases/route.ts")))
+  const enc = [
+    base({ chave: "c1", tipo: "CANCELADA", status: "CANCELADA", podeAtribuir: false, fase: { key: "genealogia", label: "Genealogia", ordem: 1 } }), base({ chave: "c2", tipo: "CANCELADA", status: "CANCELADA", podeAtribuir: false, fase: { key: "genealogia", label: "Genealogia", ordem: 1 } }),
+    base({ chave: "n1", tipo: "NAO_EXIGIDA", status: "NAO_EXIGIDA", podeAtribuir: false, fase: { key: "genealogia", label: "Genealogia", ordem: 1 } }),
+  ]
+  const cards = cartoesDaFase({ linhas: [], encerradas: { canceladas: enc.filter((l) => l.tipo === "CANCELADA").length, naoExigidas: enc.filter((l) => l.tipo === "NAO_EXIGIDA").length }, riscoDe: () => "ritmo" })
+  const fora = cards.find((c) => /Cancelada/.test(c.rotulo))!
+  const aberta = filtrarEOrdenar(enc, { pessoaId: null, status: "ENCERRADAS" })
+  ok("card 'Cancelada / não exigida' = tamanho da lista que ele abre (nunca 'Nenhuma' com linhas na lista)", fora.titulo.startsWith(String(aberta.length)) && aberta.length === 3, `${fora.titulo} | ${fora.sub}`)
+  ok("a lista do processo lê as canceladas/não exigidas de TODAS as fases (sem recorte pela fase atual) e inclui as tarefas canceladas sem Documento", !/e\.faseMacroKey === faseAtualKey : faseEhDocumental/.test(foco) && /soTarefa/.test(foco))
 
   // ── sugestão nunca atribui sozinha ─────────────────────────────────────────────────────────────────────────────────────
   secao("SUGESTÃO — nunca atribui sem confirmação explícita (servidor e tela); origem no histórico")
