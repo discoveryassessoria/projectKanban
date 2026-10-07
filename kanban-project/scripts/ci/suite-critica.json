@@ -237,6 +237,7 @@
   ]
  },
  "arquivos": [
+    "scripts/regras-inegociaveis-do-marco.test.ts",
     "scripts/seletores-sem-pessoa-preselecionada.test.ts",
     "scripts/planilha-documental-projecao.test.ts",
     "scripts/planilha-documental-sem-valores.test.ts",
