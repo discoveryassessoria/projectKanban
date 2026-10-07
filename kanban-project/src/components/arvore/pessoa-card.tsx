@@ -191,16 +191,14 @@ function DocumentoIndicador({ doc }: { doc: DocumentoArvore }) {
   // `doc.status` já vem derivado da Tarefa viva (nunca `Documento.status`
   // cru) — ver `lib/operacional/documento-estado.ts`.
   const statusConfig: Record<string, { color: string; label: string }> = {
-    'BLOQUEADA':          { color: '#EF4444', label: 'Bloqueado' },
-    'SEM_RESPONSAVEL':    { color: '#F59E0B', label: 'Sem responsável' },
-    'A_FAZER':            { color: '#F59E0B', label: 'A fazer' },
-    'AGUARDANDO_TERCEIRO': { color: '#22C55E', label: 'Aguardando terceiro' },
-    'EM_ANDAMENTO':       { color: '#22C55E', label: 'Em andamento' },
-    'RECEBIDO':           { color: '#4f91c5', label: 'Recebido' },
+    'em_busca':   { color: '#EF4444', label: 'Em busca' },
+    'solicitar':  { color: '#F59E0B', label: 'A solicitar' },
+    'solicitado': { color: '#22C55E', label: 'Em andamento' },
+    'recebido':   { color: '#4f91c5', label: doc.isValidado ? 'Validada' : 'Recebido' },
   }
 
-  const config = statusConfig[doc.status]
-  if (!config) return null // PENDENTE = sem bolinha
+  const config = doc.bolinha ? statusConfig[doc.bolinha] : null
+  if (!config) return null // só some quando a certidão não é mais exigida
 
   const tipoLabel = tipoLabels[doc.tipo] || doc.tipo
 

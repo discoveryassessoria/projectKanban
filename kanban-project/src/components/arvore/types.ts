@@ -91,6 +91,10 @@ export interface DocumentoArvore {
   tipo: string
   descricao?: string | null
   status: string
+  /** Decididos no servidor (documento-estado.ts): recebida, validada e a cor da bolinha. `null` = sem bolinha (não exigido). */
+  isRecebido?: boolean
+  isValidado?: boolean
+  bolinha?: 'em_busca' | 'solicitar' | 'solicitado' | 'recebido' | null
   cartorio?: string | null
   livro?: string | null
   folha?: string | null
