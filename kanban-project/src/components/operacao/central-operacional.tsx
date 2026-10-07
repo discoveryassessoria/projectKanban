@@ -11,10 +11,8 @@
 // Nenhum motor novo: os dois endpoints chamam `whereGerencial` por baixo, e é
 // por isso que os contadores aqui e lá nunca discordam.
 //
-// Ações em lote (atribuir/repriorizar) saem por `/api/tarefas/redistribuir` e
-// `/api/tarefas/repriorizar` — as MESMAS portas canônicas, item a item,
-// auditadas. Nunca "concluir tudo": a única ação sem confirmação individual
-// que existe é atribuição e prioridade.
+// Atribuir/transferir responsável NÃO acontece aqui: só na aba Tarefas da Torre
+// (Lei da Torre, L4). Nunca "concluir tudo".
 // ============================================================================
 "use client"
 

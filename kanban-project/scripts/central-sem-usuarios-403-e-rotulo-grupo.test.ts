@@ -31,6 +31,11 @@ const central = semComentarios(ler(nomes[0]))
 ok(/\/api\/operacao\/atribuiveis/.test(central) && /if \(!podeEditarTarefas\) return/.test(central), "Central usa atribuíveis só com tarefas.editar")
 for (const f of nomes.slice(1)) {
   const s = semComentarios(ler(f))
+  if (f.endsWith("DocumentoOperationalDrawer.tsx")) {
+    // Lei da Torre (L4): a gaveta não atribui mais — não busca a lista de atribuíveis.
+    ok(!/\/api\/operacao\/atribuiveis/.test(s), `${f.split("/").pop()}: não busca atribuíveis (só a Torre atribui)`)
+    continue
+  }
   ok(/pode\("tarefas\.editar"\) \? "\/api\/operacao\/atribuiveis" : null/.test(s), `${f.split("/").pop()}: atribuíveis condicionado à permissão (sem chamada sem permissão)`)
 }
 ok(/verificarPermissao\(request, 'tarefas\.editar'\)/.test(ler("src/app/api/operacao/atribuiveis/route.ts")), "a rota de atribuíveis exige tarefas.editar (a mesma que a UI checa)")

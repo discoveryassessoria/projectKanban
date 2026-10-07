@@ -17,8 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { textoPrazoDaTarefa } from "@/src/lib/tarefa/texto-prazo"
 import { useRouter, useSearchParams } from "next/navigation"
 import { urlArvoreDoProcesso, urlOperacionalDoProcesso, ABAS_DA_OPERACAO, type AbaDaOperacao } from "@/lib/operacional/navegacao"
-import { auth, SeletorResponsavel } from "./kit-operacional"
-import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { auth } from "./kit-operacional"
 import { useJsonLocalStorage } from "@/src/lib/cliente"
 import { DocumentoOperationalDrawer } from "@/src/components/kanban/DocumentoOperationalDrawer"
 import { TarefaTransversalModal } from "@/src/components/kanban/TarefaTransversalModal"
@@ -120,13 +119,7 @@ export function OperacaoV3({ gestor = false, naTorre = false, abaInicial = null 
   }
   const novasIds = useNovasDaFamilia(processoFiltro)
   const [sel, setSel] = useState<Record<number, true>>({})
-  // ATRIBUIR da fila: MESMA porta e MESMA permissão da Torre/Visão global (`tarefas.editar` → POST /api/tarefas/:id/comando atribuir|transferir).
-  // A atribuição entra no histórico pela porta canônica (não há escrita paralela aqui).
-  const { pode: podePermissao } = usePermissoes()
-  const podeAtribuir = podePermissao("tarefas.editar")
-  const [atribuirAberto, setAtribuirAberto] = useState(false)
-  const [atribuirOcupado, setAtribuirOcupado] = useState(false)
-  const [atribuirErro, setAtribuirErro] = useState<string | null>(null)
+  // Lei da Torre (L4): atribuir/transferir só na aba Tarefas da Torre — aqui só o link "Atribuir na Torre".
   const [drawerTaskId, setDrawerTaskId] = useState<number | null>(null)
   const [group, setGroup] = useState<AgruparFilaPor>("pessoa")
   const [radar, setRadar] = useState<FiltroRadar>(null)
@@ -286,26 +279,6 @@ export function OperacaoV3({ gestor = false, naTorre = false, abaInicial = null 
     dados.recarregar()
   }, [avisar, dados])
 
-  const atribuirSelecionadas = useCallback(async (responsavelId: number) => {
-    const alvos = filaBase.filter((l) => sel[l.taskId])
-    setAtribuirOcupado(true); setAtribuirErro(null)
-    let falhas = 0
-    for (const l of alvos) {
-      try {
-        const r = await fetch(`/api/tarefas/${l.taskId}/comando`, {
-          method: "POST", headers: auth(),
-          body: JSON.stringify({ acao: l.responsavelId == null ? "atribuir" : "transferir", responsavelId }),
-        })
-        if (!r.ok) falhas++
-      } catch { falhas++ }
-    }
-    setAtribuirOcupado(false)
-    if (falhas > 0) { setAtribuirErro(`${falhas} tarefa${falhas === 1 ? "" : "s"} não pôde${falhas === 1 ? "" : "ram"} ser atribuída${falhas === 1 ? "" : "s"}.`); dados.recarregar(); return }
-    setAtribuirAberto(false); setSel({})
-    avisar(`${alvos.length} tarefa${alvos.length === 1 ? "" : "s"} atribuída${alvos.length === 1 ? "" : "s"}.`)
-    dados.recarregar()
-  }, [filaBase, sel, avisar, dados])
-
   if (dados.erro) {
     return (
       <div className="opv3-root" style={{ padding: 40, textAlign: "center" }}>
@@ -405,8 +378,6 @@ export function OperacaoV3({ gestor = false, naTorre = false, abaInicial = null 
                 if (!primeira?.processoId) { avisar("Nenhuma família em A fazer para anexar a tarefa transversal."); return }
                 setTransversalProcessoId(primeira.processoId)
               }}
-              podeAtribuir={podeAtribuir}
-              onAtribuir={() => { setAtribuirErro(null); setAtribuirAberto(true) }}
               onVerFamilia={(fam) => { setTab("fam"); setFamOpen({ fam, estagio: "iniciar" }); setFamUltimo((m) => ({ ...m, [fam]: "iniciar" })) }}
               novasIds={novasIds}
             />
@@ -501,15 +472,6 @@ export function OperacaoV3({ gestor = false, naTorre = false, abaInicial = null 
         </div>
       )}
 
-      {atribuirAberto && (
-        <SeletorResponsavel
-          titulo={`Atribuir ${Object.keys(sel).length} tarefa${Object.keys(sel).length === 1 ? "" : "s"}`}
-          atual={null} ocupado={atribuirOcupado} erro={atribuirErro}
-          aoFechar={() => { setAtribuirAberto(false); setAtribuirErro(null) }}
-          aoEscolher={atribuirSelecionadas}
-        />
-      )}
-
       {transversalProcessoId != null && (
         <TarefaTransversalModal
           processoId={transversalProcessoId}
@@ -543,7 +505,7 @@ export function OperacaoV3({ gestor = false, naTorre = false, abaInicial = null 
 function AbaFila({
   linhas, todasSelecionaveis, todosAbertos, group, setGroup, radar, clearRadar, quick, clearQuick,
   sel, setSel, col, setCol, nAguard, nAcompVenc, noOrgTotal,
-  onAbrir, onIniciarFoco, onIniciarSelecionadas, onVincularTodos, onAddTransversal, podeAtribuir, onAtribuir, onVerFamilia, novasIds,
+  onAbrir, onIniciarFoco, onIniciarSelecionadas, onVincularTodos, onAddTransversal, onVerFamilia, novasIds,
 }: {
   linhas: LinhaOperacaoV3[]
   todasSelecionaveis: LinhaOperacaoV3[]
@@ -570,8 +532,6 @@ function AbaFila({
   onIniciarSelecionadas: () => void
   onVincularTodos: (ids: number[]) => void
   onAddTransversal: () => void
-  podeAtribuir: boolean
-  onAtribuir: () => void
   onVerFamilia: (fam: string) => void
   /** Tarefas do último aviso "chegou trabalho" — ganham a pílula "Nova". */
   novasIds: Set<number>
@@ -621,7 +581,7 @@ function AbaFila({
             <span style={{ fontSize: 12, fontWeight: 600, color: "#8a3f15" }}>{selCount} sel.</span>
             <button className="opv3-btn opv3-acc opv3-sm" onClick={onIniciarSelecionadas}>Iniciar (enviar ao cartório) as {selCount}</button>
             <button className="opv3-btn opv3-sm" onClick={() => onVincularTodos(Object.keys(sel).map(Number))}>Vincular órgão</button>
-            {podeAtribuir && <button className="opv3-btn opv3-sm" onClick={onAtribuir}>Atribuir</button>}
+            <a className="opv3-btn opv3-sm" href="/torre?aba=tarefas" style={{ textDecoration: "none" }}>Atribuir na Torre</a>
             <button className="opv3-btn opv3-sm" onClick={() => setSel({})}>Limpar</button>
           </div>
         )}

@@ -27,7 +27,7 @@ import { ordenarCertidoesDaFamilia } from "@/lib/operacional/ordem-certidoes"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import {
   auth, dataCurta, Estado, ROTULO_STATUS, ROTULO_PRIORIDADE, rotularFase,
-  acaoPrincipal, SeletorResponsavel, type LinhaOperacional,
+  acaoPrincipal, type LinhaOperacional,
 } from "./kit-operacional"
 import {
   classificarAtencaoOperacional, motivosAtivos, ROTULO_MOTIVO,
@@ -240,8 +240,8 @@ function ModalMotivo({ titulo, placeholder, ocupado, erro, aoFechar, aoConfirmar
  * não motor).
  */
 function LinhaOperacaoTabela({
-  l, selecionado, aoSelecionar, aoExecutar, ocupado, marcado, aoMarcar, mostrarSelecao,
-  aoAguardarTerceiro, aoBloquear, aoDevolverAFila, aoContatarTerceiro,
+  l, selecionado, aoSelecionar, aoExecutar, ocupado,
+  aoAguardarTerceiro, aoBloquear, aoContatarTerceiro,
 }: {
   l: LinhaOperacional
   /**
@@ -254,14 +254,9 @@ function LinhaOperacaoTabela({
   /** A ação do botão: comanda (quando há o que comandar) e SÓ DEPOIS navega. */
   aoExecutar: () => void
   ocupado: boolean
-  marcado: boolean
-  aoMarcar: () => void
-  /** `tarefas.editar` — sem ela, a coluna nem existe (nunca um checkbox morto). */
-  mostrarSelecao: boolean
   /** Cada callback só existe quando a PERMISSÃO existe — o item nem aparece sem ela (nunca botão morto). */
   aoAguardarTerceiro?: () => void
   aoBloquear?: () => void
-  aoDevolverAFila?: () => void
   aoContatarTerceiro?: () => void
 }) {
   const acao = acaoPrincipal(l)
@@ -270,11 +265,6 @@ function LinhaOperacaoTabela({
       onClick={aoSelecionar}
       className={`cursor-pointer border-b border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-secondary)] last:border-b-0 ${selecionado ? "bg-[var(--surface-secondary)]" : ""}`}
     >
-      {mostrarSelecao && (
-        <td className="w-8 px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
-          <input type="checkbox" checked={marcado} onChange={aoMarcar} className="h-3.5 w-3.5 accent-[var(--action-primary)]" />
-        </td>
-      )}
       <td className="max-w-[160px] overflow-hidden px-3 py-2.5">
         <div className="flex items-center gap-1.5">
           <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[var(--pessoa-tile)] text-[8.5px] font-semibold text-[var(--pessoa)]">
@@ -348,7 +338,6 @@ function LinhaOperacaoTabela({
               {aoContatarTerceiro && <DropdownMenuItem onClick={aoContatarTerceiro}>Contatar {l.terceiroNome}</DropdownMenuItem>}
               {aoAguardarTerceiro && l.coluna !== "AGUARDANDO_TERCEIRO" && <DropdownMenuItem onClick={aoAguardarTerceiro}>Aguardar terceiro</DropdownMenuItem>}
               {aoBloquear && l.coluna !== "BLOQUEADA" && <DropdownMenuItem onClick={aoBloquear}>Bloquear</DropdownMenuItem>}
-              {aoDevolverAFila && l.responsavelId != null && <DropdownMenuItem onClick={aoDevolverAFila}>Devolver à fila</DropdownMenuItem>}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -399,7 +388,7 @@ export function FamiliaTabelaExpandida({
 }) {
   const router = useRouter()
   const { pode: podePermissao } = usePermissoes()
-  const podeAtribuirLote = podePermissao("tarefas.editar")
+  const podeExportar = podePermissao("tarefas.editar")
   const podeIniciarConcluir = podePermissao("tarefas.iniciar_concluir")
   const podeBloquear = podePermissao("tarefas.bloquear")
 
@@ -409,10 +398,6 @@ export function FamiliaTabelaExpandida({
   const [erroComando, setErroComando] = useState<string | null>(null)
   const [verTodas, setVerTodas] = useState(false)
   const [acaoComMotivo, setAcaoComMotivo] = useState<{ tarefaId: number; acao: "aguardar_terceiro" | "bloquear"; titulo: string } | null>(null)
-  const [selecionadosLote, setSelecionadosLote] = useState<Set<number>>(new Set())
-  const [loteAberto, setLoteAberto] = useState(false)
-  const [loteOcupado, setLoteOcupado] = useState(false)
-  const [loteErro, setLoteErro] = useState<string | null>(null)
 
   const endpoint = useMemo(() => {
     // Os filtros ativos entram PRIMEIRO — `familia`/`processo`/`visao`/
@@ -537,9 +522,6 @@ export function FamiliaTabelaExpandida({
     }
     abrirOTrabalho(l)
   }, [comandar, abrirOTrabalho])
-  const devolverAFila = useCallback(async (l: LinhaOperacional) => {
-    await comandar(l.taskId, { acao: "devolver_a_fila" }, "Tarefa devolvida para Sem responsável.")
-  }, [comandar])
   /** Abre o canal de contato real do terceiro — nunca um número decorativo. */
   const contatarTerceiro = useCallback((l: LinhaOperacional) => {
     if (l.terceiroEmail) window.open(`mailto:${l.terceiroEmail}`, "_blank")
@@ -549,56 +531,8 @@ export function FamiliaTabelaExpandida({
   const acoesDaLinha = (l: LinhaOperacional) => ({
     aoAguardarTerceiro: podeIniciarConcluir ? () => setAcaoComMotivo({ tarefaId: l.taskId, acao: "aguardar_terceiro", titulo: `Aguardar terceiro — ${l.titulo}` }) : undefined,
     aoBloquear: podeBloquear ? () => setAcaoComMotivo({ tarefaId: l.taskId, acao: "bloquear", titulo: `Bloquear — ${l.titulo}` }) : undefined,
-    aoDevolverAFila: podeAtribuirLote ? () => void devolverAFila(l) : undefined,
     aoContatarTerceiro: (l.terceiroEmail || l.terceiroTelefone) ? () => contatarTerceiro(l) : undefined,
   })
-
-  const alternarSelecaoLote = (taskId: number) => setSelecionadosLote((prev) => {
-    const novo = new Set(prev)
-    if (novo.has(taskId)) novo.delete(taskId); else novo.add(taskId)
-    return novo
-  })
-  const alternarTodosNaFamilia = (ids: number[], todasMarcadas: boolean) => setSelecionadosLote((prev) => {
-    const novo = new Set(prev)
-    if (todasMarcadas) ids.forEach((id) => novo.delete(id))
-    else ids.forEach((id) => novo.add(id))
-    return novo
-  })
-  // ── ATRIBUIÇÃO EM LOTE — mesma porta de sempre (`POST /api/tarefas/{id}/
-  // comando`), chamada uma vez por tarefa selecionada (mandato "Seleção em
-  // massa": lote chama a porta de UMA linha, nunca uma porta paralela).
-  const linhasSelecionadasLote = useMemo(
-    () => (linhas ?? []).filter((l) => selecionadosLote.has(l.taskId)),
-    [linhas, selecionadosLote],
-  )
-  const atribuirLote = async (responsavelId: number) => {
-    setLoteOcupado(true)
-    setLoteErro(null)
-    let falhas = 0
-    for (const l of linhasSelecionadasLote) {
-      try {
-        const r = await fetch(`/api/tarefas/${l.taskId}/comando`, {
-          method: "POST",
-          headers: auth(),
-          body: JSON.stringify({ acao: l.responsavelId == null ? "atribuir" : "transferir", responsavelId }),
-        })
-        if (!r.ok) falhas++
-      } catch {
-        falhas++
-      }
-    }
-    setLoteOcupado(false)
-    if (falhas > 0) {
-      setLoteErro(`${falhas} tarefa${falhas === 1 ? "" : "s"} não pôde${falhas === 1 ? "" : "ram"} ser atribuída${falhas === 1 ? "" : "s"}.`)
-      return
-    }
-    const total = linhasSelecionadasLote.length
-    setLoteAberto(false)
-    setSelecionadosLote(new Set())
-    await recarregarAgora()
-    setRecarga((n) => n + 1)
-    toast({ description: `${total} tarefa${total === 1 ? "" : "s"} atribuída${total === 1 ? "" : "s"}.`, variant: "success" })
-  }
 
   const linhasOrdenadas = useMemo(() => ordenarCertidoesDaTabela(linhas ?? []), [linhas])
   const linhasVisiveis = verTodas ? linhasOrdenadas : linhasOrdenadas.slice(0, LINHAS_VISIVEIS_POR_FAMILIA)
@@ -646,7 +580,6 @@ export function FamiliaTabelaExpandida({
       <table className="w-full border-collapse text-left">
         <thead className="sticky top-0 z-10 bg-[var(--surface-overlay)]">
           <tr className="border-b border-[var(--border-subtle)] [&>th]:px-3 [&>th]:py-2 [&>th]:text-[10px] [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-[var(--text-muted)]">
-            {podeAtribuirLote && <th className="w-8" />}
             <th>Pessoa</th>
             <th>Documento / Tarefa</th>
             <th>Fase</th>
@@ -666,9 +599,6 @@ export function FamiliaTabelaExpandida({
               aoSelecionar={() => aoSelecionar(l.taskId, l.processoId)}
               aoExecutar={() => void irParaOTrabalho(l)}
               ocupado={ocupado}
-              marcado={selecionadosLote.has(l.taskId)}
-              aoMarcar={() => alternarSelecaoLote(l.taskId)}
-              mostrarSelecao={podeAtribuirLote}
               {...acoesDaLinha(l)}
             />
           ))}
@@ -687,24 +617,11 @@ export function FamiliaTabelaExpandida({
             <>{linhas.length} tarefa{linhas.length === 1 ? "" : "s"}</>
           )}
         </div>
-        {podeAtribuirLote && (
+        {podeExportar && (
           <div className="flex items-center gap-3">
-            <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
-              <input
-                type="checkbox"
-                checked={linhas.length > 0 && linhas.every((l) => selecionadosLote.has(l.taskId))}
-                onChange={() => alternarTodosNaFamilia(linhas.map((l) => l.taskId), linhas.every((l) => selecionadosLote.has(l.taskId)))}
-                className="h-3.5 w-3.5 accent-[var(--action-primary)]"
-              />
-              Selecionar todas ({linhas.length})
-            </label>
-            <button
-              disabled={linhas.filter((l) => selecionadosLote.has(l.taskId)).length === 0}
-              onClick={() => setLoteAberto(true)}
-              className="flex items-center gap-1.5 rounded-md bg-[var(--action-primary)] px-2.5 py-1.5 text-[11.5px] font-medium text-[var(--action-primary-ink)] transition-opacity hover:opacity-90 disabled:opacity-40"
-            >
-              Atribuir selecionadas
-            </button>
+            <a href="/torre?aba=tarefas" className="text-[11.5px] font-medium text-[var(--action-primary)] hover:underline">
+              Atribuir na Torre
+            </a>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-1 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1.5 text-[11.5px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)]">
@@ -718,16 +635,6 @@ export function FamiliaTabelaExpandida({
           </div>
         )}
       </div>
-      {loteAberto && (
-        <SeletorResponsavel
-          titulo={`Atribuir ${linhasSelecionadasLote.length} tarefa${linhasSelecionadasLote.length === 1 ? "" : "s"}`}
-          atual={null}
-          ocupado={loteOcupado}
-          erro={loteErro}
-          aoFechar={() => { setLoteAberto(false); setLoteErro(null) }}
-          aoEscolher={atribuirLote}
-        />
-      )}
       {acaoComMotivo && (
         <ModalMotivo
           titulo={acaoComMotivo.titulo}

@@ -183,8 +183,6 @@ secao("8) Aba Documentos do processo e central da fase")
 secao("9) Exportações CSV")
 {
   ok("exportarFamiliaCsv (Central da família) exporta na regra fixa e inclui a geração", /const linhas = ordenarCertidoesDaTabela\(linhasEntrada\)/.test(ler("src/components/operacao/tabela-familia.tsx")))
-  ok("exportarCsv (Distribuição) exporta na regra fixa", /const linhas = ordenarLinhasDeCertidao\(linhasEntrada\)/.test(ler("src/components/operacao/distribuicao-tarefas.tsx")))
-  ok("a ordenação da Visão global (colunas) só ordena famílias", /ordenarLinhasDeCertidao\(linhas, \(a, b\) =>/.test(ler("src/components/operacao/visao-global.tsx")))
   ok("ordenarLinhasDeCertidao é a mesma regra", iguais(idsDe(ordenarLinhasDeCertidao(FAM as any) as any), esperado))
 }
 

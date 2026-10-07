@@ -187,8 +187,8 @@ async function main() {
     const fonte = (p: string) => readFileSync(p, "utf8")
     for (const [arq, rota] of [["src/app/tarefas/page.tsx", "/tarefas"], ["src/app/operacao/distribuicao/page.tsx", "/operacao/distribuicao"]] as const) {
       const s = fonte(arq)
-      ok(`${arq}: consulta a função de absorção e só redireciona quando ela devolve destino`, s.includes(`destinoDaAbsorcao("${rota}", user.tipo)`) && /if \(mounted && !carregando && paraTorre\) \{ router\.replace\(paraTorre\)/.test(s))
-      ok(`${arq}: continua com o código da tela de hoje (nada apagado)`, /<VisaoGlobal|<DistribuicaoTarefas/.test(s))
+      void rota
+      ok(`${arq}: Lei da Torre (L4) — só redireciona para a aba Tarefas da Torre`, /redirect\("\/torre\?aba=tarefas"\)/.test(s) && !/<VisaoGlobal|<DistribuicaoTarefas/.test(s))
     }
     const menu = fonte("src/components/bitrix-sidebar.tsx")
     const iOp = menu.indexOf('title: "Operação"'), iTorre = menu.indexOf('title: "Torre de Controle"'), iCal = menu.indexOf('title: "Calendário"')
