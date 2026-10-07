@@ -30,7 +30,7 @@ ok("o menu marca os dois itens com escondeParaAdmin", /escondeParaAdmin: true/.t
 ok("o menu filtra pela função única", side.includes("itemDeMenuVisivel(item"))
 ok("as rotas continuam existindo (nada apagado)", existsSync("src/app/tarefas/page.tsx") && existsSync("src/app/operacao/distribuicao/page.tsx"))
 const tp = readFileSync("src/app/tarefas/page.tsx", "utf8"), dp = readFileSync("src/app/operacao/distribuicao/page.tsx", "utf8")
-ok("e continuam redirecionando o admin para a Torre (destinoDaAbsorcao)", /destinoDaAbsorcao\(/.test(tp) && /destinoDaAbsorcao\(/.test(dp) && /\/torre/.test(readFileSync("src/lib/torre-absorcao.ts", "utf8")))
+ok("e redirecionam para a aba Tarefas da Torre (Lei da Torre, L4)", /redirect\("\/torre\?aba=tarefas"\)/.test(tp) && /redirect\("\/torre\?aba=tarefas"\)/.test(dp) && /\/torre/.test(readFileSync("src/lib/torre-absorcao.ts", "utf8")))
 
 console.log(`\n${falhou === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${passou} ok, ${falhou} falhas`)
 process.exit(falhou ? 1 : 0)

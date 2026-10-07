@@ -675,22 +675,9 @@ export function ProcessoCentralOperacional({
   }, [abrirOperacao])
 
   // ────────────────────────────────────────────────────────────────────────────
-  // GESTÃO DE RESPONSABILIDADE, AQUI DENTRO — pelas MESMAS portas da Operação.
-  //
-  // O gestor que está olhando o processo e vê uma certidão sem dono não deve
-  // precisar sair para a Operação, procurar a tarefa numa lista de todos os
-  // processos, atribuir e voltar. O PROCESSO é o contexto de gestão individual;
-  // a Operação é a visão transversal. As duas superfícies, a MESMA tarefa.
-  //
-  // Aqui havia uma rota própria (`genealogia/delegar`) que gravava
-  // `responsavelId` no passo e na tarefa com `updateMany` cru — sem auditoria,
-  // sem notificação, sem trava otimista e sem guarda de tarefa encerrada. Era
-  // uma segunda porta de responsabilidade, e ela ficou sem consumidor. Saiu.
-  //
-  // Atribuir/transferir e devolver à fila são comandos do domínio, e o comando
-  // é um só: `POST /api/tarefas/{id}/comando`. Esta tela não decide nada sobre
-  // responsabilidade — nem sequer se pode: a permissão é conferida no servidor.
-  // ────────────────────────────────────────────────────────────────────────────
+  // RESPONSABILIDADE: somente leitura aqui. Atribuir/transferir/devolver à fila
+  // só na aba Tarefas da Torre (Lei da Torre, L4) — a linha mostra o link "Atribuir na Torre".
+  // A lista abaixo segue servindo só a ESCOLHA DE EXECUTOR ao criar tarefa/iniciar operação.
   // QUEM PODE RECEBER TRABALHO — a MESMA lista que a Operação oferece.
   //
   // Não é "todo mundo do cadastro": é quem tem permissão de EXECUTAR tarefa,
@@ -720,59 +707,6 @@ export function ProcessoCentralOperacional({
       .then((d: { funcionarios?: Array<{ id: number; nome: string }> }) => setAtribuiveis(d.funcionarios ?? []))
       .catch(() => setAtribuiveis([]))
   }, [podeEditarTarefas])
-
-  const [salvandoResp, setSalvandoResp] = useState<number | null>(null)
-  const comandarTarefa = useCallback(
-    async (taskId: number, corpo: Record<string, unknown>) => {
-      setSalvandoResp(taskId)
-      setErroOperacao(null)
-      try {
-        const enviar = (c: Record<string, unknown>) => fetch(`/api/tarefas/${taskId}/comando`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-          },
-          body: JSON.stringify(c),
-        })
-        let r = await enviar(corpo)
-        let j = await r.json().catch(() => ({}))
-        // Tirar o responsável de uma tarefa EM ANDAMENTO pede confirmação explícita (o servidor recusa sem ela).
-        if (r.status === 428 && j?.codigo === "CONFIRMACAO_NECESSARIA" && window.confirm(j.error)) {
-          r = await enviar({ ...corpo, confirmarTarefaEmAndamento: true })
-          j = await r.json().catch(() => ({}))
-        }
-        if (!r.ok) {
-          setErroOperacao(
-            r.status === 409
-              ? "Esta tarefa foi alterada por outra pessoa. A tela foi atualizada."
-              : j?.error || `Não foi possível concluir a ação (HTTP ${r.status}).`,
-          )
-          carregar(true)
-          return
-        }
-        // A CENTRAL E A OPERAÇÃO LEEM A MESMA TAREFA: recarregar aqui basta para
-        // esta tela; a outra lê do servidor na próxima vez que abrir ou
-        // recarregar. Não há cópia a sincronizar porque não há cópia.
-        carregar(true)
-      } catch {
-        setErroOperacao("Falha de rede. Tente novamente.")
-      } finally {
-        setSalvandoResp(null)
-      }
-    },
-    [carregar],
-  )
-
-  const atribuirResponsavel = useCallback(
-    (taskId: number, responsavelId: number) => comandarTarefa(taskId, { acao: "atribuir", responsavelId }),
-    [comandarTarefa],
-  )
-  /** Devolver à fila é a porta canônica de "retirar responsável" — não um update. */
-  const retirarResponsavel = useCallback(
-    (taskId: number) => comandarTarefa(taskId, { acao: "devolver_a_fila" }),
-    [comandarTarefa],
-  )
 
   /**
    * "Reabrir" uma certidão CANCELADA — a porta `/reabrir-certidao` (mesma tarefa; documento, exigência e etapas voltam
@@ -1228,13 +1162,6 @@ export function ProcessoCentralOperacional({
             // expansão, para o card nunca mostrar a posição de outro trabalho.
             chaveExpansao={`${processo.id}|${bodyData.phaseContext?.faseMacroKey ?? faseAtualNome}|${bodyData.phaseContext?.ciclo ?? ""}`}
             onAbrirDetalhes={abrirDetalhes}
-            // GESTÃO CONTEXTUAL — só para quem já pode distribuir trabalho. A
-            // permissão é conferida DE NOVO no servidor: esconder o botão é
-            // desenho, não controle de acesso.
-            onAtribuirResponsavel={pode("tarefas.editar") ? atribuirResponsavel : undefined}
-            onRetirarResponsavel={pode("tarefas.editar") ? retirarResponsavel : undefined}
-            usuarios={atribuiveis}
-            salvandoResponsavel={salvandoResp}
             onReabrirCertidao={pode("tarefas.editar") ? reabrirCertidao : undefined}
             documentoDestacadoId={alvo?.documentoId ?? null}
             readOnly={readOnly}

@@ -41,6 +41,7 @@
 
 import { textoDaLinha } from "@/src/lib/process-stage/central-operacional-core"
 import { useState, useRef, useEffect, useMemo } from "react"
+import Link from "next/link"
 import { AlertTriangle, Ban, CheckCircle2, ChevronDown, ChevronRight, Clock, FileText, Layers, Search, Star, Users } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import type {
@@ -107,23 +108,7 @@ export interface PainelDaFaseProps {
   chaveExpansao: string
   /** Abre o MODAL do documento — a única porta para a execução. */
   onAbrirDetalhes?: (doc: DocumentoDoIndice) => void
-  /**
-   * GESTÃO DE RESPONSABILIDADE NO CONTEXTO DO PROCESSO.
-   *
-   * O gestor que vê uma certidão sem dono resolve ali, sem sair para a Operação
-   * e voltar. As duas superfícies chamam a MESMA porta de domínio; esta tela só
-   * repassa o `taskId` e a pessoa escolhida.
-   *
-   * Ausentes ⇒ a coluna vira leitura pura. É o caso de quem executa: ele PRECISA
-   * ver de quem é o trabalho, e não ganha o poder de distribuí-lo por estar
-   * olhando o processo.
-   */
-  onAtribuirResponsavel?: (taskId: number, responsavelId: number) => void | Promise<void>
-  onRetirarResponsavel?: (taskId: number) => void | Promise<void>
-  /** Quem pode receber trabalho. Carregada UMA vez pelo container, nunca por linha. */
-  usuarios?: Array<{ id: number; nome: string }>
-  /** taskId em gravação — trava só a linha que está mudando. */
-  salvandoResponsavel?: number | null
+  // Responsável é somente leitura aqui: atribuir/transferir só na Torre (Lei da Torre, L4).
   /** "Reabrir" da certidão cancelada (porta canônica). Ausente ⇒ a linha cancelada só oferece "Ver motivo". */
   onReabrirCertidao?: (tarefaId: number, motivo: string) => Promise<string | null>
   /** Consulta de fase passada: mesmo layout, sem ações de mutação. */
@@ -159,10 +144,6 @@ export function PainelDaFase({
   indice,
   chaveExpansao,
   onAbrirDetalhes,
-  onAtribuirResponsavel,
-  onRetirarResponsavel,
-  usuarios,
-  salvandoResponsavel = null,
   onReabrirCertidao,
   readOnly = false,
   documentoDestacadoId = null,
@@ -314,7 +295,7 @@ export function PainelDaFase({
           indice={indice}
           chaveExpansao={chaveExpansao}
           onAbrirDetalhes={onAbrirDetalhes}
-          gestao={{ onAtribuirResponsavel, onRetirarResponsavel, usuarios, salvandoResponsavel, reabrirCertidao: onReabrirCertidao }}
+          gestao={{ reabrirCertidao: onReabrirCertidao }}
           readOnly={readOnly}
           documentoDestacadoId={documentoDestacadoId}
           recorte={recorte}
@@ -464,10 +445,6 @@ export function ordenarDocumentos(docs: DocumentoDoIndice[]): DocumentoDoIndice[
  * quem está gravando a linha pisca duas vezes.
  */
 export interface GestaoDeResponsavel {
-  onAtribuirResponsavel?: (taskId: number, responsavelId: number) => void | Promise<void>
-  onRetirarResponsavel?: (taskId: number) => void | Promise<void>
-  usuarios?: Array<{ id: number; nome: string }>
-  salvandoResponsavel?: number | null
   /**
    * "Reabrir" de uma certidão CANCELADA — a porta canônica (`/reabrir-certidao`), só para quem tem a permissão da porta.
    * Devolve a mensagem de erro (ou null quando reabriu). Ausente ⇒ a linha não oferece o botão.
@@ -1142,52 +1119,23 @@ function rotuloDaAcao(f: DocumentoDoIndice["naFase"]): string {
 }
 
 /**
- * QUEM RESPONDE POR ESTE TRABALHO — e como isso se muda, sem sair do processo.
+ * QUEM RESPONDE POR ESTE TRABALHO — somente leitura.
  *
- * ─── POR QUE A AÇÃO MORA NA COLUNA ──────────────────────────────────────────
- * O gestor está olhando o processo e vê uma certidão sem dono. O caminho antigo
- * era: sair para a Operação, achar a tarefa numa lista de TODOS os processos,
- * atribuir, e voltar para onde já estava. A pergunta nasce aqui; a resposta
- * passou a caber aqui.
- *
- * A Operação continua existindo e continua sendo o lugar da distribuição em
- * escala — cem tarefas sem dono não se resolvem uma linha por vez. As duas
- * superfícies chamam a MESMA porta de domínio, sobre a MESMA tarefa.
- *
- * ─── O SELETOR ABRE SOB DEMANDA ─────────────────────────────────────────────
- * Quinhentas linhas com um `<select>` montado em cada uma são quinhentas listas
- * de funcionários no DOM para no máximo uma ser usada. O seletor nasce no
- * clique; a lista de gente vem pronta do container, carregada UMA vez.
- *
- * ─── ATRIBUIR NÃO INICIA ────────────────────────────────────────────────────
- * Este controle muda o DONO. Não toca em estado, prazo, etapa ou progresso —
- * quem começa o trabalho é quem executa, na fila dele, com um clique próprio.
+ * LEI DA TORRE (L4): só a aba Tarefas da Torre atribui, transfere ou retira
+ * responsável. Aqui a coluna mostra o dono da TAREFA e, quando a tarefa ainda
+ * está aberta, o caminho para atribuir na Torre.
  */
 function CelulaResponsavel({
   doc,
-  gestao,
   readOnly,
 }: {
   doc: DocumentoDoIndice
-  gestao?: GestaoDeResponsavel
   readOnly: boolean
 }) {
-  const [editando, setEditando] = useState(false)
   const f = doc.naFase
   const taskId = f.taskId
-  const salvando = gestao?.salvandoResponsavel != null && gestao.salvandoResponsavel === taskId
-  // SEM TAREFA NÃO HÁ A QUEM ATRIBUIR — e isso é dito, não escondido atrás de um
-  // botão que não faria nada. Documento concluído também não se redistribui.
-  // CANCELADA/SUPERSEDIDA também não se redistribui — a operação acabou, e
-  // reatribuir responsável por um trabalho encerrado por cancelamento não faz
-  // sentido operacional (mesma régua de CONCLUIDA).
   const encerrada = f.estado === "CONCLUIDA" || f.estado === "CANCELADA" || f.estado === "SUPERSEDIDA" || f.estado === "NAO_EXIGIDA"
-  const podeGerir =
-    !readOnly
-    && taskId != null
-    && !encerrada
-    && !!gestao?.onAtribuirResponsavel
-    && (gestao?.usuarios?.length ?? 0) > 0
+  const podeLinkar = !readOnly && taskId != null && !encerrada
 
   const nome = f.responsavelNome
     ? <span className="text-white/80 truncate">{f.responsavelNome}</span>
@@ -1195,47 +1143,17 @@ function CelulaResponsavel({
       ? <span className="text-[var(--text-muted)]">—</span>
       : <span className="text-[var(--accent-text)]">Sem responsável</span>
 
-  if (!podeGerir) return <div className="min-w-0 text-[11.5px] truncate">{nome}</div>
-
-  if (editando) {
-    return (
-      <div className="min-w-0 text-[11.5px]">
-        <select
-          autoFocus
-          aria-label="Responsável pela tarefa"
-          disabled={salvando}
-          defaultValue={f.responsavelId ?? ""}
-          onChange={async (e) => {
-            const v = e.target.value
-            setEditando(false)
-            if (v === "") await gestao!.onRetirarResponsavel?.(taskId!)
-            else await gestao!.onAtribuirResponsavel!(taskId!, Number(v))
-          }}
-          onBlur={() => setEditando(false)}
-          className="w-full rounded border border-[var(--border-default)] bg-[var(--app-background)] px-1.5 py-1 text-[11.5px] text-white/85 focus:outline-none focus:border-[var(--border-default)] disabled:opacity-50"
-        >
-          <option value="" className="bg-[var(--surface-secondary)]">
-            {f.responsavelId != null ? "— retirar responsável —" : "— selecione —"}
-          </option>
-          {gestao!.usuarios!.map((u) => (
-            <option key={u.id} value={u.id} className="bg-[var(--surface-secondary)]">{u.nome}</option>
-          ))}
-        </select>
-      </div>
-    )
-  }
+  if (!podeLinkar) return <div className="min-w-0 text-[11.5px] truncate">{nome}</div>
 
   return (
     <div className="min-w-0 text-[11.5px]">
       <div className="truncate">{nome}</div>
-      <button
-        type="button"
-        disabled={salvando}
-        onClick={() => setEditando(true)}
-        className="text-[10.5px] text-[var(--text-secondary)] hover:text-[var(--text-secondary)] hover:underline disabled:opacity-40"
+      <Link
+        href={`/torre?aba=tarefas&tarefa=${taskId}`}
+        className="text-[10.5px] text-[var(--text-secondary)] hover:underline"
       >
-        {salvando ? "salvando…" : f.responsavelId != null ? "alterar" : "atribuir"}
-      </button>
+        Atribuir na Torre
+      </Link>
     </div>
   )
 }
@@ -1415,7 +1333,7 @@ function LinhaDocumento({
       {/* O RESPONSÁVEL É O DA TAREFA. Não existe um segundo dono por documento:
           inventar um criaria a divergência de "Daniela numa tela e Equipe
           Documental na outra". E é AQUI que ele se muda — ver CelulaResponsavel. */}
-      <CelulaResponsavel doc={doc} gestao={gestao} readOnly={readOnly} />
+      <CelulaResponsavel doc={doc} readOnly={readOnly} />
 
       <CelulaPrazo f={doc.naFase} />
 

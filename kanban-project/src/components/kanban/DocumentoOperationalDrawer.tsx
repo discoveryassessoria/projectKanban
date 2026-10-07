@@ -4,6 +4,7 @@
 
 
 import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react"
+import Link from "next/link"
 import { useApi } from "@/src/lib/dados"
 import { rotuloStatusTarefa } from "@/src/lib/home/rotulo-status-tarefa"
 import { authHeaders } from "@/src/lib/financeiro/http"
@@ -456,7 +457,6 @@ function ConteudoDrawer({
   rodapeExtra,
 }: DocumentoOperationalDrawerProps) {
   const { pode } = usePermissoes()
-  const [delegandoResp, setDelegandoResp] = useState(false)
   const [repactuandoPrazo, setRepactuandoPrazo] = useState(false)
   // O DOCUMENTO ABRE NO SEU WORKFLOW.
   //
@@ -487,15 +487,6 @@ function ConteudoDrawer({
     ? "Operação sem documento associado."
     : consulta.erro
 
-  // Usuários para delegação — leitura independente, com o seu cache.
-  // QUEM PODE RECEBER TRABALHO — rota de atribuíveis (tarefas.editar), nunca /api/usuarios
-  // (usuarios.gerenciar: 403 para a assistente). Sem permissão, nem chama.
-  const usuariosReq = useApi<{ funcionarios?: Usuario[] }>(pode("tarefas.editar") ? "/api/operacao/atribuiveis" : null)
-  const usuarios = useMemo<Usuario[]>(() => {
-    const d = usuariosReq.dados
-    return d?.funcionarios ?? []
-  }, [usuariosReq.dados])
-
   // MÁQUINA DE ESTADOS EXPLÍCITA do Drawer — nunca inferir "sem operação" só porque a
   // projeção ainda não chegou. Agora ela é DERIVADA da consulta, e por isso não pode
   // mais divergir dela: LOADING enquanto não há resposta; ERROR em falha;
@@ -518,79 +509,6 @@ function ConteudoDrawer({
 
   // ESC fecha — só o overlay do topo (ver escape-stack.ts)
   useFecharComEsc(isOpen, onClose)
-
-  // ────────────────────────────────────────────────────────────────────────────
-  // DELEGAR = TRANSFERIR A TAREFA, pela porta canônica.
-  //
-  // Aqui havia `atribuirResponsavel(stepId, …)`, que fazia PATCH em
-  // `…/workflow/steps/{id}` com `assigneeId` — e isso move o executor DAQUELE
-  // PASSO, não o responsável pelo trabalho. Duas telas ofereciam "delegar" e
-  // cada uma escrevia num lugar: o passo, o documento. A Tarefa, que é a
-  // unidade operacional e a que a Minha Fila lê, não era tocada por nenhuma.
-  //
-  // A porta é `POST /api/tarefas/{id}/atribuir` → `atribuirTarefa`, que já faz
-  // auditoria, notificação e trava otimista. Este componente não decide nada
-  // sobre atribuição: só chama.
-  // ────────────────────────────────────────────────────────────────────────────
-  // REMOVER RESPONSÁVEL: 1ª chamada devolve a prévia (428, nada gravado) → confirmação com a lista (+ 2ª confirmação se já iniciada, + motivo opcional) → 2ª chamada grava.
-  const [removerPrevia, setRemoverPrevia] = useState<{ pergunta: string; alerta?: string; exigeConfirmacaoDeAndamento?: boolean; assinatura: string } | null>(null)
-  const [removerMotivo, setRemoverMotivo] = useState("")
-  const [removerAndamentoOk, setRemoverAndamentoOk] = useState(false)
-  const chamarRemocao = async (corpo: Record<string, unknown>) => {
-    const taskId = projection?.tarefa?.taskId
-    if (!taskId) return null
-    const r = await fetch(`/api/torre/tarefas/${taskId}/remover-responsavel`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` },
-      body: JSON.stringify(corpo),
-    })
-    return { status: r.status, data: await r.json().catch(() => ({})) as Record<string, unknown> }
-  }
-  const removerResponsavel = async () => {
-    setSalvando(true)
-    try {
-      const r = await chamarRemocao({})
-      if (r?.status === 428 && r.data.confirmacao) { setRemoverMotivo(""); setRemoverAndamentoOk(false); setRemoverPrevia(r.data.confirmacao as never) }
-      else if (r && !(r.status >= 200 && r.status < 300)) console.error("[DocumentoOperationalDrawer] remover responsável:", r.data.error ?? r.status)
-    } finally { setSalvando(false) }
-  }
-  const confirmarRemocao = async () => {
-    if (!removerPrevia) return
-    setSalvando(true)
-    try {
-      const r = await chamarRemocao({ confirmado: true, assinatura: removerPrevia.assinatura, ...(removerMotivo.trim() ? { motivo: removerMotivo.trim() } : {}), ...(removerPrevia.exigeConfirmacaoDeAndamento ? { confirmarAndamento: removerAndamentoOk } : {}) })
-      if (r && !(r.status >= 200 && r.status < 300)) console.error("[DocumentoOperationalDrawer] remover responsável:", r.data.error ?? r.status)
-      setRemoverPrevia(null)
-      await carregar()
-      onSave?.()
-    } finally { setSalvando(false) }
-  }
-
-  const delegarTarefa = async (responsavelId: number) => {
-    const taskId = projection?.tarefa?.taskId
-    if (!taskId) return
-    setSalvando(true)
-    try {
-      const r = await fetch(`/api/tarefas/${taskId}/atribuir`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-        },
-        body: JSON.stringify({ responsavelId }),
-      })
-      if (!r.ok) {
-        const j = await r.json().catch(() => null)
-        console.error("[DocumentoOperationalDrawer] delegar:", j?.error ?? r.status)
-      }
-      await carregar()
-      onSave?.()
-    } catch (e) {
-      console.error("[DocumentoOperationalDrawer] delegar:", e)
-    } finally {
-      setSalvando(false)
-    }
-  }
 
   // REPACTUAR PRAZO — Torre de Controle, Bloco D (29/09/2026). Porta canônica
   // já existente (`POST /api/tarefas/{id}/comando`, `acao:"alterar_prazo"` →
@@ -808,55 +726,16 @@ function ConteudoDrawer({
                     <UserRound className="w-4 h-4 text-[var(--text-secondary)] flex-shrink-0" />
                     <span className="truncate">{tarefa?.responsavelNome || "Não atribuído"}</span>
                   </div>
-                  {/* DELEGAR É GESTÃO, NÃO EXECUÇÃO — mesma permissão que o servidor já
-                      confere na porta canônica (POST /api/tarefas/[id]/atribuir exige
-                      tarefas.editar). Assistente não distribui trabalho de terceiro,
-                      só executa a própria fila; sem esta checagem o link aparecia pra
-                      todo mundo e só falhava (403) depois do clique. */}
-                  {delegandoResp && pode('tarefas.editar') ? (
-                    <select
-                      autoFocus
-                      disabled={salvando}
-                      value={tarefa?.responsavelId ?? ""}
-                      onChange={async (e) => {
-                        if (e.target.value) await delegarTarefa(Number(e.target.value))
-                        setDelegandoResp(false)
-                      }}
-                      onBlur={() => setDelegandoResp(false)}
-                      className="self-start rounded-md border border-[var(--border-default)] bg-[var(--app-background)] px-1.5 py-1 text-[12px] text-white/85 focus:outline-none focus:border-[var(--border-default)] focus:ring-1 focus:border-[var(--border-default)] disabled:opacity-50"
+                  {/* Lei da Torre (L4): só a aba Tarefas da Torre atribui/transfere/retira
+                      responsável. Aqui o responsável é somente leitura + link. */}
+                  {tarefa?.taskId != null && (
+                    <Link
+                      href={`/torre?aba=tarefas&tarefa=${tarefa.taskId}`}
+                      className="self-start text-[var(--text-secondary)] text-[12px] hover:underline"
+                      data-testid="atribuir-na-torre"
                     >
-                      <option value="" disabled className="bg-[var(--surface-secondary)]">— selecione —</option>
-                      {usuarios.map((u) => (
-                        <option key={u.id} value={u.id} className="bg-[var(--surface-secondary)]">{u.nome}</option>
-                      ))}
-                    </select>
-                  ) : pode('tarefas.editar') ? (
-                    /* DELEGAR MOVE A TAREFA — pela porta canônica de atribuição, a
-                       mesma que a tela de Tarefas usa. Este botão escrevia
-                       `Documento.responsavelId`: um TERCEIRO lugar para guardar de
-                       quem é o trabalho, que a linha da Central não lê e ninguém
-                       sabia qual valia. Sem tarefa não há a quem delegar — e isso
-                       é dito, não escondido atrás de um botão que não faz nada. */
-                    <button
-                      onClick={() => tarefa && setDelegandoResp(true)}
-                      disabled={!tarefa || salvando}
-                      title={tarefa ? "Transferir a tarefa deste documento" : "Sem tarefa nesta fase para delegar"}
-                      className="self-start text-[var(--text-secondary)] text-[12px] hover:underline disabled:text-[var(--text-muted)] disabled:no-underline disabled:cursor-not-allowed"
-                    >
-                      Delegar
-                    </button>
-                  ) : null}
-                  {/* REMOVER RESPONSÁVEL (06/10/2026): só por este botão, com confirmação explícita — "— selecione —" nunca remove (ambíguo). */}
-                  {!delegandoResp && tarefa?.responsavelId != null && pode('tarefas.editar') && (
-                    <button
-                      onClick={() => void removerResponsavel()}
-                      disabled={salvando}
-                      title="Devolve a tarefa à fila de distribuição (fica no histórico)"
-                      className="self-start text-[var(--text-secondary)] text-[12px] hover:underline disabled:opacity-50"
-                      data-testid="remover-responsavel"
-                    >
-                      Remover responsável
-                    </button>
+                      Atribuir na Torre
+                    </Link>
                   )}
                 </div>
                 {/* PRAZO DA TAREFA — dimensão A (prazo oficial), nunca "SLA": rótulo
@@ -1039,23 +918,6 @@ function ConteudoDrawer({
                 onSave?.()
               }}
             />
-            {removerPrevia && (
-              <div className="fixed inset-0 z-[10030] flex items-center justify-center bg-[var(--overlay-modal)] p-4" data-testid="confirmar-remocao-responsavel" role="dialog" aria-modal="true">
-                <div className="bg-[var(--surface-popover)] text-white rounded-xl shadow-[var(--elev-3)] w-full max-w-md p-5">
-                  <h3 className="text-base font-bold">{removerPrevia.pergunta}</h3>
-                  {removerPrevia.alerta && <p className="text-xs mt-3 font-semibold" style={{ color: "var(--warning-text)" }}>{removerPrevia.alerta}</p>}
-                  {removerPrevia.exigeConfirmacaoDeAndamento && (
-                    <label className="flex items-start gap-2 text-xs mt-2"><input type="checkbox" checked={removerAndamentoOk} onChange={(e) => setRemoverAndamentoOk(e.target.checked)} />Confirmo remover o responsável de tarefa já iniciada (o andamento é preservado).</label>
-                  )}
-                  <textarea value={removerMotivo} onChange={(e) => setRemoverMotivo(e.target.value)} rows={2} placeholder="Motivo (opcional)" className="w-full mt-3 rounded-lg p-2 text-sm bg-transparent border border-[var(--border-default)]" />
-                  <p className="text-xs opacity-70 mt-2">Fica no histórico (origem manual); a pessoa que perdeu a tarefa é avisada.</p>
-                  <div className="flex justify-end gap-2 mt-4">
-                    <button type="button" className="px-3 py-2 text-sm rounded-lg border" onClick={() => setRemoverPrevia(null)}>Cancelar</button>
-                    <button type="button" disabled={salvando || (!!removerPrevia.exigeConfirmacaoDeAndamento && !removerAndamentoOk)} className="px-3 py-2 text-sm rounded-lg bg-[var(--accent-primary)] text-white disabled:opacity-50" onClick={() => void confirmarRemocao()}>Remover responsável</button>
-                  </div>
-                </div>
-              </div>
-            )}
             {repactuandoPrazo && (
               <RepactuarPrazoModal
                 prazoAtualIso={tarefa?.dataPrazo ?? null}
