@@ -68,6 +68,13 @@ const EVENTO_POR_STATUS: Partial<Record<StepInstanceStatus, WorkflowEventoTipo>>
  * transação — o documento, a necessidade e o protocolo não podem ser gravados
  * como se o passo tivesse andado.
  */
+/**
+ * TEMPO DA TRANSAÇÃO DO PASSO. O padrão do Prisma (5 s) estourava quando o banco de produção respondia devagar: a transação morria no meio
+ * e o salvar do registro falhava com «Transaction not found» (P2028) — caso Rodolfo Fogli, 07/10/2026, a 1ª tentativa errou e a 2ª passou.
+ * Não é folga de conforto: é o que separa «salvou» de «dá erro e tem que clicar de novo».
+ */
+const TX_DO_PASSO = { maxWait: 15_000, timeout: 60_000 } as const
+
 export class TransicaoDePassoRecusada extends Error {
   readonly code: string
   readonly de: string
@@ -917,7 +924,7 @@ export async function atualizarPassoV2(
   let subtarefaConcluida: string | undefined
   let aindaFaltam: Array<{ key: string; label: string; motivo: string }> | undefined
   try {
-    liberarProximo = await prisma.$transaction((tx) => aplicarTransicaoDoPassoTx(tx, p, patch, ctx, now))
+    liberarProximo = await prisma.$transaction((tx) => aplicarTransicaoDoPassoTx(tx, p, patch, ctx, now), TX_DO_PASSO)
   } catch (e) {
     if (e instanceof TransicaoDePassoRecusada) {
       // ETAPA-PONTE (achado real 15/09/2026): este PATCH é o "concluir etapa" dos
@@ -970,7 +977,7 @@ export async function atualizarPassoV2(
           liberarProximo = false
         } else {
           try {
-            liberarProximo = await prisma.$transaction((tx) => aplicarTransicaoDoPassoTx(tx, p, patch, ctx, new Date()))
+            liberarProximo = await prisma.$transaction((tx) => aplicarTransicaoDoPassoTx(tx, p, patch, ctx, new Date()), TX_DO_PASSO)
           } catch (e2) {
             if (e2 instanceof TransicaoDePassoRecusada) {
               return { ok: false, error: e2.code === "CONFLITO" ? "CONCURRENT_UPDATE" : "STEP_TRANSITION_REJECTED", status: 409 }
