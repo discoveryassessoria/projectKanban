@@ -11,7 +11,7 @@ import { analisarExclusaoArvore, removerPessoaDaArvore } from "@/src/services/pe
 import { verificarPermissao, extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 import { removerFamiliaSeOrfa } from "@/src/services/familia"
 import { FRASE_CONFIRMACAO } from "@/src/services/exclusao-definitiva"
-import { estadoOperacionalDosDocumentos, rotularEstadoDoDocumento } from "@/lib/operacional/documento-estado"
+import { estadoOperacionalDosDocumentos, rotularEstadoDoDocumento, bolinhaDaCertidao } from "@/lib/operacional/documento-estado"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ arvoreid: string }> }) {
   const semPermissao = await verificarPermissao(request, "arvore.ver")
@@ -69,10 +69,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       ...arvore,
       pessoas: arvore.pessoas.map((p) => ({
         ...p,
-        documentos: p.documentos.map((d) => ({
-          ...d,
-          status: rotularEstadoDoDocumento(d.status, estados.get(d.id)).status,
-        })),
+        documentos: p.documentos.map((d) => {
+          const rotulo = rotularEstadoDoDocumento(d.status, estados.get(d.id))
+          // `bolinha`/`isRecebido`/`isValidado`: a decisão é do SERVIDOR (documento-estado.ts); a árvore só desenha.
+          return { ...d, status: rotulo.status, isRecebido: rotulo.isRecebido, isValidado: rotulo.isValidado, bolinha: bolinhaDaCertidao(rotulo) }
+        }),
       })),
     }
 

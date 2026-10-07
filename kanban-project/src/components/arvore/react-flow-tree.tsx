@@ -130,20 +130,13 @@ function getDocumentosStatus(pessoa: PessoaArvore, temConjuge: boolean) {
   const documentos = pessoa.documentos || []
   const falecido = pessoa.vivo === false || !!pessoa.data_obito
 
-  const CORES_POR_ESTADO: Record<string, 'em_busca' | 'solicitar' | 'solicitado' | 'recebido'> = {
-    BLOQUEADA: 'em_busca',
-    SEM_RESPONSAVEL: 'solicitar',
-    A_FAZER: 'solicitar',
-    AGUARDANDO_TERCEIRO: 'solicitado',
-    EM_ANDAMENTO: 'solicitado',
-    RECEBIDO: 'recebido',
-  }
-
   const verificarDocumento = (tipo: string): 'em_busca' | 'solicitar' | 'solicitado' | 'recebido' | null => {
     // ✅ CORRIGIDO: Usar includes() ao invés de ===
-    const doc = documentos.find(d => d.tipo?.toUpperCase().includes(tipo))
+    // Pode haver mais de um documento do tipo (uma via cancelada e a vigente): vale o que ainda é exigido.
+    const doc = documentos.find(d => d.tipo?.toUpperCase().includes(tipo) && d.bolinha)
     if (!doc) return null
-    return CORES_POR_ESTADO[doc.status ?? ''] ?? null // Pendente/cancelado/inválido = não mostrar
+    // A cor vem pronta do servidor (`bolinhaDaCertidao`): pendente = laranja, recebido = azul, sem bolinha só se não é mais exigida.
+    return doc.bolinha ?? null
   }
   
   return {

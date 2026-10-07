@@ -216,3 +216,18 @@ export function rotularEstadoDoDocumento(rawStatus: string, estado: EstadoDocume
   }
   return { ...rotular("PENDENTE"), isRecebido: false, isValidado: false, emOperacao: false }
 }
+
+// ─── A BOLINHA DA CERTIDÃO NA ÁRVORE — também uma regra só, no servidor ───────────────────────────────────────────────────────────────
+// Toda certidão EXIGIDA da pessoa tem bolinha. Pendente (ainda a solicitar) é laranja — mesmo com o registro já localizado na Genealogia, que não
+// esconde a bolinha nem a torna azul. Azul = recebida (passo «Registrar recebimento» concluído; validada continua azul). Só sai da árvore quem não é
+// mais exigido (cancelado / não exigido). A tela não decide cor: lê `bolinha`.
+export type BolinhaDaCertidao = "em_busca" | "solicitar" | "solicitado" | "recebido"
+export function bolinhaDaCertidao(r: RotuloDoEstado): BolinhaDaCertidao | null {
+  if (r.isRecebido) return "recebido"
+  switch (r.status) {
+    case "BLOQUEADA": case "INVALIDO": case "NAO_ENCONTRADO": return "em_busca"
+    case "PENDENTE": case "SEM_RESPONSAVEL": case "A_FAZER": return "solicitar"
+    case "AGUARDANDO_TERCEIRO": case "EM_ANDAMENTO": return "solicitado"
+    default: return null // CANCELADO / NAO_EXIGIDO: a exigência acabou
+  }
+}
