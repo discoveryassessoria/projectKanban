@@ -191,8 +191,10 @@ async function main() {
     t.map((x) => `#${x.id} ${x.faseMacroKey} ${x.statusTarefa}`).join(' | '))
   ok('e é a MESMA tarefa', t[0]?.id === taskIdOriginal, `#${t[0]?.id} (era #${taskIdOriginal})`)
   ok('que agora aponta para a fase nova', t[0]?.faseMacroKey === 'emissao_documental', t[0]?.faseMacroKey ?? '—')
-  ok('o trabalho já feito foi preservado',
-    t[0]?.statusTarefa === 'EM_ANDAMENTO' && t[0]?.dataInicio != null && t[0]?.responsavelId === admin.id)
+  ok('o trabalho já feito foi preservado (status e início)', t[0]?.statusTarefa === 'EM_ANDAMENTO' && t[0]?.dataInicio != null)
+  // FASE NOVA = TRABALHO NOVO, SEM DONO (07/10/2026): ao seguir para outra fase a tarefa volta à distribuição, com o histórico dizendo por quê.
+  ok('mas o responsável da fase anterior sai: a fase nova chega sem dono, para o gestor distribuir', t[0]?.responsavelId == null, String(t[0]?.responsavelId))
+  ok('e o histórico diz «Origem: mudança de fase»', (await prisma.logAuditoria.count({ where: { entidade: 'Tarefa', entidadeId: taskIdOriginal, acao: 'TAREFA_DEVOLVIDA_A_FILA', descricao: { contains: 'mudança de fase' } } })) === 1)
 
   const reancoragem = await prisma.logAuditoria.count({
     where: { entidade: 'Tarefa', entidadeId: taskIdOriginal, acao: 'TAREFA_REANCORADA' },
