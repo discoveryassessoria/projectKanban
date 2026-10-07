@@ -50,6 +50,7 @@ interface Celula {
   }
 }
 interface Linha {
+  documentoId?: number
   tipoDocumentoId: number | null
   tipoRegistro: string | null
   dataRegistro: string | null
@@ -61,8 +62,8 @@ interface Linha {
   conjuge: string | null
   paiNome: string | null
   maeNome: string | null
-  celulas: Celula[]
-  totalBrl: number
+  celulas?: Celula[]
+  totalBrl?: number
 }
 interface Bloco {
   pessoaId: number | null
@@ -71,13 +72,14 @@ interface Bloco {
   linhagemPrincipal: boolean
   posicao: string | null
   linhas: Linha[]
-  totalBrl: number
+  totalBrl?: number
 }
 interface Planilha {
   nomeProcesso?: string | null
-  colunas: { colunaId: number; nome: string }[]
+  /** Ausentes na versão SEM VALORES (aba Documentos): lá a resposta nem carrega colunas de serviço nem totais. */
+  colunas?: { colunaId: number; nome: string }[]
   pessoas: Bloco[]
-  totalGeralBrl: number
+  totalGeralBrl?: number
   totalBaseBrl?: number
 }
 
@@ -309,8 +311,17 @@ function CelulaEconomica({
   )
 }
 
-export function PlanilhaDocumentalView({ processoId }: { processoId: number }) {
-  const req = useApi<{ planilha?: Planilha }>(`/api/processos/${processoId}/custos`)
+/**
+ * `semValores` = a versão da aba Documentos: a MESMA planilha, sem nenhuma coluna de valor, sem «Total» e sem edição de preço. Os dados vêm de
+ * OUTRA rota (`/planilha-documental`, permissão `processos.ver`), que nem consulta dinheiro — nada financeiro chega ao navegador.
+ * `filtrarLinha` aplica à planilha os mesmos filtros da lista (Linha reta, Pendentes, busca…); sem ele, mostra tudo.
+ */
+export function PlanilhaDocumentalView({ processoId, semValores = false, filtrarLinha }: {
+  processoId: number
+  semValores?: boolean
+  filtrarLinha?: (bloco: Bloco, linha: Linha) => boolean
+}) {
+  const req = useApi<{ planilha?: Planilha }>(semValores ? `/api/processos/${processoId}/planilha-documental` : `/api/processos/${processoId}/custos`)
   const p = req.dados?.planilha ?? null
 
   // Quatro estados: carregando / erro / vazio / conteúdo. Nenhum é silêncio.
@@ -335,9 +346,11 @@ export function PlanilhaDocumentalView({ processoId }: { processoId: number }) {
   // Reler a planilha inteira depois de gravar: o total da linha, o da pessoa e
   // o do processo mudam junto, e recalcular no cliente seria a segunda régua.
   const recarregar = () => { void req.recarregar() }
-  const economicas = p.colunas
-  const principais = p.pessoas.filter((b) => b.linhagemPrincipal)
-  const apoio = p.pessoas.filter((b) => !b.linhagemPrincipal)
+  const economicas = semValores ? [] : p.colunas ?? []
+  // Filtros da lista aplicados à planilha: a pessoa some quando nenhuma linha dela casa.
+  const comFiltro = (bs: Bloco[]) => (filtrarLinha ? bs.map((b) => ({ ...b, linhas: b.linhas.filter((l) => filtrarLinha(b, l)) })).filter((b) => b.linhas.length > 0) : bs)
+  const principais = comFiltro(p.pessoas.filter((b) => b.linhagemPrincipal))
+  const apoio = comFiltro(p.pessoas.filter((b) => !b.linhagemPrincipal))
 
   if (p.pessoas.length === 0) {
     return (
@@ -350,7 +363,7 @@ export function PlanilhaDocumentalView({ processoId }: { processoId: number }) {
     )
   }
 
-  const comum = { economicas, processoId, aoMudar: recarregar }
+  const comum = { economicas, processoId, aoMudar: recarregar, semValores }
 
   return (
     <div className="mt-3 space-y-6">
@@ -381,7 +394,7 @@ export function PlanilhaDocumentalView({ processoId }: { processoId: number }) {
           que a planilha já mostra célula a célula. O que ainda depende de Regra
           Documental é informação do domínio (`totalBaseBrl`) e vive no tooltip,
           não numa segunda linha de resultado. */}
-      <div className="flex items-baseline justify-end border-t border-[var(--border-default)] pt-3 text-sm">
+      {!semValores && p.totalGeralBrl != null && <div className="flex items-baseline justify-end border-t border-[var(--border-default)] pt-3 text-sm">
         <span
           className="text-[var(--text-secondary)]"
           title={
@@ -392,7 +405,7 @@ export function PlanilhaDocumentalView({ processoId }: { processoId: number }) {
         >
           Total <span className="ml-2 font-medium tabular-nums text-[var(--text-primary)]">{fmt(p.totalGeralBrl)}</span>
         </span>
-      </div>
+      </div>}
     </div>
   )
 }
@@ -403,13 +416,14 @@ export function PlanilhaDocumentalView({ processoId }: { processoId: number }) {
  * cabeçalho global só serviria a uma lista contínua, que esta tela não é.
  */
 function BlocoPessoa({
-  bloco, economicas, rotuloPrimeira, processoId, aoMudar,
+  bloco, economicas, rotuloPrimeira, processoId, aoMudar, semValores,
 }: {
   bloco: Bloco
   economicas: { colunaId: number; nome: string }[]
   rotuloPrimeira: string
   processoId: number
   aoMudar: () => void
+  semValores: boolean
 }) {
   return (
     <div style={{ breakInside: "avoid", pageBreakInside: "avoid" }}>
@@ -431,7 +445,7 @@ function BlocoPessoa({
               {economicas.map((c) => (
                 <th key={c.colunaId} className="px-2 py-2 text-right font-medium">{c.nome}</th>
               ))}
-              <th className="px-2 py-2 text-right font-medium">Total</th>
+              {!semValores && <th className="px-2 py-2 text-right font-medium">Total</th>}
             </tr>
           </thead>
           <tbody className="text-[var(--text-secondary)]">
@@ -457,16 +471,18 @@ function BlocoPessoa({
                 {economicas.map((c) => (
                   <CelulaEconomica
                     key={c.colunaId}
-                    celula={l.celulas.find((x) => x.colunaId === c.colunaId)}
+                    celula={(l.celulas ?? []).find((x) => x.colunaId === c.colunaId)}
                     processoId={processoId}
                     pessoaId={bloco.pessoaId}
                     tipoDocumentoId={l.tipoDocumentoId}
                     aoMudar={aoMudar}
                   />
                 ))}
-                <td className="px-2 py-1 text-right font-medium tabular-nums text-[var(--text-primary)]">
-                  {fmt(l.totalBrl)}
-                </td>
+                {!semValores && (
+                  <td className="px-2 py-1 text-right font-medium tabular-nums text-[var(--text-primary)]">
+                    {fmt(l.totalBrl ?? 0)}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -476,4 +492,5 @@ function BlocoPessoa({
   )
 }
 
+export type { Bloco as BlocoDaPlanilha, Linha as LinhaDaPlanilha }
 export default PlanilhaDocumentalView

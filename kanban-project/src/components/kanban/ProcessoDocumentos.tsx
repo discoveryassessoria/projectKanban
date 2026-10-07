@@ -366,6 +366,7 @@ export function ProcessoDocumentos({ processo }: ProcessoDocumentosProps) {
         foraDaLinha={bib.foraDaLinha}
         onAbrirDetalhes={(docId) => setDrawerDocId(docId)}
         onReabrirCertidao={reabrirCertidao}
+        processoId={processo.id}
       />
 
       {/* Drawer da pessoa (Central Operacional) */}
