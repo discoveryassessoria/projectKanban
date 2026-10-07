@@ -53,12 +53,17 @@ import {
 } from "@/src/services/genealogia/emitir-evento-requerente"
 import { processarOutbox } from "@/src/services/outbox-dispatcher"
 import {
+  VinculoRecusado, definirFlagDaPessoa, definirPessoaDoRequerente, reativarVinculosNaArvore,
+} from "@/src/services/processo-requerentes"
+import {
   autorLegivel, efeitosPosCommitDaArvore, propagarNaTransacao, OPCOES_TX_ARVORE,
 } from "@/src/services/genealogia/propagar-arvore"
 
 export type VincularRequerenteErro =
   | "ARVORE_NAO_ENCONTRADA"
   | "REQUERENTE_NAO_ENCONTRADO"
+  // O requerente só entra na árvore se estiver ATIVO em um processo dessa árvore (dono único: processo-requerentes.ts).
+  | "REQUERENTE_FORA_DO_PROCESSO_DA_ARVORE"
   // "PESSOA_EM_OUTRA_ARVORE" saiu em 16/09/2026: pertencer a outra árvore deixou
   // de ser erro — vira Pessoa nova nesta árvore (ver comentário de cabeçalho).
 
@@ -156,12 +161,10 @@ async function aplicarVinculoNaArvore(
         if (pessoa.removidaEm != null) {
           await tx.pessoa.update({
             where: { id: pessoa.id },
-            data: { removidaEm: null, removidaPorId: null, motivoRemocao: null, requerente: flagRequerente },
+            data: { removidaEm: null, removidaPorId: null, motivoRemocao: null },
           })
-          await tx.processoRequerente.updateMany({
-            where: { requerenteId, removidoEm: { not: null } },
-            data: { removidoEm: null, removidoPorId: null, motivoRemocao: null },
-          })
+          await reativarVinculosNaArvore(tx, requerenteId, arvoreId)
+          await definirFlagDaPessoa(tx, pessoa.id, flagRequerente)
         }
         // Idempotente: já é nó DESTA árvore. Só atualiza posição/vínculos se enviados.
         if (Object.keys(patchPosicao).length > 0) {
@@ -175,14 +178,12 @@ async function aplicarVinculoNaArvore(
         await tx.pessoa.update({
           where: { id: pessoa.id },
           data: {
-            arvoreId, requerente: flagRequerente, ...patchPosicao,
+            arvoreId, ...patchPosicao,
             removidaEm: null, removidaPorId: null, motivoRemocao: null,
           },
         })
-        await tx.processoRequerente.updateMany({
-          where: { requerenteId, removidoEm: { not: null } },
-          data: { removidoEm: null, removidoPorId: null, motivoRemocao: null },
-        })
+        await reativarVinculosNaArvore(tx, requerenteId, arvoreId)
+        await definirFlagDaPessoa(tx, pessoa.id, flagRequerente)
         if (arvore.pessoaPrincipalId == null) {
           await tx.arvore.update({ where: { id: arvore.id }, data: { pessoaPrincipalId: pessoa.id } })
         }
@@ -210,7 +211,6 @@ async function aplicarVinculoNaArvore(
       nacionalidade: requerente.nacionalidade ?? null,
       pais_nasc: requerente.pais ?? null,
       arvoreId,
-      requerente: flagRequerente,
       x: input.x ?? null,
       y: input.y ?? null,
       paiId: input.paiId ?? null,
@@ -219,7 +219,9 @@ async function aplicarVinculoNaArvore(
     select: { id: true },
   })
 
-  await tx.requerente.update({ where: { id: requerenteId }, data: { personId: nova.id } })
+  // O ponteiro e a marca de requerente só nascem pelo dono único — que exige o requerente ATIVO num processo desta árvore.
+  await definirPessoaDoRequerente(tx, requerenteId, nova.id)
+  await definirFlagDaPessoa(tx, nova.id, flagRequerente)
 
   if (arvore.pessoaPrincipalId == null) {
     await tx.arvore.update({ where: { id: arvore.id }, data: { pessoaPrincipalId: nova.id } })
@@ -319,7 +321,10 @@ export async function vincularRequerente(
       await propagarNaTransacao(tx, { arvoreId: input.arvoreId, motivo: "pessoa passou a ser requerente", autor })
     }
     return r
-  }, OPCOES_TX_ARVORE)
+  }, OPCOES_TX_ARVORE).catch((e): VincularRequerenteResult => {
+    if (e instanceof VinculoRecusado) return { ok: false, code: "REQUERENTE_FORA_DO_PROCESSO_DA_ARVORE", message: e.message }
+    throw e
+  })
   if (resultado.ok) await efeitosDoVinculoPosCommit({ arvoreId: input.arvoreId })
   return resultado
 }
@@ -365,6 +370,7 @@ export type VincularPessoaExistenteErro =
   | "REQUERENTE_JA_VINCULADO"
   | "PESSOA_JA_E_REQUERENTE"
   | "PESSOA_EM_OUTRA_ARVORE"
+  | "REQUERENTE_FORA_DO_PROCESSO_DA_ARVORE"
 
 export interface VincularPessoaExistenteInput {
   arvoreId: number
@@ -420,11 +426,12 @@ async function aplicarVinculoAPessoaExistenteTx(
   await tx.pessoa.update({
     where: { id: pessoaId },
     data: {
-      arvoreId, requerente: flagRequerente,
+      arvoreId,
       removidaEm: null, removidaPorId: null, motivoRemocao: null,
     },
   })
-  await tx.requerente.update({ where: { id: requerenteId }, data: { personId: pessoaId } })
+  await definirPessoaDoRequerente(tx, requerenteId, pessoaId)
+  await definirFlagDaPessoa(tx, pessoaId, flagRequerente)
   if (arvore.pessoaPrincipalId == null) {
     await tx.arvore.update({ where: { id: arvore.id }, data: { pessoaPrincipalId: pessoaId } })
   }
@@ -453,7 +460,10 @@ export async function vincularPessoaExistenteAoRequerente(
     const autor = await autorLegivel(tx, input.actorId)
     await propagarNaTransacao(tx, { arvoreId: input.arvoreId, motivo: "pessoa passou a ser requerente", autor })
     return r
-  }, OPCOES_TX_ARVORE)
+  }, OPCOES_TX_ARVORE).catch((e): VincularPessoaExistenteResult => {
+    if (e instanceof VinculoRecusado) return { ok: false, code: "REQUERENTE_FORA_DO_PROCESSO_DA_ARVORE", message: e.message }
+    throw e
+  })
   if (resultado.ok) await efeitosDoVinculoPosCommit({ arvoreId: input.arvoreId })
   return resultado
 }

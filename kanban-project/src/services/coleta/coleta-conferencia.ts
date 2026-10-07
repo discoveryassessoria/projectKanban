@@ -13,6 +13,7 @@
 // não se aplica aqui (nome igual com CPF diferente só avisa); CPF igual REAPROVEITA.
 // ============================================================================
 
+import { incluirNoProcesso } from "@/src/services/processo-requerentes"
 import type { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { mascararCpf } from "@/src/lib/cpf"
@@ -22,7 +23,6 @@ import {
 } from "@/src/lib/coleta/campos"
 import { copiarParaAnexoDeCliente, apagarObjetoColeta } from "./storage-coleta"
 import { linkAtivoDoProcesso } from "./coleta-link"
-import { REATIVAR_VINCULO_PROCESSO } from "@/src/lib/genealogia/vinculo-ativo"
 
 // ── LEITURA ─────────────────────────────────────────────────────────────────
 
@@ -143,9 +143,7 @@ type Tx = Prisma.TransactionClient
 async function garantirRequerente(tx: Tx, processoId: number, d: DadosColeta): Promise<{ id: number; reaproveitou: boolean }> {
   const existente = await tx.requerente.findFirst({ where: { cpf: { in: variantesDoCpf(d.cpf) } }, select: { id: true } })
   const id = existente ? existente.id : (await tx.requerente.create({ data: dadosParaCadastro(d), select: { id: true } })).id
-  const vinculo = await tx.processoRequerente.findUnique({ where: { processoId_requerenteId: { processoId, requerenteId: id } } })
-  if (!vinculo) await tx.processoRequerente.create({ data: { processoId, requerenteId: id } })
-  else if (vinculo.removidoEm) await tx.processoRequerente.update({ where: { processoId_requerenteId: { processoId, requerenteId: id } }, data: REATIVAR_VINCULO_PROCESSO })
+  await incluirNoProcesso(tx, processoId, [id]) // cria o vínculo que falta ou reativa o que tinha saído — pelo dono único
   return { id, reaproveitou: Boolean(existente) }
 }
 

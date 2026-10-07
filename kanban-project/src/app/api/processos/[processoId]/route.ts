@@ -1,5 +1,6 @@
 // src/app/api/processos/[processoId]/route.ts
 
+import { atualizarRequerentesDoProcesso } from "@/src/services/processo-requerentes"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { VINCULO_PROCESSO_ATIVO } from "@/src/lib/genealogia/vinculo-ativo"
@@ -171,17 +172,9 @@ export async function PUT(
       ])
     }
 
-    // Atualizar requerentes se fornecidos — mesmo motivo da transação acima.
+    // Atualizar requerentes se fornecidos — pelo DONO ÚNICO do vínculo (`processo-requerentes.ts`): diff, histórico preservado, uma transação.
     if (requerenteIds !== undefined) {
-      await prisma.$transaction([
-        prisma.processoRequerente.deleteMany({ where: { processoId: id } }),
-        ...(requerenteIds.length > 0
-          ? [prisma.processoRequerente.createMany({
-              data: requerenteIds.map((requerenteId: number) => ({ processoId: id, requerenteId })),
-              skipDuplicates: true,
-            })]
-          : []),
-      ])
+      await atualizarRequerentesDoProcesso({ processoId: id, requerenteIds: (requerenteIds as unknown[]).map(Number).filter(Number.isInteger), autorId: null })
     }
 
     // Atualizar o processo

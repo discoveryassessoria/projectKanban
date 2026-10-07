@@ -24,6 +24,7 @@ import './verificacoes/emissao-documental'
 import './verificacoes/genealogia'
 import './verificacoes/integridade-invariantes'
 import './verificacoes/regras-do-marco-saude'
+import './verificacoes/vinculo-requerente-arvore'
 
 export { catalogo, cobertura, dominiosSemCobertura, elegiveis, metadados, VERSAO_CATALOGO } from './catalogo'
 export { executarDiagnostico, consolidar } from './motor'
