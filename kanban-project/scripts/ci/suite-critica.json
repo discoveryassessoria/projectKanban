@@ -237,6 +237,7 @@
   ]
  },
  "arquivos": [
+    "scripts/seletores-sem-pessoa-preselecionada.test.ts",
     "scripts/planilha-documental-projecao.test.ts",
     "scripts/planilha-documental-sem-valores.test.ts",
     "scripts/emissao-aguardando-e-registrar-recebimento.test.ts",

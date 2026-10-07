@@ -2,6 +2,7 @@
 
 "use client"
 
+import { ROTULO_ESCOLHA_DA_PESSOA, PESSOA_ESCOLHIDA_INICIAL } from "@/src/lib/ui/atribuicao"
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { useApi } from "@/src/lib/dados"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
@@ -108,7 +109,7 @@ function ConteudoModal({
 
   // Estado do formulário
   const [tipoOperacao, setTipoOperacao] = useState<TipoOperacao | null>(null)
-  const [responsavelId, setResponsavelId] = useState<string>("auto")
+  const [responsavelId, setResponsavelId] = useState<string>(PESSOA_ESCOLHIDA_INICIAL)
   const [dataPrazoInicial, setDataPrazoInicial] = useState<string>(tomorrowPlusDays(7))
   const [prioridade, setPrioridade] = useState<Prioridade>("normal")
   const [observacaoInicial, setObservacaoInicial] = useState<string>("")
@@ -157,7 +158,7 @@ function ConteudoModal({
         },
         body: JSON.stringify({
           tipoOperacao,
-          responsavelId: responsavelId === "auto" ? null : parseInt(responsavelId),
+          responsavelId: responsavelId === "auto" || responsavelId === "" ? null : parseInt(responsavelId),
           dataPrazoInicial: dataPrazoInicial || null,
           prioridade,
           observacaoInicial: observacaoInicial.trim() || null,
@@ -302,6 +303,7 @@ function ConteudoModal({
                           onChange={(e) => setResponsavelId(e.target.value)}
                           className="w-full px-3 py-2 text-sm border border-[var(--border-default)] rounded-md focus:outline-none focus:border-[var(--border-default)] focus:ring-1 focus:ring-[var(--border-strong)] bg-[var(--surface-popover)]"
                         >
+                          <option value="">{ROTULO_ESCOLHA_DA_PESSOA}</option>
                           <option value="auto">Auto (responsável padrão da etapa)</option>
                           {usuarios.map((u) => (
                             <option key={u.id} value={u.id}>

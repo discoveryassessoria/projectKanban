@@ -35,6 +35,7 @@
 // ============================================================================
 "use client"
 
+import { ROTULO_ESCOLHA_DA_PESSOA } from "@/src/lib/ui/atribuicao"
 import { ordenarLinhasDeCertidao } from "@/lib/operacional/ordem-certidoes"
 import { useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -301,7 +302,7 @@ function PainelSucessao({ funcionarios, aoFechar, aoConcluido }: {
             onChange={(e) => setOrigemId(e.target.value ? Number(e.target.value) : "")}
             className="mt-1 w-full rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)]"
           >
-            <option value="">Selecione…</option>
+            <option value="">{ROTULO_ESCOLHA_DA_PESSOA}</option>
             {funcionarios?.map((f) => <option key={f.id} value={f.id}>{f.nome} ({f.tarefasAtivas} ativas)</option>)}
           </select>
           <label className="mt-3 block text-[11px] font-medium text-[var(--text-secondary)]">Para (recebe a carteira)</label>
@@ -310,7 +311,7 @@ function PainelSucessao({ funcionarios, aoFechar, aoConcluido }: {
             onChange={(e) => setDestinoId(e.target.value ? Number(e.target.value) : "")}
             className="mt-1 w-full rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)]"
           >
-            <option value="">Selecione…</option>
+            <option value="">{ROTULO_ESCOLHA_DA_PESSOA}</option>
             {funcionarios?.map((f) => <option key={f.id} value={f.id}>{f.nome} ({f.tarefasAtivas} ativas)</option>)}
           </select>
         </div>

@@ -6,6 +6,7 @@
 // O TOAST é o do protótipo: "<botão> · <1ª parte do título>", com "Desfazer" quando o fato é reversível (atribuição, redistribuição,
 // desbloqueio, troca de canal — cada um lê o PRÓPRIO LogAuditoria e recusa se algo mudou depois). Avançar fase, reconciliar, registrar
 // ligação e cobrar o cliente são fatos acontecidos: o toast confirma, sem "Desfazer".
+import { ROTULO_ESCOLHA_DA_PESSOA, PESSOA_ESCOLHIDA_INICIAL } from "@/src/lib/ui/atribuicao"
 import { useConfirmarAtribuicao } from "./ConfirmarAtribuicao"
 import { useCallback, useEffect, useState, type ReactNode } from "react"
 import { CANAIS_SOLICITACAO } from "@/src/lib/process-stage/canais-solicitacao"
@@ -224,7 +225,7 @@ function ModalForcar({ pedido, chamar, concluir }: { pedido: Extract<Pedido, { t
 
 function ModalPessoa({ pedido, chamar, concluir, alvo }: { pedido: Extract<Pedido, { tipo: "pessoa" }>; chamar: Chamar; concluir: Concluir; alvo: (i: ItemPrecisa) => Record<string, unknown> }) {
   const [pessoas, setPessoas] = useState<Array<{ id: number; nome: string }> | null>(null)
-  const [sel, setSel] = useState("")
+  const [sel, setSel] = useState<string>(PESSOA_ESCOLHIDA_INICIAL)
   const [env, setEnv] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   useEffect(() => { void api<{ funcionarios: Array<{ id: number; nome: string }> }>("/api/operacao/atribuiveis").then((r) => setPessoas(r.ok ? r.data.funcionarios ?? [] : [])) }, [])
@@ -243,7 +244,7 @@ function ModalPessoa({ pedido, chamar, concluir, alvo }: { pedido: Extract<Pedid
     </>}>
       <Campo rotulo="Pessoa">
         <select className="tor-in w-full" value={sel} onChange={(e) => setSel(e.target.value)}>
-          <option value="">{pessoas == null ? "Carregando…" : "Escolha…"}</option>
+          <option value="">{pessoas == null ? "Carregando…" : ROTULO_ESCOLHA_DA_PESSOA}</option>
           {(pessoas ?? []).map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
         </select>
       </Campo>
