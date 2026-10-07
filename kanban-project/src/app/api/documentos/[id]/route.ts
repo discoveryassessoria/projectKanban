@@ -3,6 +3,7 @@
 // ✅ FIX (rodada 10): whitelist do PUT inclui os 12 campos da rodada 6 (editor registral) +
 //    rodada 9 (solicitar certidão). Sem isso, esses campos eram silenciosamente ignorados.
 
+import { aplicarPlanoNaArvore, aplicarSubstituicoes, decisoesDoCorpo, planejarConfirmacao, respostaDeConfirmacao } from "@/src/services/genealogia/confirmacao-arvore"
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Prisma, TipoDocumento, StatusDocumento } from "@prisma/client"
@@ -308,6 +309,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // Marca movimentação sempre que algo é editado
     dataToUpdate.ultimaMovimentacao = new Date()
 
+    // CONFIRMAÇÃO ÁRVORE × CADASTRO (07/10/2026): dado registral DIFERENTE do que a árvore tem só é gravado com a escolha explícita de quem cadastra
+    // (`decisoes`). Sem ela o servidor recusa (409) — vale para qualquer cliente desta API, não só para a tela. Árvore vazia: preenche sem perguntar.
+    const plano = await planejarConfirmacao({ documentoId: id, novos: body, atuais: documentoAtual as never, decisoes: decisoesDoCorpo(body) })
+    if (plano.pendentes.length > 0) return NextResponse.json(respostaDeConfirmacao(plano.pendentes), { status: 409 })
+    Object.assign(dataToUpdate, aplicarSubstituicoes({}, plano))
+
     const documentoAtualizado = await prisma.documento.update({
       where: { id },
       data: dataToUpdate,
@@ -321,6 +328,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         }
       }
     })
+
+    // A escolha «cadastro» corrige a árvore, a árvore vazia é preenchida e o histórico entra nos dois lados.
+    if (plano.itens.length > 0) {
+      const autorPlano = await extrairUsuarioComPermissoes(request).catch(() => null)
+      await aplicarPlanoNaArvore(plano, { documentoId: id, autorId: autorPlano?.userId ?? null })
+    }
 
     // Toda porta que muda `Documento.orgaoId` espelha nas Tarefas do documento
     // (mesma regra de `vincularOrgaoAoDocumento`) — a Torre lê `Tarefa.orgaoId`.

@@ -17,8 +17,7 @@ import { createPortal } from "react-dom"
 import { X, Loader2, AlertTriangle, BookOpen, ChevronDown, ChevronUp } from "lucide-react"
 import { CampoData } from "@/src/components/ui/campo-data"
 import { CartorioOrgaoField } from "@/src/components/orgaos/CartorioOrgaoField"
-import { conflitosComArvore } from "@/src/lib/genealogia/dados-registrais-edicao"
-import { CAMPOS_SINCRONIZAVEIS, textoDoAvisoDeConflito } from "@/src/lib/genealogia/sincronizacao-registral"
+import { ModalConfirmacaoArvore, divergenciasDaResposta, type DivergenciaDaArvore, type EscolhasDaArvore } from "@/src/components/kanban/documento/ModalConfirmacaoArvore"
 
 // ============================================================
 // TIPOS
@@ -267,8 +266,8 @@ function ConteudoModal({
   const consulta = useApi<Documento>(documentoId ? `/api/documentos/${documentoId}` : null)
   const doc = consulta.dados ?? null
   // O QUE A ÁRVORE TEM para os campos desta certidão (a árvore começa como guia; o registro localizado vale mais). Ao digitar um valor DIFERENTE, a tela avisa e pede confirmação.
-  const arvoreReq = useApi<{ campos: Array<{ chave: string; rotulo: string; origem: string; tipo: "data" | "texto"; arvore: string | null }> }>(documentoId ? `/api/documentos/${documentoId}/arvore-valores` : null)
-  const [confirmadosArvore, setConfirmadosArvore] = useState<Set<string>>(new Set())
+  // Divergência com a árvore: o SERVIDOR recusa (409) e devolve o que difere; a pessoa escolhe e o salvamento é refeito com a escolha.
+  const [divergenciasArvore, setDivergenciasArvore] = useState<DivergenciaDaArvore[] | null>(null)
   const loading = consulta.carregando
   const erro = consulta.erro ? "Erro ao carregar documento." : null
   const carregar = consulta.recarregar
@@ -379,24 +378,9 @@ function ConteudoModal({
     nomeRegistradoOk && estadoOk && cidadeOk && cartorioOk && orgaoOk &&
     livroOk && folhaOk && termoOk && dataEventoOk
 
-  // AVISO DE CONFLITO COM A ÁRVORE (dados do evento digitados × o que a árvore tem). Só se o valor difere e a árvore já tinha algo; vale o registro, mas confirma-se antes.
-  // Só do que foi DIGITADO agora (diferente do que o documento já tinha): não se reclama de campo que ninguém tocou.
-  const digitadoAgora: Record<string, string> = {}
-  if (doc) {
-    if (form.data_evento !== (doc.data_evento ? doc.data_evento.slice(0, 10) : "")) digitadoAgora.data_evento = form.data_evento
-    if (form.cidade_registro !== (doc.cidade_registro ?? "")) digitadoAgora.cidade_registro = form.cidade_registro
-    if (form.estado_registro !== (doc.estado_registro ?? "")) digitadoAgora.estado_registro = form.estado_registro
-    if (form.pais_registro !== (doc.pais_registro ?? "")) digitadoAgora.pais_registro = form.pais_registro
-  }
-  const conflitosArvore = arvoreReq.dados ? conflitosComArvore(arvoreReq.dados.campos, digitadoAgora) : []
-  const pendentesArvore = conflitosArvore.filter((c) => !confirmadosArvore.has(`${c.campo.chave}=${c.novo}`))
-  // "É a data do registro": o valor digitado na data do EVENTO era a do REGISTRO — vai para o campo certo e a data do evento é limpa para digitar a certa.
-  const moverParaDataDoRegistro = (novo: string) => { setForm((f) => ({ ...f, data_registro: novo, data_evento: "" })) }
-
   // -- Salvar (e opcionalmente concluir etapa)
-  const handleSalvar = async () => {
+  const handleSalvar = async (decisoes?: EscolhasDaArvore) => {
     if (!documentoId || !doc) return
-    if (pendentesArvore.length > 0) { alert("Confirme (ou corrija) os valores que diferem da árvore antes de salvar."); return }
 
     // Em modo buscar, valida antes
     if (isModoBuscar && !podeConcluirEtapa) {
@@ -458,6 +442,7 @@ function ConteudoModal({
         body.status = "SOLICITAR"
       }
 
+      if (decisoes) body.decisoes = decisoes
       const resDoc = await fetch(`/api/documentos/${documentoId}`, {
         method: "PUT",
         headers: {
@@ -466,7 +451,12 @@ function ConteudoModal({
         },
         body: JSON.stringify(body),
       })
-      if (!resDoc.ok) throw new Error(`PUT documento HTTP ${resDoc.status}`)
+      if (!resDoc.ok) {
+        // 409 CONFIRMACAO_ARVORE: o valor difere da árvore e nada foi salvo — abre a escolha (árvore · cadastro · cancelar).
+        const divergentes = divergenciasDaResposta(resDoc.status, await resDoc.json().catch(() => null))
+        if (divergentes) { setDivergenciasArvore(divergentes); return }
+        throw new Error(`PUT documento HTTP ${resDoc.status}`)
+      }
 
       // 2. Se veio de uma etapa "localizar_registro", conclui a etapa
       if (isModoBuscar && stepId && podeConcluirEtapa) {
@@ -853,22 +843,6 @@ function ConteudoModal({
                       onChange={(v) => setForm({ ...form, data_registro: v })}
                     />
                   </div>
-                  {conflitosArvore.map((c) => {
-                    const confirmado = confirmadosArvore.has(`${c.campo.chave}=${c.novo}`)
-                    const def = CAMPOS_SINCRONIZAVEIS.find((x) => x.chave === c.campo.chave)
-                    return (
-                      <div key={c.campo.chave} data-testid="aviso-conflito-arvore" className="mt-3 p-2.5 rounded-md border border-[var(--warning-text)]/40 text-[12.5px] text-[var(--text-primary)]">
-                        {def ? textoDoAvisoDeConflito(def, c.arvore, c.novo) : `A árvore diz ${c.arvore}. Confirmar ${c.novo}?`}
-                        <div className="mt-1.5 flex gap-2 flex-wrap">
-                          <button type="button" disabled={confirmado} onClick={() => setConfirmadosArvore((s) => new Set(s).add(`${c.campo.chave}=${c.novo}`))}
-                            className="px-2.5 py-1 rounded-md text-[12px] font-semibold bg-[var(--accent-primary)] text-white disabled:opacity-50">{confirmado ? "Confirmado" : "Confirmar"}</button>
-                          {c.origem === "data_evento" && (
-                            <button type="button" data-testid="atalho-data-do-registro" onClick={() => moverParaDataDoRegistro(c.novo)} className="px-2.5 py-1 rounded-md text-[12px] border border-[var(--border-default)]">É a data do registro</button>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
                 </Section>
 
                 {/* ============== SEÇÃO 5: Rastreamento (só no modo completo) ============== */}
@@ -937,7 +911,7 @@ function ConteudoModal({
 
                 {isModoBuscar ? (
                   <button
-                    onClick={handleSalvar}
+                    onClick={() => void handleSalvar()}
                     disabled={saving || !podeConcluirEtapa}
                     className="px-5 py-2 text-[12.5px] font-semibold bg-[var(--surface-secondary)] hover:bg-[var(--surface-secondary)] disabled:bg-[var(--surface-secondary)] disabled:opacity-50 disabled:cursor-not-allowed text-[var(--text-primary)] rounded-md inline-flex items-center gap-2 transition-colors"
                   >
@@ -946,7 +920,7 @@ function ConteudoModal({
                   </button>
                 ) : (
                   <button
-                    onClick={handleSalvar}
+                    onClick={() => void handleSalvar()}
                     disabled={saving}
                     className="px-5 py-2 text-[12.5px] font-semibold bg-[var(--surface-secondary)] hover:bg-[var(--surface-secondary)] disabled:bg-[var(--surface-secondary)] disabled:opacity-50 text-[var(--text-primary)] rounded-md inline-flex items-center gap-2 transition-colors"
                   >
@@ -959,6 +933,13 @@ function ConteudoModal({
           )}
         </div>
       </div>
+      {divergenciasArvore && (
+        <ModalConfirmacaoArvore
+          divergencias={divergenciasArvore} salvando={saving}
+          onCancelar={() => setDivergenciasArvore(null)}
+          onDecidir={(escolhas) => { setDivergenciasArvore(null); void handleSalvar(escolhas) }}
+        />
+      )}
     </>
   )
 

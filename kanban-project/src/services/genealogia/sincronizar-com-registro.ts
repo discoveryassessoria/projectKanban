@@ -65,7 +65,7 @@ export async function registrosLocalizados(db: DB, filtro: { arvoreId?: number; 
       stepInstances: { some: { stepKey: "localizar_registro", status: "CONCLUIDO" } },
     },
     select: {
-      id: true, tipo: true, documentType: { select: { legacyEnumKey: true } }, pessoaId: true, data_evento: true, cidade_registro: true, estado_registro: true, pais_registro: true,
+      id: true, tipo: true, documentType: { select: { legacyEnumKey: true } }, pessoaId: true, data_evento: true, cidade_registro: true, estado_registro: true, pais_registro: true, data_registro: true, cartorio: true, livro: true, folha: true, termo: true,
       pessoa: { select: { arvoreId: true } }, necessidade: { select: { uniaoId: true } },
     },
     orderBy: { id: "asc" },
@@ -79,7 +79,7 @@ export async function registrosLocalizados(db: DB, filtro: { arvoreId?: number; 
     if (evento === "CASAMENTO" && uniaoId == null) continue // sem a união não há onde gravar
     porAlvo.set(`${evento}:${evento === "CASAMENTO" ? `U${uniaoId}` : `P${d.pessoaId}`}`, {
       documentoId: d.id, evento, pessoaId: d.pessoaId, uniaoId, arvoreId: d.pessoa.arvoreId,
-      valores: { data_evento: d.data_evento, cidade_registro: d.cidade_registro, estado_registro: d.estado_registro, pais_registro: d.pais_registro },
+      valores: { data_evento: d.data_evento, cidade_registro: d.cidade_registro, estado_registro: d.estado_registro, pais_registro: d.pais_registro, data_registro: d.data_registro, cartorio: d.cartorio, livro: d.livro, folha: d.folha, termo: d.termo },
     })
   }
   return [...porAlvo.values()]
@@ -111,7 +111,7 @@ async function carregarContexto(db: DB, filtro: { arvoreId?: number; documentoId
   const uniaoIds = [...new Set(registros.map((r) => r.uniaoId).filter((x): x is number => x != null))]
   const [pessoas, unioes] = await Promise.all([
     pessoaIds.length ? db.pessoa.findMany({ where: { id: { in: pessoaIds } }, select: { id: true, nome: true, sobrenome: true, data_nasc: true, local_nasc: true, estado_nasc: true, pais_nasc: true, data_obito: true } }) : Promise.resolve([]),
-    uniaoIds.length ? db.uniao.findMany({ where: { id: { in: uniaoIds } }, select: { id: true, data_inicio: true, local: true, estado: true, pais: true } }) : Promise.resolve([]),
+    uniaoIds.length ? db.uniao.findMany({ where: { id: { in: uniaoIds } }, select: { id: true, data_inicio: true, local: true, estado: true, pais: true, data_registro: true, cartorio: true, livro: true, folha: true, termo: true } }) : Promise.resolve([]),
   ])
   return {
     registros,
@@ -132,14 +132,14 @@ const itemDe = (c: Contexto, r: RegistroLocalizado, d: DiferencaDeCampo): ItemDe
   }
 }
 
-function calcularItens(c: Contexto): ItemDeSincronizacao[] {
+function calcularItens(c: Contexto, incluirConflitos = true): ItemDeSincronizacao[] {
   const itens: ItemDeSincronizacao[] = []
   for (const r of c.registros) {
     const atual = r.evento === "CASAMENTO" ? c.unioes.get(r.uniaoId!) : c.pessoas.get(r.pessoaId)
     if (!atual) continue
     for (const d of diferencasDoEvento(r.evento, r.valores, atual)) {
       const item = itemDe(c, r, d)
-      if (item) itens.push(item)
+      if (item && (incluirConflitos || item.tipo === "PREENCHER")) itens.push(item)
     }
   }
   return itens
@@ -166,14 +166,17 @@ export async function sincronizarArvore(args: {
 }): Promise<ResultadoDaSincronizacao> {
   const { arvoreId, autorId = null, origem, documentoId, selecao = null } = args
   const previa = await carregarContexto(prisma, documentoId != null ? { documentoId } : { arvoreId })
-  if (calcularItens(previa).length === 0) return { aplicados: [], logs: [] }
+  // REGRA (07/10/2026): valor DIFERENTE do da árvore nunca é gravado por sincronização automática — só com a confirmação explícita de quem cadastra
+  // (`confirmacao-arvore.ts`) ou com a seleção item a item do botão «Sincronizar com a Genealogia» (`selecao`). Sozinha, a sincronização só PREENCHE o que a árvore tem vazio.
+  const incluirConflitos = selecao != null
+  if (calcularItens(previa, incluirConflitos).length === 0) return { aplicados: [], logs: [] }
   const processos = await prisma.processo.findMany({ where: { arvoreId }, select: { id: true } })
 
   const { resultado } = await aplicarMudancaNaArvore<ResultadoDaSincronizacao>({
     arvoreId, autorId,
     fn: async (tx) => {
       const c = await carregarContexto(tx, documentoId != null ? { documentoId } : { arvoreId })
-      const itens = calcularItens(c).filter((i) => !selecao || selecao.has(`${i.alvo}:${i.alvoId}:${i.chave}`))
+      const itens = calcularItens(c, incluirConflitos).filter((i) => !selecao || selecao.has(`${i.alvo}:${i.alvoId}:${i.chave}`))
       const logs: number[] = []
       const porAlvo = new Map<string, ItemDeSincronizacao[]>()
       for (const i of itens) { const k = `${i.alvo}:${i.alvoId}`; if (!porAlvo.has(k)) porAlvo.set(k, []); porAlvo.get(k)!.push(i) }
