@@ -164,3 +164,6 @@
 .tpr-fase-bt.escolhida { outline: 2px solid var(--action-primary); outline-offset: 1px; }
 .tpr-fase .conta { margin-top: auto; padding-top: 6px; border-top: 1px dashed var(--border-default); font-weight: 600; color: var(--text-secondary); }
 .tpr-filtro-fase { display: flex; align-items: center; gap: 10px; padding: 8px 16px; font-size: 13px; background: var(--info-tile); border-bottom: 1px solid var(--border-default); }
+.tpr-fase.atual .conta { color: var(--action-primary-ink); border-top-color: currentColor; }
+.tpr-fase.concluida .conta { color: var(--success-text); }
+.tpr-fase.reaberta .conta { color: var(--warning-text); }
