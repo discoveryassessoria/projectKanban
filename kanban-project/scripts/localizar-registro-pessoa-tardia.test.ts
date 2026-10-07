@@ -158,6 +158,50 @@ async function main() {
   const tVolta = await prisma.tarefa.findUniqueOrThrow({ where: { id: tarefaEmissao.id }, select: { faseMacroKey: true, workflowStepInstanceId: true, statusTarefa: true } })
   ok("localizado: a MESMA tarefa volta para a certidão da Emissão, aberta", tVolta.faseMacroKey === "emissao_documental" && tVolta.workflowStepInstanceId === tarefaEmissao.workflowStepInstanceId && tVolta.statusTarefa === "NAO_INICIADA", JSON.stringify(tVolta))
 
+  // ── (G) caso CARLOTA SALVARANI: tarefa reancorada para a Genealogia — a gaveta e o servidor ──────────────────────────────
+  secao("(G) Genealogia aberta TRAVA a Emissão da mesma certidão — tela E servidor; ao concluir, a Emissão volta SEM dono herdado")
+  const { montarWorkflowV2, atualizarPassoV2 } = await import("../src/services/documento-operacao")
+  const { concluirSubtarefaCorrentePeloPasso } = await import("../src/services/subtarefas-da-etapa")
+  const dani = await prisma.usuario.create({ data: { nome: `${MARCA} Dani`, email: `${MARCA.toLowerCase()}-dani@t.com`, senha: "x", tipo: "assistente" } })
+  await prisma.tarefa.update({ where: { id: tarefaEmissao.id }, data: { responsavelId: dani.id } })
+  await prisma.$transaction(async (tx) => {
+    await reabrirPassoTx(tx, locTit.id, "DISPONIVEL", { correlationId: "lrpt|reabrir3", operacao: "teste", ciclo: 1, processoId: c.processoId, workflowInstanceId: c.instanciaId, ignorarDependencias: true })
+  })
+  const tNaGenealogia = await prisma.tarefa.findUniqueOrThrow({ where: { id: tarefaEmissao.id }, select: { faseMacroKey: true, responsavelId: true } })
+  ok("a tarefa foi para a Genealogia e NÃO levou o responsável da fase anterior", tNaGenealogia.faseMacroKey === "genealogia" && tNaGenealogia.responsavelId == null, JSON.stringify(tNaGenealogia))
+  await prisma.tarefa.update({ where: { id: tarefaEmissao.id }, data: { responsavelId: dani.id } }) // o gestor distribui na Genealogia
+  const passoEmissao = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: emTit.id }, select: { id: true, documentoId: true, workflowInstanceId: true, status: true, motivo: true } })
+  ok("dados: o passo da Emissão está BLOQUEADO «Aguardando Genealogia»", passoEmissao.status === "BLOQUEADO" && passoEmissao.motivo === MOTIVO_AGUARDANDO_GENEALOGIA, `${passoEmissao.status} ${passoEmissao.motivo}`)
+  const docTit = passoEmissao.documentoId as number
+
+  const gaveta = await montarWorkflowV2(docTit)
+  ok("TELA: a gaveta da tarefa de Genealogia mostra o passo «Localizar registro», NÃO os passos da Emissão", gaveta?.steps?.[0]?.stepKey === "localizar_registro" && !(gaveta?.steps ?? []).some((x: { stepKey?: string }) => x.stepKey === "solicitar_certidao"), JSON.stringify(gaveta?.steps?.map((x: { stepKey?: string }) => x.stepKey)))
+  const gavetaEmissao = await montarWorkflowV2(docTit, undefined, { workflowInstanceId: passoEmissao.workflowInstanceId })
+  const stEmissao = (gavetaEmissao?.steps ?? [])[0] as { status?: string; subtarefas?: Array<{ status: string; disponivel: boolean; concluida: boolean; bloqueioTexto: string | null }> } | undefined
+  ok("TELA: consultada a Emissão, o passo aparece BLOQUEADO", stEmissao?.status === "bloqueada", String(stEmissao?.status))
+  const subsE = stEmissao?.subtarefas ?? []
+  ok("TELA: nenhuma subtarefa da Emissão fica «Disponível» (sem «Iniciar»)", subsE.length > 0 && subsE.every((x) => !x.disponivel && x.status !== "DISPONIVEL"), JSON.stringify(subsE.map((x) => `${x.status}:${x.disponivel}`)))
+  ok("TELA: o texto das subtarefas é «Aguardando Genealogia»", subsE.every((x) => x.bloqueioTexto === "Aguardando Genealogia"), JSON.stringify(subsE.map((x) => x.bloqueioTexto)))
+
+  const ctxAdmin = { usuarioId: dani.id, permissoes: { "workflow.concluirPasso": true, "workflow.iniciarPasso": true } as never, isAdmin: true }
+  const recusa = await atualizarPassoV2(docTit, emTit.id, { status: "concluida" }, ctxAdmin)
+  ok("SERVIDOR: concluir o passo da Emissão travada é RECUSADO (409), com mensagem em português", !recusa.ok && recusa.status === 409 && /aguardando a Genealogia/i.test(recusa.mensagem ?? ""), JSON.stringify(recusa))
+  const recusa2 = await atualizarPassoV2(docTit, emTit.id, { startedAt: new Date().toISOString() }, ctxAdmin)
+  ok("SERVIDOR: salvar andamento/iniciar também é recusado", !recusa2.ok && recusa2.status === 409, JSON.stringify(recusa2))
+  const baixo = await concluirSubtarefaCorrentePeloPasso({ stepInstanceId: emTit.id, executadoPorId: dani.id, payload: {} })
+  ok("SERVIDOR (porta de baixo, usada por iniciar em lote / registrar recebimento / solicitação): recusa com a mesma mensagem", baixo.aplicavel === false && baixo.motivo === "PASSO_BLOQUEADO" && /aguardando a Genealogia/i.test(baixo.mensagem ?? ""), JSON.stringify(baixo))
+  ok("nada mudou no passo da Emissão depois das recusas", (await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: emTit.id } })).status === "BLOQUEADO")
+
+  await concluir(locTit.id)
+  const liberada = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: emTit.id }, select: { status: true } })
+  const tLiberada = await prisma.tarefa.findUniqueOrThrow({ where: { id: tarefaEmissao.id }, select: { faseMacroKey: true, responsavelId: true, statusTarefa: true } })
+  ok("concluída a Genealogia: o passo 1 da Emissão fica «Disponível»", liberada.status === "DISPONIVEL", liberada.status)
+  ok("e a tarefa volta para a Emissão SEM o responsável de quem concluiu a Genealogia", tLiberada.faseMacroKey === "emissao_documental" && tLiberada.responsavelId == null, JSON.stringify(tLiberada))
+  ok("o histórico diz «Origem: mudança de fase»", (await prisma.logAuditoria.count({ where: { entidade: "Tarefa", entidadeId: tarefaEmissao.id, acao: "TAREFA_DEVOLVIDA_A_FILA", descricao: { contains: "mudança de fase" } } })) >= 2)
+  const gavetaLiberada = await montarWorkflowV2(docTit)
+  ok("a gaveta volta a mostrar a Emissão, com a subtarefa de entrada «Disponível»", (gavetaLiberada?.steps?.[0] as { stepKey?: string; subtarefas?: Array<{ disponivel: boolean }> } | undefined)?.stepKey === "solicitar_certidao" && !!(gavetaLiberada?.steps?.[0] as { subtarefas?: Array<{ disponivel: boolean }> })?.subtarefas?.some((x) => x.disponivel))
+  await prisma.usuario.deleteMany({ where: { email: { startsWith: MARCA.toLowerCase() } } })
+
   await P.limpar()
   console.log(`\n${falhou === 0 ? "✅" : "❌"} LOCALIZAR REGISTRO — PESSOA/UNIÃO TARDIA — ${passou} ok, ${falhou} falhas`)
   if (falhou) { console.log("Falhas: " + falhas.join("; ")); process.exit(1) }

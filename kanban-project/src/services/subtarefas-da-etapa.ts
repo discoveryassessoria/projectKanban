@@ -693,7 +693,7 @@ export async function concluirSubtarefaCorrentePeloPasso(args: {
    */
   subtarefaKeyEsperada?: string
 }): Promise<
-  | { aplicavel: false; motivo?: "SUBTAREFA_INCORRETA" | "SEM_SUBTAREFA_ABERTA" | "PROTOCOLO_OBRIGATORIO" }
+  | { aplicavel: false; motivo?: "SUBTAREFA_INCORRETA" | "SEM_SUBTAREFA_ABERTA" | "PROTOCOLO_OBRIGATORIO" | "PASSO_BLOQUEADO"; /** Em português claro, quando o motivo for o passo bloqueado. */ mensagem?: string }
   | {
       aplicavel: true
       subtarefaKey: string
@@ -705,6 +705,18 @@ export async function concluirSubtarefaCorrentePeloPasso(args: {
       faltando: Array<{ key: string; label: string; motivo: string }>
     }
 > {
+  // PASSO BLOQUEADO NÃO EXECUTA SUBTAREFA — por nenhuma porta (iniciar em lote, registrar recebimento, solicitação, editor). Emissão travada por
+  // «Aguardando Genealogia» (ou bloqueio manual) recusa, com a mensagem que a pessoa entende. A confirmação do que já foi feito (retry) não passa por aqui.
+  const passoDaSubtarefa = await prisma.phaseWorkflowStepInstance.findUnique({ where: { id: args.stepInstanceId }, select: { status: true, motivo: true } })
+  if (passoDaSubtarefa?.status === "BLOQUEADO") {
+    return {
+      aplicavel: false, motivo: "PASSO_BLOQUEADO",
+      mensagem: passoDaSubtarefa.motivo === "Aguardando Genealogia"
+        ? "Esta certidão está aguardando a Genealogia: localize o registro antes de solicitar a certidão ao cartório."
+        : `Este passo está bloqueado${passoDaSubtarefa.motivo ? ` (${passoDaSubtarefa.motivo})` : ""} e não pode ser executado agora.`,
+    }
+  }
+
   const subs = await subtarefasDaEtapa({
     stepInstanceId: args.stepInstanceId, valores: args.valores, fornecedorId: args.fornecedorId,
   })

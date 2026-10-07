@@ -79,6 +79,32 @@ export interface NovaTarefaOperacional extends OrigemDoTrabalho {
 export const chaveDaTarefa = chaveDaUnidade
 
 /**
+ * FASE NOVA = TRABALHO NOVO, SEM DONO (regra permanente do Marco, 07/10/2026): quando a tarefa de uma certidão MUDA DE FASE — por QUALQUER porta
+ * (seguir para a Emissão, voltar à Genealogia reaberta, voltar de lá) — o responsável sai e o gestor distribui na fase nova. Nada herda quem fez a
+ * fase anterior. O andamento e o histórico ficam. Devolve `true` quando tirou o dono (o chamador grava a auditoria com `registrarDevolucaoPorMudancaDeFase`).
+ */
+export function mudouDeFaseComDono(atual: { faseMacroKey: string | null; responsavelId: number | null }, novaFase: string | null | undefined): boolean {
+  return atual.faseMacroKey != null && novaFase != null && atual.faseMacroKey !== novaFase && atual.responsavelId != null
+}
+
+export async function registrarDevolucaoPorMudancaDeFase(
+  tx: Prisma.TransactionClient,
+  a: { tarefaId: number; titulo: string; donoId: number; donoNome: string | null; deFase: string | null; paraFase: string | null; stepId: number },
+): Promise<void> {
+  // O executor do passo novo sai junto: um só dono do trabalho (a tarefa), nunca um executor órfão no passo.
+  const { limparResponsavelDoPassoTx } = await import('@/src/services/task-step-sync')
+  await limparResponsavelDoPassoTx(tx, a.stepId)
+  const nome = a.donoNome ?? `usuário ${a.donoId}`
+  await tx.logAuditoria.create({
+    data: {
+      acao: 'TAREFA_DEVOLVIDA_A_FILA', entidade: 'Tarefa', entidadeId: a.tarefaId, usuarioId: null,
+      descricao: `Responsável removido de "${a.titulo}" (${nome} → ninguém): a certidão mudou de fase (${a.deFase} → ${a.paraFase}) e volta à distribuição. Origem: mudança de fase.`,
+      detalhes: { tarefaId: a.tarefaId, de: a.donoId, deNome: nome, origem: 'mudanca-de-fase', deFase: a.deFase, paraFase: a.paraFase } as never,
+    },
+  })
+}
+
+/**
  * A TAREFA SEGUE O TRABALHO PARA A FASE NOVA.
  *
  * Mudar de fase MOVE o trabalho; não o multiplica. Quando a fase seguinte
@@ -160,15 +186,8 @@ export async function reancorarTarefaNaUnidade(
     return tx.tarefa.findUniqueOrThrow({ where: { id: args.tarefaId } })
   }
 
-  // FASE NOVA = TRABALHO NOVO, SEM DONO (07/10/2026, caso Rodolfo Fogli): a certidão que seguiu da Genealogia para a Emissão documental ficava com
-  // quem fez a Genealogia — e a Emissão chegava à Daniela já «atribuída», sem passar pela distribuição. Quando a tarefa muda de FASE, o responsável
-  // sai (o gestor distribui na fase nova, como qualquer certidão que nasce); o andamento e o histórico ficam. Dentro da MESMA fase (workflow
-  // republicado, reancoragem de rotina) nada disso acontece.
-  const mudouDeFase = atual.faseMacroKey != null && args.faseMacroKey != null && atual.faseMacroKey !== args.faseMacroKey
-  const donoAnterior = mudouDeFase
-    ? await tx.tarefa.findUnique({ where: { id: args.tarefaId }, select: { responsavelId: true, responsavel: { select: { nome: true } } } })
-    : null
-  const devolverAFila = mudouDeFase && donoAnterior?.responsavelId != null
+  const dono = await tx.tarefa.findUnique({ where: { id: args.tarefaId }, select: { responsavelId: true, titulo: true, responsavel: { select: { nome: true } } } })
+  const devolverAFila = mudouDeFaseComDono({ faseMacroKey: atual.faseMacroKey, responsavelId: dono?.responsavelId ?? null }, args.faseMacroKey)
 
   const tarefa = await tx.tarefa.update({
     where: { id: args.tarefaId },
@@ -188,18 +207,8 @@ export async function reancorarTarefaNaUnidade(
       lockVersion: { increment: 1 },
     },
   })
-  if (devolverAFila) {
-    // O executor do passo novo sai junto: um só dono do trabalho (a tarefa), nunca um executor órfão no passo.
-    const { limparResponsavelDoPassoTx } = await import('@/src/services/task-step-sync')
-    await limparResponsavelDoPassoTx(tx, args.workflowStepInstanceId)
-    const nome = donoAnterior?.responsavel?.nome ?? `usuário ${donoAnterior?.responsavelId}`
-    await tx.logAuditoria.create({
-      data: {
-        acao: 'TAREFA_DEVOLVIDA_A_FILA', entidade: 'Tarefa', entidadeId: tarefa.id, usuarioId: null,
-        descricao: `Responsável removido de "${tarefa.titulo}" (${nome} → ninguém): a certidão mudou de fase (${atual.faseMacroKey} → ${args.faseMacroKey}) e volta à distribuição. Origem: mudança de fase.`,
-        detalhes: { tarefaId: tarefa.id, de: donoAnterior?.responsavelId ?? null, deNome: nome, origem: 'mudanca-de-fase', deFase: atual.faseMacroKey, paraFase: args.faseMacroKey } as never,
-      },
-    })
+  if (devolverAFila && dono?.responsavelId != null) {
+    await registrarDevolucaoPorMudancaDeFase(tx, { tarefaId: tarefa.id, titulo: tarefa.titulo, donoId: dono.responsavelId, donoNome: dono.responsavel?.nome ?? null, deFase: atual.faseMacroKey, paraFase: args.faseMacroKey ?? null, stepId: args.workflowStepInstanceId })
   }
   await tx.logAuditoria.create({
     data: {
@@ -598,13 +607,20 @@ export async function reancorarTarefaNoPasso(
   alvo: { workflowInstanceId: number; workflowStepInstanceId: number; faseMacroKey: string | null; motivoCodigo: string | null },
   agora: Date,
 ): Promise<{ mudou: boolean; status: StatusTarefa; stepAtualId: number | null }> {
+  const antes = await tx.tarefa.findUnique({ where: { id: tarefaId }, select: { faseMacroKey: true, responsavelId: true, titulo: true, responsavel: { select: { nome: true } } } })
+  // FASE NOVA = TRABALHO NOVO, SEM DONO — também por esta porta (Genealogia reaberta ↔ Emissão).
+  const devolver = !!antes && mudouDeFaseComDono({ faseMacroKey: antes.faseMacroKey, responsavelId: antes.responsavelId }, alvo.faseMacroKey)
   await tx.tarefa.update({
     where: { id: tarefaId },
     data: {
+      ...(devolver ? { responsavelId: null, dataAtribuicao: null, atribuidoPorId: null } : {}),
       workflowInstanceId: alvo.workflowInstanceId, workflowStepInstanceId: alvo.workflowStepInstanceId, faseMacroKey: alvo.faseMacroKey,
       motivoCodigo: alvo.motivoCodigo, blockedPreviousStatus: null, justificativa: null, lockVersion: { increment: 1 },
     },
   })
+  if (devolver && antes?.responsavelId != null) {
+    await registrarDevolucaoPorMudancaDeFase(tx, { tarefaId, titulo: antes.titulo, donoId: antes.responsavelId, donoNome: antes.responsavel?.nome ?? null, deFase: antes.faseMacroKey, paraFase: alvo.faseMacroKey, stepId: alvo.workflowStepInstanceId })
+  }
   return sincronizarTarefaComWorkflow(tx, tarefaId, agora)
 }
 

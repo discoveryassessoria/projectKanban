@@ -30,6 +30,8 @@ type DB = TX | typeof prisma
 
 export const FASE_GENEALOGIA_KEY = "genealogia"
 export const MOTIVO_AGUARDANDO_GENEALOGIA = "Aguardando Genealogia"
+/** O que a pessoa lê quando tenta agir na Emissão travada. */
+export const TEXTO_AGUARDANDO_GENEALOGIA = "Esta certidão está aguardando a Genealogia: localize o registro antes de solicitar a certidão ao cartório."
 export const ORIGEM_REABERTURA_POR_PENDENCIA = "PENDENCIA_LOCALIZAR_REGISTRO"
 const ACAO_GENEALOGIA_REABERTA = "GENEALOGIA_REABERTA"
 /** Marca da Tarefa que a regra REANCOROU no "Localizar registro" (a tarefa é UMA por obrigação: o trabalho aberto agora é localizar). */

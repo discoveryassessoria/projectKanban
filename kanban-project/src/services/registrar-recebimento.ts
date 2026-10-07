@@ -73,7 +73,7 @@ export async function registrarRecebimentoDaCertidao(args: {
       // Pedido antigo, sem protocolo guardado: registrar o recebimento nunca exige o número do cartório.
       confirmadoSemProtocolo: true,
     })
-    if (!r.aplicavel) return { ok: false, codigo: 'ESTADO_MUDOU', mensagem: 'O estado da certidão mudou enquanto você registrava — recarregue e tente de novo.' }
+    if (!r.aplicavel) return { ok: false, codigo: 'ESTADO_MUDOU', mensagem: r.motivo === 'PASSO_BLOQUEADO' && r.mensagem ? r.mensagem : 'O estado da certidão mudou enquanto você registrava — recarregue e tente de novo.' }
   }
   // A espera automática do cartório termina (a tarefa deixa de estar "aguardando terceiros").
   await resumirTarefaSeEsperaSubtarefaEncerrada({ stepInstanceId, fornecedorId })

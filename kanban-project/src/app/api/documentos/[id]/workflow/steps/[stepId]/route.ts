@@ -79,7 +79,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     })
     if (!r.ok) {
       const codigo = r.error.split(":")[0]
-      return NextResponse.json({ error: r.error }, { status: HTTP_DO_ERRO[codigo] ?? r.status })
+      return NextResponse.json({ error: r.error, ...(r.mensagem ? { mensagem: r.mensagem } : {}) }, { status: HTTP_DO_ERRO[codigo] ?? r.status })
     }
 
     // O avanço de fase é disparado por atualizarPassoV2 (serviço), não aqui: assim
