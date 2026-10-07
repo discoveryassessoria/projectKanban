@@ -135,7 +135,7 @@ async function main() {
   const passo1 = await prisma.phaseWorkflowStepInstance.findFirstOrThrow({ where: { documentoId: p.documentoId, stepKey: "solicitar_certidao" }, select: { id: true } })
   await concluirPasso(passo1.id, { origem: "USER", usuarioId: p.marcoId })
   const t3 = await montarAndamentoDaOperacao(p.documentoId)
-  check("3a) etapa concluída gera evento PASSO_CONCLUIDO", t3.some((e) => e.tipo === "PASSO_CONCLUIDO" && e.etapa === "solicitar_certidao"))
+  check("3a) etapa concluída gera evento PASSO_CONCLUIDO", t3.some((e) => e.tipo === "PASSO_CONCLUIDO" && e.etapa === "Solicitar certidão"))
 
   // ══════════════════════════════════════════════════════════════════════════
   secao("4) PRAZO — antes → depois")

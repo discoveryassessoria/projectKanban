@@ -27,7 +27,7 @@ const toggle = (col: Record<string, true>, setCol: (c: Record<string, true>) => 
 // AGUARDANDO
 // ============================================================================
 export function AbaAguardando({
-  linhas, aguardPor, setAguardPor, quick, clearQuick, col, setCol, onAbrir, onCobrar, onVerFamilia,
+  linhas, aguardPor, setAguardPor, quick, clearQuick, col, setCol, onAbrir, onCobrar, onVerFamilia, podeRegistrar, onRegistrarRecebimento,
 }: {
   linhas: LinhaOperacaoV3[]
   aguardPor: "familia" | "orgao"
@@ -39,6 +39,9 @@ export function AbaAguardando({
   onAbrir: (id: number) => void
   onCobrar: (id: number) => void
   onVerFamilia: (fam: string) => void
+  /** Quem pode registrar o recebimento desta linha (quem fez o pedido, o responsável, o administrador). */
+  podeRegistrar?: (t: LinhaOperacaoV3) => boolean
+  onRegistrarRecebimento?: (t: LinhaOperacaoV3) => void
 }) {
   const grupos = useMemo(() => (aguardPor === "orgao" ? agruparPorOrgao(linhas) : agruparPorFamilia(linhas)), [linhas, aguardPor])
 
@@ -66,19 +69,21 @@ export function AbaAguardando({
       )}
 
       {grupos.map((g) => (
-        <GrupoAguardando key={g.fam} grupo={g} col={col} setCol={setCol} onAbrir={onAbrir} onCobrar={onCobrar} onVerFamilia={aguardPor === "familia" ? onVerFamilia : undefined} />
+        <GrupoAguardando key={g.fam} grupo={g} col={col} setCol={setCol} onAbrir={onAbrir} onCobrar={onCobrar} onVerFamilia={aguardPor === "familia" ? onVerFamilia : undefined} podeRegistrar={podeRegistrar} onRegistrarRecebimento={onRegistrarRecebimento} />
       ))}
     </>
   )
 }
 
-function GrupoAguardando({ grupo, col, setCol, onAbrir, onCobrar, onVerFamilia }: {
+function GrupoAguardando({ grupo, col, setCol, onAbrir, onCobrar, onVerFamilia, podeRegistrar, onRegistrarRecebimento }: {
   grupo: FamiliaComGrupos
   col: Record<string, true>
   setCol: (c: Record<string, true>) => void
   onAbrir: (id: number) => void
   onCobrar: (id: number) => void
   onVerFamilia?: (fam: string) => void
+  podeRegistrar?: (t: LinhaOperacaoV3) => boolean
+  onRegistrarRecebimento?: (t: LinhaOperacaoV3) => void
 }) {
   const ck = `ag|${grupo.fam}`
   const aberto = !col[ck]
@@ -99,7 +104,7 @@ function GrupoAguardando({ grupo, col, setCol, onAbrir, onCobrar, onVerFamilia }
                 <span className={`opv3-pill ${p.pillCls}`}>{p.pill}</span><b style={{ fontSize: 12.5 }}>{p.titulo}</b><span style={{ color: "#5b6478" }}>{p.sub}</span>
               </div>
             )}
-          <div className="opv3-hd opv3-gA"><span>Documento</span><span>Com quem</span><span>Passo atual</span><span>Status</span><span>Desde</span><span>Acompanhamento</span><span>Cobranças</span><span>Prazo da tarefa</span><span>Ação</span></div>
+          <div className="opv3-hd opv3-gA"><span>Documento</span><span>Cartório / órgão</span><span>Passo atual</span><span>Status</span><span>Pedido em</span><span>Acompanhamento</span><span>Cobranças</span><span>Prazo da tarefa</span><span>Ação</span></div>
           {p.linhas.map((t) => {
             const passo = passoLabelDe(t)
             return (
@@ -108,11 +113,12 @@ function GrupoAguardando({ grupo, col, setCol, onAbrir, onCobrar, onVerFamilia }
                 <div>{orgaoTxt(t)}<AtalhoVincularOrgao t={t} onAbrir={onAbrir} /></div>
                 <div>{passo.label}</div>
                 <div><span className={`opv3-pill ${statusTarefaCls(t)}`}>{statusTarefaTxt(t)}</span></div>
-                <div>{fmtData(t.atribuidaEm)}</div>
+                <div>{fmtData(t.pedidoEnviadoEm ?? t.atribuidaEm)}{t.lembreteDeCobrancaEm && <div style={{ fontSize: 11, color: "#7a8296" }} title="Só um lembrete de cobrança: não trava nada.">cobrar a partir de {fmtData(t.lembreteDeCobrancaEm)}</div>}</div>
                 <div><span className={`opv3-pill ${relCls(t.acompanhamentoPasso)}`}>{acompTxtCompleto(t.acompanhamentoPasso)}</span></div>
                 <div>{cobrancasTxt(t)}</div>
                 <div><span className={`opv3-pill ${prazoTarefaCls(t)}`}>{textoPrazoDaTarefa(t)}</span></div>
                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {podeRegistrar?.(t) && onRegistrarRecebimento && <button className="opv3-btn opv3-sm opv3-acc" onClick={() => onRegistrarRecebimento(t)} title="A certidão chegou do cartório: registra o recebimento e libera a conferência">Registrar recebimento</button>}
                   {t.acompanhamentoVencido && <button className="opv3-btn opv3-sm opv3-acc" onClick={() => onCobrar(t.taskId)}>Cobrar</button>}
                   <button className="opv3-btn opv3-sm" onClick={() => onAbrir(t.taskId)}>{concluirLabelDe(t)}</button>
                   <button className="opv3-btn opv3-sm" onClick={() => onAbrir(t.taskId)}>Abrir</button>

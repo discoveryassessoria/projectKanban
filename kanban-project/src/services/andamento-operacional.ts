@@ -46,6 +46,14 @@
 
 import { prisma } from "@/lib/prisma"
 import type { WorkflowEventoTipo } from "@prisma/client"
+import { rotuloDeEstado, ROTULO_DE_ETAPA } from "@/lib/operacional/emissao-recebimento"
+
+/** Um código interno nunca aparece na tela: "AGUARDANDO_TERCEIRO" vira "Aguardando terceiros"; o que não tem rótulo vira texto legível. */
+const humanizar = (codigo: string): string => {
+  const t = codigo.replace(/_/g, " ").toLowerCase()
+  return t.charAt(0).toUpperCase() + t.slice(1)
+}
+const rotuloDaEtapa = (chave: string | null): string | null => (chave == null ? null : ROTULO_DE_ETAPA[chave] ?? humanizar(chave))
 
 export interface AutorEvento {
   tipo: "humano" | "sistema"
@@ -130,6 +138,8 @@ const TITULO_LOG_ACAO: Record<string, string> = {
   TAREFA_INICIADA: "Tarefa iniciada",
   TAREFA_REDISTRIBUIDAS: "Redistribuída",
   TAREFA_REPRIORIZADAS: "Reprioridade em lote",
+  // O recebimento da certidão registrado pela Operação (a frase clara — «Recebida em 07/10 · registrado por Daniela Brait» — vai na descrição).
+  CERTIDAO_RECEBIMENTO_REGISTRADO: "Recebimento registrado",
   // `reabertura-de-execucao.ts` grava sob este código (não "TAREFA_REABERTA" —
   // é a etapa que reabre, por instância, não a tarefa inteira). Sem entrada
   // aqui, a timeline mostrava o código bruto como título.
@@ -318,11 +328,11 @@ export async function montarAndamentoDaOperacao(documentoId: number): Promise<Ev
       categoria: CATEGORIA_LOG_ACAO(l.acao),
       data: l.criadoEm.toISOString(),
       autor: autorDe(l.usuarioId, nomesUsuario),
-      titulo: TITULO_LOG_ACAO[l.acao] ?? l.acao,
+      titulo: TITULO_LOG_ACAO[l.acao] ?? humanizar(l.acao),
       descricao: l.descricao,
       de: ehResponsabilidade ? rotuloDeValor(det.de) : ehPrazo ? rotuloDeData(det.de) : (typeof det.de === "string" ? det.de : null),
       para: ehResponsabilidade ? rotuloDeValor(det.para) : ehPrazo ? rotuloDeData(det.para) : (typeof det.para === "string" ? det.para : null),
-      etapa: typeof det.stepKey === "string" ? det.stepKey : null,
+      etapa: typeof det.stepKey === "string" ? rotuloDaEtapa(det.stepKey) : null,
       // `reabertura-de-execucao.ts` grava a justificativa sob `justificativa`,
       // não `motivo` — nome mais preciso para "razão de reabrir" (ela nunca
       // foi motivo de bloqueio ao vivo). Aceitar as duas chaves aqui é o que
@@ -344,7 +354,7 @@ export async function montarAndamentoDaOperacao(documentoId: number): Promise<Ev
       titulo: TITULO_HISTORICO_ACAO[h.acao] ?? h.acao,
       descricao: h.acao === "COMENTARIO" ? h.descricao : null,
       de: null, para: null,
-      etapa: typeof dados.subtaskKey === "string" ? dados.subtaskKey : null,
+      etapa: typeof dados.subtaskKey === "string" ? rotuloDaEtapa(dados.subtaskKey) : null,
       motivo: h.acao !== "COMENTARIO" ? h.descricao : null,
       referencias: { tarefaId: escopo.tarefaId ?? undefined, documentoId: escopo.documentoId ?? undefined },
     })
@@ -381,11 +391,11 @@ export async function montarAndamentoDaOperacao(documentoId: number): Promise<Ev
       data: e.criadoEm.toISOString(),
       // WorkflowEvento não carrega autor — é sempre o motor (task-step-sync.ts).
       autor: SISTEMA,
-      titulo: esperaDeTerceiro ? "Aguardando terceiros" : TITULO_WORKFLOW_EVENTO[e.tipo] ?? e.tipo,
+      titulo: esperaDeTerceiro ? "Aguardando terceiros" : TITULO_WORKFLOW_EVENTO[e.tipo] ?? humanizar(e.tipo),
       descricao: null,
-      de: typeof d.de === "string" ? d.de : null,
-      para: typeof d.para === "string" ? d.para : null,
-      etapa: e.stepInstanceId != null ? tituloDoStep.get(e.stepInstanceId) ?? null : null,
+      de: typeof d.de === "string" ? rotuloDeEstado(d.de) : null,
+      para: typeof d.para === "string" ? rotuloDeEstado(d.para) : null,
+      etapa: e.stepInstanceId != null ? rotuloDaEtapa(tituloDoStep.get(e.stepInstanceId) ?? null) : null,
       motivo: typeof d.justificativa === "string" ? d.justificativa : null,
       referencias: {
         tarefaId: escopo.tarefaId ?? undefined, documentoId: escopo.documentoId ?? undefined,

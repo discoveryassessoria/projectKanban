@@ -124,6 +124,8 @@ export type PassoLido = {
 export type ExecucaoLida = {
   id: number; stepInstanceId: number; subtaskKey: string; status: string; criadoEm: Date; startedAt: Date | null
   previstoPara: Date | null; proximoAcompanhamentoEm: Date | null; escalada: boolean
+  /** Quando e por quem a subtarefa foi concluída (a data do pedido e quem o fez). */
+  completedAt: Date | null; executadoPorId: number | null
 }
 export type ContatoLido = { subtaskExecutionId: number; resultado: string }
 export type PessoaLida = { id: number; nome: string; sobrenome: string | null; numeroLinhagem: number | null; linhaReta: boolean; data_nasc: Date | null; arvoreId: number | null }
@@ -175,7 +177,7 @@ export function criarCacheDeLeitura(db: Leitor): CacheDeLeitura {
       where: { stepInstanceId: { in: ids }, supersededAt: null },
       select: {
         id: true, stepInstanceId: true, subtaskKey: true, status: true, criadoEm: true, startedAt: true,
-        previstoPara: true, proximoAcompanhamentoEm: true, escalada: true,
+        previstoPara: true, proximoAcompanhamentoEm: true, escalada: true, completedAt: true, executadoPorId: true,
       },
     }),
     (r) => r.stepInstanceId,

@@ -20,6 +20,8 @@ import { usePermissoes } from "@/src/hooks/use-permissoes"
 import type { SubtarefaProjetada } from "./useConfiguracaoDaEtapa"
 import { authHeaders, jsonHeaders } from "@/src/lib/financeiro/http"
 import { RegistrarContatoModal, type DadosDeContato } from "@/src/components/operacao/RegistrarContatoModal"
+import { RegistrarRecebimentoModal } from "@/src/components/operacao/RegistrarRecebimentoModal"
+import { SUBTAREFA_PEDIDO_ENVIADO, SUBTAREFA_CONFIRMACAO, SUBTAREFA_CERTIDAO_RECEBIDA } from "@/lib/operacional/emissao-recebimento"
 
 // ============================================================
 // HELPER — pega userId logado do localStorage (mesmo padrão do
@@ -124,6 +126,8 @@ interface WorkflowTabProps {
    */
   tarefaResponsavelId?: number | null
   tarefaResponsavelNome?: string | null
+  /** A tarefa deste documento — para «Registrar recebimento» no passo 2 (Receber confirmação do pedido). */
+  tarefaId?: number | null
   /**
    * A INSTÂNCIA DA FASE sendo exibida (ativa ou "Somente leitura" de uma fase
    * passada) — mesmo contrato do `faseInstanciaId` do DocumentoOperationalDrawer.
@@ -196,6 +200,7 @@ export function WorkflowTab({
   contextoAntecipada,
   tarefaResponsavelId = null,
   tarefaResponsavelNome = null,
+  tarefaId = null,
   faseInstanciaId = null,
 }: WorkflowTabProps) {
   // fase atual não tem Workflow Interno configurado (nunca cai no de outra fase)
@@ -394,6 +399,8 @@ export function WorkflowTab({
             tarefaResponsavelNome={tarefaResponsavelNome}
             isAdmin={isAdmin}
             onRecarregar={carregar}
+            tarefaId={tarefaId ?? null}
+            documentoId={workflow.documentoId}
           />
         ))}
       </div>
@@ -483,7 +490,7 @@ export function WorkflowTab({
 // cadastradas (passo anterior à consolidação), cai no StepCard de sempre.
 
 function StepOuSubtarefas({
-  step, onOpenCentral, refDoAtual, podeIniciar, tarefaResponsavelNome, isAdmin, onRecarregar,
+  step, onOpenCentral, refDoAtual, podeIniciar, tarefaResponsavelNome, isAdmin, onRecarregar, tarefaId, documentoId,
 }: {
   step: WorkflowStep
   onOpenCentral: (subtarefaKey?: string) => void
@@ -492,7 +499,10 @@ function StepOuSubtarefas({
   tarefaResponsavelNome?: string | null
   isAdmin: boolean
   onRecarregar: () => void
+  tarefaId: number | null
+  documentoId: number
 }) {
+  const [recebimentoAberto, setRecebimentoAberto] = useState(false)
   // SEM FETCH PRÓPRIO — `step.subtarefas` já chega pronto na MESMA resposta
   // de `/api/documentos/[id]/workflow` (ver montarWorkflowV2). Antes disto
   // havia uma segunda chamada aqui (`useConfiguracaoDaEtapa`), e a corrida
@@ -516,11 +526,24 @@ function StepOuSubtarefas({
     )
   }
 
+  // PEDIDO ENVIADO E RECEBIMENTO AINDA NÃO REGISTRADO: o botão «Registrar recebimento» aparece no passo 2. O servidor confere quem pode.
+  const pedidoEnviado = subtarefas.some((x) => x.key === SUBTAREFA_PEDIDO_ENVIADO && x.concluida)
+  const recebimentoAberto_ = subtarefas.some((x) => x.key === SUBTAREFA_CERTIDAO_RECEBIDA && !x.concluida)
+  const podeRegistrarAqui = tarefaId != null && pedidoEnviado && recebimentoAberto_ && (podeIniciar || isAdmin)
+
   return (
     <div ref={refDoAtual} className="space-y-1.5">
+      {recebimentoAberto && tarefaId != null && (
+        <RegistrarRecebimentoModal
+          tarefaId={tarefaId} documentoId={documentoId}
+          onFechar={() => setRecebimentoAberto(false)}
+          onRegistrado={() => { setRecebimentoAberto(false); onRecarregar() }}
+        />
+      )}
       {subtarefas.map((s, i) => (
         <SubtarefaRow
           key={s.key}
+          onRegistrarRecebimento={podeRegistrarAqui && s.key === SUBTAREFA_CONFIRMACAO && !s.concluida ? () => setRecebimentoAberto(true) : undefined}
           subtarefa={s}
           ordem={i + 1}
           onOpenCentral={onOpenCentral}
@@ -548,7 +571,7 @@ const SUBTAREFA_STATUS_LABEL: Record<string, string> = {
 }
 
 function SubtarefaRow({
-  subtarefa, ordem, onOpenCentral, podeIniciar, tarefaResponsavelNome, isAdmin, stepInstanceId, onRecarregar,
+  subtarefa, ordem, onOpenCentral, podeIniciar, tarefaResponsavelNome, isAdmin, stepInstanceId, onRecarregar, onRegistrarRecebimento,
 }: {
   subtarefa: {
     key: string; label: string; descricao: string | null; concluida: boolean; disponivel: boolean
@@ -562,6 +585,8 @@ function SubtarefaRow({
   isAdmin: boolean
   stepInstanceId: number
   onRecarregar: () => void
+  /** Presente só no passo 2, com o pedido já enviado e o recebimento ainda não registrado. */
+  onRegistrarRecebimento?: () => void
 }) {
   const s = subtarefa
   // MODO CONCLUÍDA — compacto, mesmo padrão visual do StepCard concluído, mas
@@ -675,6 +700,16 @@ function SubtarefaRow({
             </>
           )}
         </div>
+        {onRegistrarRecebimento && (
+          <button
+            onClick={onRegistrarRecebimento}
+            data-testid="registrar-recebimento-passo"
+            title="A certidão chegou do cartório: conclui «Receber confirmação do pedido» e «Receber certidão» e libera a conferência"
+            className="px-2.5 py-1.5 text-[10.5px] font-semibold bg-[var(--action-primary)] text-[var(--action-primary-ink)] rounded transition-colors whitespace-nowrap"
+          >
+            Registrar recebimento
+          </button>
+        )}
         {podeAgir ? (
           <button
             onClick={() => onOpenCentral(s.key)}

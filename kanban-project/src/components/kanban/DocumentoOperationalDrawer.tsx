@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react"
 import { useApi } from "@/src/lib/dados"
+import { aguardandoOCartorio, rotuloDeEstado } from "@/lib/operacional/emissao-recebimento"
 import { rotuloStatusTarefa } from "@/src/lib/home/rotulo-status-tarefa"
 import { authHeaders } from "@/src/lib/financeiro/http"
 import { useFecharComEsc } from "@/src/lib/ui/escape-stack"
@@ -423,6 +424,8 @@ interface StepDoDrawer {
   assignee?: { id: number; nome: string } | null
   notes?: string | null
   externalProtocol?: string | null
+  /** As subtarefas do passo (Emissão: enviar → confirmar → receber → conferir) — para dizer «Aguardando o cartório». */
+  subtarefas?: Array<{ key: string; status: string; concluida: boolean }>
 }
 
 interface WorkflowDoDrawer {
@@ -643,7 +646,11 @@ function ConteudoDrawer({
   const statusCls = doc ? (STATUS_PILL_CLS[doc.status] || STATUS_NEUTRAL_PILL) : ""
   const tipoLabel = doc ? (TIPO_LABELS[doc.tipo] || doc.tipo) : ""
   const statusDocumentalLabel = doc ? (STATUS_LABELS[doc.status] || doc.status) : ""
-  const statusLabel = tarefa ? rotuloStatusTarefa(tarefa.statusTarefa) ?? tarefa.statusTarefa : "Sem tarefa"
+  // SEM TAREFA ABERTA, o cabeçalho diz o que está acontecendo em português claro: se o pedido já foi enviado e o recebimento não foi registrado,
+  // a certidão está «Aguardando terceiros» (o vocabulário oficial do cartório); senão, que não há tarefa aberta nesta fase (nunca o código interno).
+  const statusPorSubtarefa = Object.fromEntries((workflow?.steps?.[0]?.subtarefas ?? []).map((st) => [st.key, st.concluida ? "CONCLUIDO" : st.status]))
+  const aguardaOCartorio = aguardandoOCartorio(statusPorSubtarefa)
+  const statusLabel = tarefa ? rotuloStatusTarefa(tarefa.statusTarefa) ?? rotuloDeEstado(tarefa.statusTarefa) ?? tarefa.statusTarefa : aguardaOCartorio ? "Aguardando terceiros" : "Sem tarefa aberta"
 
   const tabsAll: Array<{ id: TabId; label: string; count?: number; danger?: boolean }> = [
     { id: "workflow", label: "Workflow" },
@@ -1014,6 +1021,7 @@ function ConteudoDrawer({
                   contextoAntecipada={contextoAntecipada}
                   tarefaResponsavelId={tarefa?.responsavelId ?? null}
                   tarefaResponsavelNome={tarefa?.responsavelNome ?? null}
+                  tarefaId={tarefa?.taskId ?? null}
                   faseInstanciaId={faseInstanciaId}
                   onChange={() => {
                     onSave?.()
@@ -1349,7 +1357,7 @@ function LinhaEvento({ e }: { e: EventoAndamentoUI }) {
           {e.etapa ? <> · Etapa: {e.etapa}</> : null}
         </div>
         {(e.de || e.para) && (
-          <div className="text-[11px] text-[var(--text-secondary)] font-mono mt-0.5">
+          <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">
             {e.de ?? "—"} → {e.para ?? "—"}
           </div>
         )}
