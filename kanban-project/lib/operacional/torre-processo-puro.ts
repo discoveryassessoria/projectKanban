@@ -160,10 +160,11 @@ export function pessoasDaTabela(linhas: LinhaDaTabela[]): Array<{ id: number; no
  * "Ativas + canceladas / não exigidas" (no fim, riscadas) e em "Cancelada / não exigida" (só elas).
  */
 export function filtrarEOrdenar(
-  linhas: LinhaDaTabela[], f: { pessoaId: number | null; status: FiltroDeStatusDaTabela },
+  linhas: LinhaDaTabela[], f: { pessoaId: number | null; status: FiltroDeStatusDaTabela; /** Fase clicada no Caminho: só as tarefas ABERTAS dela. */ faseKey?: string | null },
 ): LinhaDaTabela[] {
   const filtradas = linhas
     .filter((l) => (f.pessoaId == null ? true : l.pessoaId === f.pessoaId))
+    .filter((l) => (f.faseKey == null ? true : l.tipo === 'ABERTA' && l.fase?.key === f.faseKey))
     .filter((l) => {
       if (f.status === 'TODOS') return true
       if (f.status === 'ATIVAS') return l.tipo === 'ABERTA' || l.tipo === 'CONCLUIDA'
@@ -175,6 +176,33 @@ export function filtrarEOrdenar(
   const porFase = new Map<number, LinhaDaTabela[]>()
   for (const l of filtradas) { const o = l.fase?.ordem ?? 9999; const g = porFase.get(o) ?? []; g.push(l); porFase.set(o, g) }
   return [...porFase.entries()].sort((a, b) => a[0] - b[0]).flatMap(([, g]) => ordenarCertidoesDaFamilia(g, chaveDaLinhaDaTabela))
+}
+
+// ─── A CONTA DE CADA FASE DO CAMINHO ("3 abertas = 1 sem responsável · 2 Daniela Brait") ─────────────────────────────────
+// Sai das MESMAS linhas da tabela (`d.tabela`, tipo ABERTA, `fase.key`): nenhuma consulta própria. A soma fecha por construção — cada
+// aberta cai em UM só grupo (sem responsável, ou a pessoa que a tem).
+
+export interface ContaDaFase { abertas: number; semResponsavel: number; porPessoa: Array<{ id: number | null; nome: string; n: number }> }
+
+export function contaDaFase(tabela: LinhaDaTabela[], faseKey: string): ContaDaFase {
+  const abertas = tabela.filter((l) => l.tipo === 'ABERTA' && l.fase?.key === faseKey)
+  const pessoas = new Map<string, { id: number | null; nome: string; n: number }>()
+  let semResponsavel = 0
+  for (const l of abertas) {
+    if (l.responsavelId == null && !l.responsavelNome) { semResponsavel++; continue }
+    const k = String(l.responsavelId ?? l.responsavelNome)
+    const p = pessoas.get(k) ?? { id: l.responsavelId, nome: l.responsavelNome ?? `usuário ${l.responsavelId}`, n: 0 }
+    p.n++; pessoas.set(k, p)
+  }
+  return { abertas: abertas.length, semResponsavel, porPessoa: [...pessoas.values()].sort((a, b) => b.n - a.n || a.nome.localeCompare(b.nome, 'pt-BR')) }
+}
+
+/** "3 abertas = 1 sem responsável · 2 Daniela Brait" · "1 aberta = 1 sem responsável" · "0 abertas". */
+export function textoDaContaDaFase(c: ContaDaFase): string {
+  const total = `${c.abertas} ${c.abertas === 1 ? 'aberta' : 'abertas'}`
+  if (c.abertas === 0) return total
+  const partes = [...(c.semResponsavel > 0 ? [`${c.semResponsavel} sem responsável`] : []), ...c.porPessoa.map((p) => `${p.n} ${p.nome}`)]
+  return `${total} = ${partes.join(' · ')}`
 }
 
 /** Quantas linhas contam por padrão: as que são trabalho (abertas + concluídas). Canceladas / não exigidas não contam. */

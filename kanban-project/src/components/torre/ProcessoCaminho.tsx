@@ -3,10 +3,10 @@
 // (Passo atual · Com quem · Prazo · Cartórios · Cancelada / não exigida — este último é um botão que liga e desliga a exibição dessas certidões na lista). Os textos nascem de `torre-caminho.ts` e `torre-processo-puro.ts` (puros).
 import { textosDaFase } from "@/lib/operacional/torre-caminho"
 import { textoTempoNaFase } from "@/lib/operacional/torre-predicados"
-import { ROTULO_ENCERRADAS } from "@/lib/operacional/torre-processo-puro"
+import { ROTULO_ENCERRADAS, contaDaFase, textoDaContaDaFase } from "@/lib/operacional/torre-processo-puro"
 import type { DetalheDoProcesso } from "@/lib/operacional/torre-foco"
 
-export function ProcessoCaminho({ d, agora, encerradasNaLista, onAlternarEncerradas }: { d: DetalheDoProcesso; agora: Date; encerradasNaLista: boolean; onAlternarEncerradas: () => void }) {
+export function ProcessoCaminho({ d, agora, encerradasNaLista, onAlternarEncerradas, faseSelecionada, onFase }: { d: DetalheDoProcesso; agora: Date; encerradasNaLista: boolean; onAlternarEncerradas: () => void; faseSelecionada: string | null; onFase: (phaseKey: string | null) => void }) {
   const fases = d.caminho.fases
   return (
     <>
@@ -19,12 +19,17 @@ export function ProcessoCaminho({ d, agora, encerradasNaLista, onAlternarEncerra
               {fases.map((f) => {
                 const atual = f.estado === "atual"
                 const t = textosDaFase(f, agora, atual ? { tempoNaFase: textoTempoNaFase(d.faseAtual), certidoes: d.certidoes } : {})
+                const conta = contaDaFase(d.tabela, f.phaseKey)
+                const escolhida = faseSelecionada === f.phaseKey
                 return (
-                  <div key={f.phaseKey} className={`tpr-fase ${f.estado}`} data-fase={f.phaseKey} data-estado={f.estado}>
+                  <button key={f.phaseKey} type="button" className={`tpr-fase tpr-fase-bt ${f.estado} ${escolhida ? "escolhida" : ""}`} data-fase={f.phaseKey} data-estado={f.estado}
+                    aria-pressed={escolhida} title={escolhida ? "Clique para voltar a ver todas as fases" : `Clique para ver só as tarefas abertas de ${f.label}`}
+                    onClick={() => onFase(escolhida ? null : f.phaseKey)}>
                     <div className="l1">{t.l1}</div>
                     <div className="l2">{t.l2}</div>
                     {t.l3 && <div className="l3">{t.l3}</div>}
-                  </div>
+                    <div className="conta" data-conta={f.phaseKey}>{textoDaContaDaFase(conta)}</div>
+                  </button>
                 )
               })}
             </div>

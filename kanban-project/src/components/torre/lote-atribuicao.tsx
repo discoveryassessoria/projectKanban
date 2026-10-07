@@ -19,7 +19,7 @@ export type AcaoDeLoteDeAtribuicao = "ATRIBUIR" | "REMOVER_RESPONSAVEL" | "ATRIB
 export interface LoteDeAtribuicao {
   pessoas: PessoaDoLote[]
   pessoaId: number | null
-  setPessoaId: (id: number) => void
+  setPessoaId: (id: number | null) => void
   pessoa: PessoaDoLote | undefined
   ocupado: boolean
   /** Roda a ação: 1ª viagem devolve a prévia (428) → modal de confirmação → 2ª viagem grava. Devolve `true` se gravou. */
@@ -27,8 +27,10 @@ export interface LoteDeAtribuicao {
   modal: ReactNode
 }
 
-export function useLoteDeAtribuicao({ podeEditar, onResultado }: {
+export function useLoteDeAtribuicao({ podeEditar, onResultado, preEscolher = true }: {
   podeEditar: boolean
+  /** `false` = a lista começa em "— escolha a pessoa —", sem ninguém pré-escolhido (a página do processo). */
+  preEscolher?: boolean
   /** O que cada tela faz com o resultado (aviso + "Desfazer", limpar a seleção, recarregar). */
   onResultado: (mensagem: string, desfazer: Desfazer | null) => void
 }): LoteDeAtribuicao {
@@ -41,10 +43,10 @@ export function useLoteDeAtribuicao({ podeEditar, onResultado }: {
     if (!podeEditar) return
     let vivo = true
     void api<{ funcionarios: PessoaDoLote[] }>("/api/operacao/atribuiveis").then((r) => {
-      if (vivo && r.ok) { setPessoas(r.data.funcionarios ?? []); setPessoaIdEstado((atual) => atual ?? r.data.funcionarios?.[0]?.id ?? null) }
+      if (vivo && r.ok) { setPessoas(r.data.funcionarios ?? []); setPessoaIdEstado((atual) => atual ?? (preEscolher ? r.data.funcionarios?.[0]?.id ?? null : null)) }
     })
     return () => { vivo = false }
-  }, [podeEditar])
+  }, [podeEditar, preEscolher])
 
   const pessoa = pessoas.find((p) => p.id === pessoaId)
 
@@ -74,12 +76,14 @@ export function AcoesDeAtribuicaoEmLote({ lote, ids, ocupado = false, comSugerid
   /** Depois de gravar (ex.: limpar a seleção). */
   depois?: () => void
 }) {
-  const bloqueado = ocupado || lote.ocupado
+  const semSelecao = ids.length === 0
+  const bloqueado = ocupado || lote.ocupado || semSelecao
   const rodar = (acao: AcaoDeLoteDeAtribuicao) => async () => { if (await lote.executar(acao, ids)) depois?.() }
   return (
     <>
       <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>Atribuir a
-        <select aria-label="Atribuir a" value={lote.pessoaId ?? ""} onChange={(e) => lote.setPessoaId(Number(e.target.value))}>
+        <select aria-label="Atribuir a" value={lote.pessoaId ?? ""} onChange={(e) => lote.setPessoaId(e.target.value === "" ? null : Number(e.target.value))}>
+          <option value="">— escolha a pessoa —</option>
           {lote.pessoas.map((p) => <option key={p.id} value={p.id}>{p.nome} ({p.tarefasAtivas} {p.tarefasAtivas === 1 ? "ativa" : "ativas"})</option>)}
         </select>
         <button type="button" disabled={bloqueado || !lote.pessoa} onClick={() => void rodar("ATRIBUIR")()}>Atribuir</button>
