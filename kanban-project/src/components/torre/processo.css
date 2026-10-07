@@ -151,3 +151,9 @@
 
 .tpr-grupo-fase { padding: 8px 14px; font-size: 12px; font-weight: 700; letter-spacing: .02em; background: var(--surface-popover); border-top: 1px solid var(--border-default); border-bottom: 1px solid var(--border-default); }
 .tpr-grupo-fase span { font-weight: 500; opacity: .75; margin-left: 8px; }
+
+/* Barra de seleção da tabela de certidões: os controles vêm de lote-atribuicao.tsx (os mesmos da aba Tarefas) e aqui ganham a aparência de botão/select. */
+.tpr-lote button:not(.tpr-btn) { height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border-default); background: var(--surface-popover); color: var(--text-primary); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.tpr-lote button:not(.tpr-btn):hover:not(:disabled) { background: var(--surface-tertiary); }
+.tpr-lote button:not(.tpr-btn):disabled { opacity: .55; cursor: not-allowed; }
+.tpr-lote select { height: 30px; border: 1px solid var(--border-default); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 13px; background: var(--surface-popover); color: var(--text-primary); }
