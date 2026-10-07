@@ -158,9 +158,9 @@ export function pedacosDaSugestao(s: SugestaoParaTexto, nomesDaEquipe: string[])
       const nomes = sr.porPessoa.map((p) => curto(p.nome))
       const lista = nomes.length === 1 ? nomes[0] : `${nomes.slice(0, -1).join(', ')} e ${nomes[nomes.length - 1]}`
       const resto = sr.semApto + sr.seguradas
-      acoes.push([{ texto: `distribuir as ${sr.total} sem responsável entre ${lista}${resto > 0 ? ` (${resto} ficam para o Precisa de você: sem apto ou no limite de carga)` : ''}` }])
+      acoes.push([{ texto: `distribuir as ${sr.total} sem responsável entre ${lista}${resto > 0 ? ` (${resto} ficam para você atribuir em Tarefas: sem apto ou no limite de carga)` : ''}` }])
     } else {
-      acoes.push([{ texto: `as ${sr.total} sem responsável ficam para o Precisa de você: nenhuma tem apto com carga livre` }])
+      acoes.push([{ texto: `as ${sr.total} sem responsável ficam para você atribuir em Tarefas: nenhuma tem apto com carga livre` }])
     }
   }
   if (acoes.length === 0) return [{ texto: 'Sugestão automática: nenhuma — nenhuma pessoa está acima do limite cadastrado e não há certidão sem responsável.' }]
@@ -188,8 +188,8 @@ export function toastCarteiraMovida(nome: string, r: { movidas: number; naoAptas
 /** "96 certidões distribuídas por aptidão e carga: Rafael 51 · Priscila 45". */
 export function toastDistribuicao(r: { atribuidas: number; porPessoa: Array<{ nome: string; quantidade: number }>; semApto: number; seguradas: number }, nomesDaEquipe: string[]): string {
   const resto = r.semApto + r.seguradas
-  const pendente = resto > 0 ? ` · ${resto} ficam para o Precisa de você (sem apto ou no limite de carga)` : ''
-  if (r.atribuidas === 0) return `Nenhuma certidão distribuída: ${resto > 0 ? `${resto} sem apto com carga livre ficam para o Precisa de você` : 'não havia certidão sem responsável'}`
+  const pendente = resto > 0 ? ` · ${resto} ficam para você atribuir em Tarefas (sem apto ou no limite de carga)` : ''
+  if (r.atribuidas === 0) return `Nenhuma certidão distribuída: ${resto > 0 ? `${resto} sem apto com carga livre ficam para você atribuir em Tarefas` : 'não havia certidão sem responsável'}`
   return `${certidoes(r.atribuidas)} ${r.atribuidas === 1 ? 'distribuída' : 'distribuídas'} por aptidão e carga: ${r.porPessoa.map((p) => `${nomeCurto(p.nome, nomesDaEquipe)} ${p.quantidade}`).join(' · ')}${pendente}`
 }
 
@@ -201,6 +201,6 @@ export function toastRedistribuicao(
   const partes = r.movimentos.filter((m) => m.movidas > 0).map((m) => `${certidoes(m.movidas)} de ${curto(m.deNome)} ${m.movidas === 1 ? 'movida' : 'movidas'} para ${curto(m.paraNome)}`)
   if (r.atribuidas > 0) partes.push(`${r.atribuidas} sem dono ${r.atribuidas === 1 ? 'distribuída' : 'distribuídas'}`)
   const resto = r.semApto + r.seguradas
-  if (resto > 0) partes.push(`${resto} ficam para o Precisa de você (sem apto ou no limite de carga)`)
+  if (resto > 0) partes.push(`${resto} ficam para você atribuir em Tarefas (sem apto ou no limite de carga)`)
   return partes.length ? partes.join(' · ') : 'Nada a redistribuir: nenhuma pessoa acima do limite e nenhuma certidão sem responsável com apto.'
 }
