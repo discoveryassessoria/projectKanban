@@ -157,3 +157,10 @@
 .tpr-lote button:not(.tpr-btn):hover:not(:disabled) { background: var(--surface-tertiary); }
 .tpr-lote button:not(.tpr-btn):disabled { opacity: .55; cursor: not-allowed; }
 .tpr-lote select { height: 30px; border: 1px solid var(--border-default); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 13px; background: var(--surface-popover); color: var(--text-primary); }
+
+/* Fase clicável no Caminho do processo + a conta da fase + o aviso de filtro da tabela. */
+.tpr-fase-bt { border: 0; font: inherit; text-align: left; cursor: pointer; width: 100%; }
+.tpr-fase-bt:hover { filter: brightness(.97); }
+.tpr-fase-bt.escolhida { outline: 2px solid var(--action-primary); outline-offset: 1px; }
+.tpr-fase .conta { margin-top: auto; padding-top: 6px; border-top: 1px dashed var(--border-default); font-weight: 600; color: var(--text-secondary); }
+.tpr-filtro-fase { display: flex; align-items: center; gap: 10px; padding: 8px 16px; font-size: 13px; background: var(--info-tile); border-bottom: 1px solid var(--border-default); }

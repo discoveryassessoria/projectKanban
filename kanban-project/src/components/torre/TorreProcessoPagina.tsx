@@ -47,6 +47,7 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
     router.replace(q ? `${caminhoAtual}?${q}` : caminhoAtual, { scroll: false })
   }, [router, caminhoAtual])
   // O estado da lista de certidões: o padrão é só as ATIVAS; o bloco "Cancelada / não exigida" e o select de Status mexem neste mesmo estado.
+  const [faseSelecionada, setFaseSelecionada] = useState<string | null>(null)
   const [statusDaLista, setStatusDaLista] = useState<FiltroDeStatusDaTabela>("ATIVAS")
   const [ocupado, setOcupado] = useState(false)
   const [toast, setToast] = useState<ToastDaPagina | null>(null)
@@ -96,7 +97,7 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
   const { postar: postarComConfirmacao, modal: modalConfirmacao } = useConfirmarAtribuicao()
   // As ações em lote da tabela (Atribuir a…, Remover responsável, Atribuir às sugeridas) são as MESMAS da aba Tarefas (lote-atribuicao.tsx).
   const lote = useLoteDeAtribuicao({
-    podeEditar: perm.editar,
+    podeEditar: perm.editar, preEscolher: false,
     onResultado: (msg, desfazer) => { avisar(msg, desfazer ? { rotulo: "Desfazer", fazer: desfazerAtribuicao(desfazer as DesfazerDeAtribuicao) } : undefined); recarregar() },
   })
   const distribuir = async () => {
@@ -181,12 +182,12 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
             onDistribuir={() => void distribuir()} onRelatorio={() => gravarRelatorio(true, relatorioDaUrl.filtros)} onHistorico={() => setModal({ tipo: "historico", certidao: null })}
             onPausar={() => setModal({ tipo: "pausar" })} onReativar={() => void reativar(false)} onForcar={() => setModal({ tipo: "forcar" })}
           />
-          <ProcessoCaminho d={d} agora={agora} encerradasNaLista={statusDaLista === "TODOS" || statusDaLista === "ENCERRADAS"} onAlternarEncerradas={() => setStatusDaLista((s) => (s === "TODOS" || s === "ENCERRADAS" ? "ATIVAS" : "TODOS"))} />
+          <ProcessoCaminho d={d} agora={agora} encerradasNaLista={statusDaLista === "TODOS" || statusDaLista === "ENCERRADAS"} onAlternarEncerradas={() => setStatusDaLista((s) => (s === "TODOS" || s === "ENCERRADAS" ? "ATIVAS" : "TODOS"))} faseSelecionada={faseSelecionada} onFase={setFaseSelecionada} />
           <ProcessoCertidoes
             status={statusDaLista} onStatus={setStatusDaLista}
             d={d} agora={agora} podeAtribuir={perm.editar} ocupado={ocupado}
             onHistorico={(l) => setModal({ tipo: "historico", certidao: { documentoId: l.documentoId, tarefaId: l.tarefaId, rotulo: [l.titulo, l.pessoa].filter(Boolean).join(" · ") } })}
-            onAtribuir={atribuir} lote={lote}
+            onAtribuir={atribuir} lote={lote} faseSelecionada={faseSelecionada} onFase={setFaseSelecionada}
             onMotivo={(l) => setModal({ tipo: "motivo", linha: l })} onReabrir={(l) => setModal({ tipo: "reabrir", linha: l })}
             onVerHistorico={() => setModal({ tipo: "historico", certidao: null })}
           />

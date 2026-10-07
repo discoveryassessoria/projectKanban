@@ -20,13 +20,15 @@ const TOM_PRAZO = { critico: "tpr-c-verm", atencao: "tpr-c-amb", ritmo: "", } as
 const descricaoDaIgual = (l: LinhaDaTabela): string =>
   [l.passo ? `${l.passo.rotulo}${l.passo.total ? ` · ${l.passo.ordem}/${l.passo.total}` : ""}` : null, l.statusRotulo, l.responsavelNome ?? "sem responsável", l.dataPrazo ? diaMesDoPrazo(l.dataPrazo) : null].filter(Boolean).join(" · ")
 
-export function ProcessoCertidoes({ d, agora, status, onStatus, podeAtribuir, ocupado, onAtribuir, lote, onMotivo, onReabrir, onVerHistorico, onHistorico }: {
+export function ProcessoCertidoes({ d, agora, status, onStatus, podeAtribuir, ocupado, onAtribuir, lote, faseSelecionada, onFase, onMotivo, onReabrir, onVerHistorico, onHistorico }: {
   d: DetalheDoProcesso; agora: Date; podeAtribuir: boolean; ocupado: boolean
   /** O filtro de status vive na página: o bloco "Cancelada / não exigida" e este select mexem no MESMO estado. */
   status: FiltroDeStatusDaTabela; onStatus: (s: FiltroDeStatusDaTabela) => void
   onAtribuir: (tarefaId: number) => void
   /** As ações em lote de atribuição — o MESMO código da aba Tarefas (`lote-atribuicao.tsx`): Atribuir a…, Remover responsável, Atribuir às sugeridas. */
   lote: LoteDeAtribuicao
+  /** A fase clicada no Caminho (`phaseKey`): a tabela mostra só as tarefas ABERTAS dela. `null` = todas. */
+  faseSelecionada: string | null; onFase: (phaseKey: string | null) => void
   onMotivo: (l: LinhaDaTabela) => void
   onReabrir: (l: LinhaDaTabela) => void
   onVerHistorico: () => void
@@ -38,13 +40,13 @@ export function ProcessoCertidoes({ d, agora, status, onStatus, podeAtribuir, oc
   const [marcadas, setMarcadas] = useState<ReadonlySet<string>>(new Set())
 
   const pessoas = useMemo(() => pessoasDaTabela(d.tabela), [d.tabela])
-  const linhas = useMemo(() => filtrarEOrdenar(d.tabela, { pessoaId, status }), [d.tabela, pessoaId, status])
+  const linhas = useMemo(() => filtrarEOrdenar(d.tabela, { pessoaId, status, faseKey: faseSelecionada }), [d.tabela, pessoaId, status, faseSelecionada])
   const trabalho = linhas.filter((l) => l.tipo === "ABERTA" || l.tipo === "CONCLUIDA")
   const fora = linhas.filter((l) => l.tipo === "CANCELADA" || l.tipo === "NAO_EXIGIDA")
   // A linha-resumo só vale na visão sem filtro (todas as pessoas; ativas, ou ativas + canceladas / não exigidas): filtrado, mostra tudo o que casou.
   const resumo = resumirIguais(trabalho, descricaoDaIgual)
   const semFiltroDeStatus = status === "ATIVAS" || status === "TODOS"
-  const colapsa = !expandido && pessoaId == null && semFiltroDeStatus && resumo.ocultas.length > 0
+  const colapsa = !expandido && pessoaId == null && faseSelecionada == null && semFiltroDeStatus && resumo.ocultas.length > 0
   const visiveis = colapsa ? resumo.visiveis : trabalho
 
   // Qualquer tarefa ABERTA é selecionável (com ou sem responsável): dá para atribuir, transferir ou remover o responsável em lote.
@@ -117,11 +119,18 @@ export function ProcessoCertidoes({ d, agora, status, onStatus, podeAtribuir, oc
         </div>
       </div>
 
-      {marcadasAtribuiveis.length > 0 && (
+      {faseSelecionada != null && (
+        <div className="tpr-filtro-fase" role="status">
+          Só as tarefas abertas de <b>{d.caminho.fases.find((f) => f.phaseKey === faseSelecionada)?.label ?? faseSelecionada}</b>
+          <button type="button" className="tpr-btn peq" onClick={() => onFase(null)}>Ver todas as fases</button>
+        </div>
+      )}
+
+      {podeAtribuir && (
         <div className="tpr-lote" role="status">
           <b>{marcadasAtribuiveis.length}</b> {marcadasAtribuiveis.length === 1 ? "selecionada" : "selecionadas"}
-          {podeAtribuir && <AcoesDeAtribuicaoEmLote lote={lote} ids={marcadasAtribuiveis.map((l) => l.tarefaId!)} ocupado={ocupado} comSugeridas depois={() => setMarcadas(new Set())} />}
-          <button type="button" className="tpr-btn peq" onClick={() => setMarcadas(new Set())}>Limpar seleção</button>
+          <AcoesDeAtribuicaoEmLote lote={lote} ids={marcadasAtribuiveis.map((l) => l.tarefaId!)} ocupado={ocupado} comSugeridas depois={() => setMarcadas(new Set())} />
+          <button type="button" className="tpr-btn peq" disabled={marcadasAtribuiveis.length === 0} onClick={() => setMarcadas(new Set())}>Limpar seleção</button>
         </div>
       )}
 
