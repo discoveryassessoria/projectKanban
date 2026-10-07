@@ -31,7 +31,7 @@ export function destinoDaAbsorcao(rota: RotaAbsorvida, tipoUsuario: string | nul
 // (família, aba, tarefa). Os avisos JÁ GRAVADOS continuam funcionando — a tradução é feita na chegada em
 // `/operacao` e no clique do sino, nunca reescrevendo o que está no banco. Não-admin: tudo igual ao de antes.
 
-/** Quem tem acesso à Torre (a MESMA regra de `/torre`): administrador ou `operacao.distribuirTarefas`. É quem `/operacao` leva à aba "Minha operação". */
+/** Quem tem acesso à Torre (a MESMA regra de `/torre`): administrador ou `operacao.distribuirTarefas`. (`/operacao` NÃO leva mais ninguém à Torre.) */
 export function temAcessoATorre(tipoUsuario: string | null | undefined, pode: (chave: 'operacao.distribuirTarefas') => boolean): boolean {
   return tipoUsuario === 'admin' || pode('operacao.distribuirTarefas')
 }
@@ -53,17 +53,14 @@ export function destinoDaOperacaoParaAdmin(query: URLSearchParams | string): str
   const processo = inteiro(q.get('processo') ?? q.get('processoId'))
   const tarefa = inteiro(q.get('tarefa') ?? q.get('taskId'))
   if (processo && !tarefa) return paginaDoProcesso(processo)
-  const destino = new URLSearchParams()
   if (tarefa) {
-    destino.set('aba', 'tarefas')
-    destino.set('tarefa', tarefa)
-  } else {
-    destino.set('aba', 'minha')
-    const op = q.get('aba') ?? ''
-    if ((ABAS_INTERNAS as readonly string[]).includes(op)) destino.set('op', op)
+    const destino = new URLSearchParams({ aba: 'tarefas', tarefa })
+    if (processo) destino.set('processo', processo)
+    return `/torre?${destino.toString()}`
   }
-  if (processo) destino.set('processo', processo)
-  return `/torre?${destino.toString()}`
+  // "MINHA OPERAÇÃO" SAIU DA TORRE (06/10/2026): é a tela de quem executa e fica em /operacao — sem redirecionar o administrador para a Torre.
+  const op = q.get('aba') ?? ''
+  return (ABAS_INTERNAS as readonly string[]).includes(op) ? `/operacao?aba=${op}` : '/operacao'
 }
 
 /**

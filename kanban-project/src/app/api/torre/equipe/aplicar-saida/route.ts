@@ -7,6 +7,8 @@ import { exigirTorre } from '@/src/lib/torre-acesso'
 import { abrirIndisponibilidade } from '@/lib/operacional/organizacao'
 import { sugerirSucessor } from '@/lib/operacional/elegibilidade'
 import { moverCarteira } from '@/lib/operacional/torre-equipe'
+import { previaDeMoverCarteira } from '@/lib/operacional/torre-equipe-previas'
+import { confirmacaoDoCorpo, pedirConfirmacao } from '@/src/lib/torre-confirmacao'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { prisma } from '@/lib/prisma'
 
@@ -21,6 +23,17 @@ export async function POST(request: NextRequest) {
   const pessoa = await prisma.usuario.findUnique({ where: { id: usuarioId }, select: { nome: true } })
   if (!pessoa) return NextResponse.json({ error: 'pessoa não encontrada' }, { status: 404 })
 
+  // PROPOSTA: a ausência e a carteira só mudam depois da confirmação explícita (a prévia mostra o que vai para o sucessor).
+  const sugerido = await sugerirSucessor(usuarioId)
+  const mover = await previaDeMoverCarteira({ deUsuarioId: usuarioId, paraUsuarioId: sugerido?.usuarioId ?? null })
+  const previa = {
+    pergunta: `Marcar ${pessoa.nome} ausente por ${dias} dias${mover ? ` e ${mover.pergunta.charAt(0).toLowerCase()}${mover.pergunta.slice(1)}` : ' (a carteira não tem para quem ir)'}`,
+    itens: mover?.itens ?? [{ pessoa: pessoa.nome, quantidade: 0, tarefas: [] }],
+    assinatura: `aus:${usuarioId}:${dias}|${mover?.assinatura ?? 'sem-carteira'}`,
+  }
+  { const { confirmado, assinatura } = confirmacaoDoCorpo(b)
+    if (!confirmado || assinatura == null) return pedirConfirmacao(previa)
+    if (assinatura !== previa.assinatura) return NextResponse.json({ ok: false, mensagem: 'A carteira mudou desde que você confirmou. Revise e confirme de novo.', code: 'SUGESTAO_MUDOU', confirmacao: previa }, { status: 409 }) }
   const inicio = new Date()
   const fim = new Date(inicio.getTime() + dias * 86_400_000)
   const motivo = typeof b?.motivo === 'string' && b.motivo.trim() ? b.motivo.trim().slice(0, 300) : `saída simulada · ${dias} dias`

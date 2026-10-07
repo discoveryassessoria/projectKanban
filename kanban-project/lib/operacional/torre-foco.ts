@@ -15,6 +15,7 @@
 import { prisma } from '@/lib/prisma'
 import { labelDaFasePorPhaseKey } from '@/src/lib/process-stage/fases-catalog'
 import { listarTarefasDaTorre, type LinhaDaTorre } from '@/src/services/torre-tarefas'
+import { listarCanceladasDaTorre } from '@/src/services/torre-canceladas'
 import { progressoRealDoProcesso, diasNaFaseAtual } from './metricas-processo'
 import { pausaVigenteDoProcesso, type PausaDoProcesso } from '@/src/services/processo-pausa'
 import { STATUS_DOCUMENTO_INATIVOS } from '@/src/lib/documentos/status-inativos'
@@ -75,6 +76,8 @@ export interface CertidaoEncerradaDoFoco {
   ordemArvore?: number | null
   tarefaId?: number | null
   faseMacroKey?: string | null
+  /** `true` = certidão inativa (não exigida/cancelada) que NÃO tem tarefa cancelada: fica fora da conta das "canceladas" da aba Tarefas. */
+  semTarefa?: boolean
 }
 
 /** Os 4 números do Foco — a MESMA definição dos filtros da aba Tarefas (Vencidas / Aguardando terceiros / Sem responsável). */
@@ -119,25 +122,31 @@ export async function focoDaFamilia(processoId: number, agora = new Date()): Pro
   const tituloDoDoc = new Map<number, string>()
   const tarefaDoDoc = new Map<number, { id: number; faseMacroKey: string | null }>()
   for (const t of tarefasDosInativos) if (t.documentoId != null && !tituloDoDoc.has(t.documentoId)) { tituloDoDoc.set(t.documentoId, t.titulo.split(' · ')[0].trim()); tarefaDoDoc.set(t.documentoId, { id: t.id, faseMacroKey: t.faseMacroKey }) }
-  // A MESMA lista da aba Tarefas (tarefas CANCELADAS do processo, de qualquer fase): as que não têm Documento inativo entram aqui também.
-  const { linhas: canceladasDaTorre } = await listarTarefasDaTorre({ processoId, status: ['CANCELADA'], incluirEncerradas: true }, agora, { incluirPausados: true })
-  const docsInativos = new Set(idsInativos)
-  const soTarefa: CertidaoEncerradaDoFoco[] = canceladasDaTorre
-    .filter((l) => l.statusTarefa === 'CANCELADA' && (l.documentoId == null || !docsInativos.has(l.documentoId)))
-    .map((l) => ({
-      documentoId: l.documentoId ?? null, titulo: l.titulo.split(' · ')[0].trim(), pessoa: l.pessoaNome ?? null, encerramento: null, tipo: 'CANCELADA' as const,
-      pessoaId: l.pessoaId ?? null, ordemArvore: null, tarefaId: l.taskId, faseMacroKey: l.faseMacroKey ?? null,
-    }))
-  const encerradasDosDocs: CertidaoEncerradaDoFoco[] = inativos.map((d) => ({
+  // AS CANCELADAS = a MESMA consulta da aba Tarefas (`listarCanceladasDaTorre`, src/services/torre-canceladas.ts): o número do card é o tamanho desta lista (L3).
+  // As certidões inativas SEM tarefa cancelada (ex.: "não exigida" pela árvore, que nunca teve tarefa) ficam à parte, como "sem tarefa": nunca somadas às canceladas.
+  const canceladasDaTorre = await listarCanceladasDaTorre({ processoId }, agora)
+  const statusDoInativo = new Map(inativos.map((d) => [d.id, String(d.status)]))
+  const docsDasCanceladas = new Set(canceladasDaTorre.map((l) => l.documentoId).filter((x): x is number => x != null))
+  const encerradasCanceladas: CertidaoEncerradaDoFoco[] = canceladasDaTorre.map((l) => ({
+    documentoId: l.documentoId ?? null, titulo: l.titulo.split(' · ')[0].trim(), pessoa: l.pessoaNome ?? l.casalNomes ?? null,
+    // quem/quando/por quê: o do documento (traz o "Reabrir" da porta canônica) ou, sem documento, o da própria tarefa (o mesmo log da aba Tarefas).
+    encerramento: encerramentos.get(l.documentoId ?? -1) ?? (l.encerramento
+      ? { tipo: 'CANCELADA' as const, quando: l.encerramento.quando, quandoRotulo: l.encerramento.quandoRotulo, porId: null, porNome: l.encerramento.porNome, motivo: l.encerramento.motivo, justificativa: null, tarefaReabrivelId: null, observacao: null }
+      : null),
+    // O rótulo da linha segue o Documento (cancelada por decisão × não exigida pela árvore); a CONTA (card) é a da lista de tarefas canceladas.
+    tipo: (l.documentoId != null && statusDoInativo.get(l.documentoId) === 'NAO_EXIGIDO' ? 'NAO_EXIGIDA' : 'CANCELADA') as 'CANCELADA' | 'NAO_EXIGIDA',
+    pessoaId: l.pessoaId ?? null, ordemArvore: null, tarefaId: l.taskId, faseMacroKey: l.faseMacroKey ?? null,
+  }))
+  const encerradasSemTarefa: CertidaoEncerradaDoFoco[] = inativos.filter((d) => !docsDasCanceladas.has(d.id)).map((d) => ({
     documentoId: d.id,
     titulo: tituloDoDoc.get(d.id) ?? (d.tipo ? TIPO_DOCUMENTO_LABELS[d.tipo] ?? String(d.tipo) : `Documento #${d.id}`),
     pessoa: d.pessoa ? [d.pessoa.nome, d.pessoa.sobrenome].filter(Boolean).join(' ') : null,
     encerramento: encerramentos.get(d.id) ?? null,
     tipo: (String(d.status) === 'NAO_EXIGIDO' ? 'NAO_EXIGIDA' : 'CANCELADA') as 'CANCELADA' | 'NAO_EXIGIDA',
     pessoaId: d.pessoaId, ordemArvore: d.pessoa?.numeroLinhagem ?? null,
-    tarefaId: tarefaDoDoc.get(d.id)?.id ?? null, faseMacroKey: tarefaDoDoc.get(d.id)?.faseMacroKey ?? null,
+    tarefaId: tarefaDoDoc.get(d.id)?.id ?? null, faseMacroKey: tarefaDoDoc.get(d.id)?.faseMacroKey ?? null, semTarefa: true,
   }))
-  const encerradas: CertidaoEncerradaDoFoco[] = [...encerradasDosDocs, ...soTarefa]
+  const encerradas: CertidaoEncerradaDoFoco[] = [...encerradasCanceladas, ...encerradasSemTarefa]
 
   return {
     processoId, familiaId: proc.familiaId, familiaNome: proc.familia?.nome ?? proc.nome,
@@ -233,7 +242,7 @@ function linhaEncerrada(e: CertidaoEncerradaDoFoco, info: Map<number, InfoDaPess
     passo: null, status: e.tipo, statusRotulo: cancelada ? 'Cancelada' : 'Não exigida',
     responsavelId: null, responsavelNome: null, iniciouEm: null, concluidaEm: null, dataPrazo: null, rotuloDoPrazo: '',
     risco: null, atrasada: false, bola: null, encerramentoTexto, motivoTexto,
-    reabrivel: cancelada && enc?.tarefaReabrivelId != null, podeAtribuir: false, fase,
+    reabrivel: cancelada && enc?.tarefaReabrivelId != null, podeAtribuir: false, fase, ...(e.semTarefa ? { semTarefa: true } : {}),
   }
 }
 
@@ -353,7 +362,7 @@ export async function detalheDoProcesso(processoId: number, agora = new Date()):
   // OS CARTÕES (Passo atual · Com quem · Prazo · Cartórios) leem a MESMA lista da tabela (todas as abertas do processo): L3 da Lei da Torre.
   const cartoes = cartoesDaFase({
     linhas: foco.tarefas,
-    encerradas: { canceladas: encerradasDaFase.filter((e) => e.tipo === 'CANCELADA').length, naoExigidas: encerradasDaFase.filter((e) => e.tipo === 'NAO_EXIGIDA').length },
+    encerradas: { canceladas: encerradasDaFase.filter((e) => !e.semTarefa).length, naoExigidas: encerradasDaFase.filter((e) => e.semTarefa).length },
     riscoDe: (l) => nivelDeRisco(l),
     // As certidões da fase (abertas e concluídas) com o órgão vinculado no DOCUMENTO — o cartão Cartórios conta vinculadas e faltantes.
     certidoesDaFase: [...foco.tarefas, ...concluidas].map((l) => ({ documentoId: l.documentoId, terceiroNome: l.terceiroNome })),

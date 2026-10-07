@@ -3,6 +3,7 @@
 // servidor devolve a prévia (HTTP 428, nada gravado); o modal pergunta "Atribuir X a Y?" e só a confirmação explícita reenvia com
 // `confirmado: true` + a assinatura da prévia. "Cancelar" não grava nada. Ver `src/lib/torre-confirmacao.ts` (servidor).
 import { useCallback, useRef, useState, type ReactNode } from "react"
+import { LAYER } from "@/src/lib/ui/layers"
 import { api, type RespostaApi } from "./torre-base"
 
 interface Previa { pergunta: string; itens: Array<{ pessoa: string; quantidade: number; tarefas: string[] }>; assinatura: string; alerta?: string; exigeConfirmacaoDeAndamento?: boolean; pedeMotivo?: boolean }
@@ -28,7 +29,7 @@ export function useConfirmarAtribuicao(): { postar: <T = Record<string, unknown>
   }, [])
 
   const modal = pend ? (
-    <div className="fixed inset-0 z-[10020] flex items-center justify-center bg-[var(--overlay-modal)] p-4" data-testid="confirmar-atribuicao" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 flex items-center justify-center bg-[var(--overlay-modal)] p-4" style={{ zIndex: LAYER.toast - 5 }} data-testid="confirmar-atribuicao" role="dialog" aria-modal="true">
       <div className="bg-[var(--surface-popover)] text-white rounded-xl shadow-[var(--elev-3)] w-full max-w-md p-5">
         <h3 className="text-base font-bold">{pend.previa.pergunta}</h3>
         <ul className="mt-3 space-y-2 text-sm max-h-60 overflow-auto">

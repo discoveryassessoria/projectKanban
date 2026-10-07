@@ -1,6 +1,6 @@
 // scripts/menu-admin-sem-tarefas-distribuicao.test.ts
-// Torre de Controle (30/09/2026): "Tarefas e Projetos" e "Distribuição" saem do menu SÓ do administrador;
-// para não-admin o menu fica como era; as rotas continuam existindo e redirecionando (nada apagado).
+// Torre de Controle (30/09/2026; consolidada em 06/10/2026): "Tarefas e Projetos" e "Distribuição" saíram do menu de TODOS;
+// a regra pura escondeParaAdmin segue válida; as rotas continuam existindo e redirecionando (nada apagado).
 import { readFileSync, existsSync } from "node:fs"
 import { itemDeMenuVisivel } from "../src/lib/menu-visibilidade"
 
@@ -26,11 +26,14 @@ ok("item comum (sem a marca) continua visível ao admin", itemDeMenuVisivel({ pe
 
 const side = readFileSync("src/components/bitrix-sidebar.tsx", "utf8")
 const bloco = (url: string) => side.slice(side.indexOf(`url: "${url}"`), side.indexOf(`url: "${url}"`) + 400)
-ok("o menu marca os dois itens com escondeParaAdmin", /escondeParaAdmin: true/.test(bloco("/tarefas")) && /escondeParaAdmin: true/.test(bloco("/operacao/distribuicao")))
+// Consolidação 06/10/2026: os dois itens SAÍRAM do menu de TODOS (não só do admin); a Operação aparece para o admin também.
+ok("o menu NÃO tem mais 'Tarefas e Projetos' nem 'Distribuição' (nem url /tarefas, nem /operacao/distribuicao)", !side.includes('url: "/tarefas"') && !side.includes('url: "/operacao/distribuicao"') && !/title: "Tarefas e Projetos"/.test(side) && !/title: "Distribui[cç][aã]o"/.test(side))
+ok("a Operação segue no menu, sem soAdmin e sem escondeParaAdmin (o admin também a vê)", side.includes('url: "/operacao"') && !/soAdmin|escondeParaAdmin/.test(bloco("/operacao").split("},")[0]))
+ok("a Torre segue no menu só para o admin", /soAdmin: true/.test(bloco("/torre")))
 ok("o menu filtra pela função única", side.includes("itemDeMenuVisivel(item"))
 ok("as rotas continuam existindo (nada apagado)", existsSync("src/app/tarefas/page.tsx") && existsSync("src/app/operacao/distribuicao/page.tsx"))
 const tp = readFileSync("src/app/tarefas/page.tsx", "utf8"), dp = readFileSync("src/app/operacao/distribuicao/page.tsx", "utf8")
-ok("e continuam redirecionando o admin para a Torre (destinoDaAbsorcao)", /destinoDaAbsorcao\(/.test(tp) && /destinoDaAbsorcao\(/.test(dp) && /\/torre/.test(readFileSync("src/lib/torre-absorcao.ts", "utf8")))
+ok("e redirecionam para a aba Tarefas da Torre (Lei da Torre, L4)", /redirect\("\/torre\?aba=tarefas"\)/.test(tp) && /redirect\("\/torre\?aba=tarefas"\)/.test(dp) && /\/torre/.test(readFileSync("src/lib/torre-absorcao.ts", "utf8")))
 
 console.log(`\n${falhou === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${passou} ok, ${falhou} falhas`)
 process.exit(falhou ? 1 : 0)

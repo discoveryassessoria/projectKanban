@@ -120,7 +120,7 @@ secao("3) Operação e Torre → Minha operação (o MESMO componente) — todas
   for (const por of ["pessoa", "orgao", "passo"] as const) {
     ok(`«Por família, depois por ${por}»: grupos e linhas na regra`, iguais(idsDe(agruparDentroDaFamilia(v3, por).flatMap((g) => g.linhas) as any), esperado))
   }
-  ok("Minha operação (Torre) monta o mesmo OperacaoV3 da Operação", /import \{ OperacaoV3 \} from "@\/src\/components\/operacao\/operacao-v3"/.test(ler("src/components/torre/Torre.tsx")) && /aba === "minha" && <OperacaoV3/.test(ler("src/components/torre/Torre.tsx")))
+  ok("Operação (/operacao, a tela de quem executa) monta o OperacaoV3 — e a Torre NÃO o monta mais (Minha operação saiu da Torre)", /OperacaoV3/.test(ler("src/app/operacao/page.tsx")) && !/OperacaoV3/.test(ler("src/components/torre/Torre.tsx")))
 }
 
 secao("4) Radar (da Operação): a lista que cada cartão abre")
@@ -167,7 +167,7 @@ secao("7) Página do processo (tabela de certidões da fase) — status/prazo/ri
   const r = filtrarEOrdenar(tab, { pessoaId: null, status: "TODOS" })
   ok("«Ativas + canceladas»: a regra fixa — a cancelada NÃO vai para o fim", iguais(r.map((l) => `${l.pessoaId}:${l.titulo.includes("nasc") ? "NASCIMENTO" : l.titulo.includes("casam") ? "CASAMENTO" : l.titulo.includes("óbito") ? "OBITO" : "OUTRO"}`), esperado))
   ok("o select «Pessoa» também na regra: G1…G4, linha reta antes, nascimento", pessoasDaTabela(tab).map((p) => p.id).join() === "1,2,3,4,5,6,7,8,9,10,11")
-  ok("a tela não oferece «Ordenar» (prazo/status) na página do processo", !/OPCOES_DE_ORDEM|aria-label="Ordenar"/.test(ler("src/components/torre/ProcessoCertidoes.tsx")) && !/OPCOES_DE_ORDEM/.test(ler("lib/operacional/torre-processo-puro.ts")))
+  ok("a tela não oferece «Ordenar» (prazo/status) na página do processo", !/OPCOES_DE_ORDEM|aria-label="Ordenar"/.test(ler("src/components/torre/ProcessoEncerradas.tsx")) && !/OPCOES_DE_ORDEM/.test(ler("lib/operacional/torre-processo-puro.ts")))
 }
 
 secao("8) Aba Documentos do processo e central da fase")
@@ -183,8 +183,6 @@ secao("8) Aba Documentos do processo e central da fase")
 secao("9) Exportações CSV")
 {
   ok("exportarFamiliaCsv (Central da família) exporta na regra fixa e inclui a geração", /const linhas = ordenarCertidoesDaTabela\(linhasEntrada\)/.test(ler("src/components/operacao/tabela-familia.tsx")))
-  ok("exportarCsv (Distribuição) exporta na regra fixa", /const linhas = ordenarLinhasDeCertidao\(linhasEntrada\)/.test(ler("src/components/operacao/distribuicao-tarefas.tsx")))
-  ok("a ordenação da Visão global (colunas) só ordena famílias", /ordenarLinhasDeCertidao\(linhas, \(a, b\) =>/.test(ler("src/components/operacao/visao-global.tsx")))
   ok("ordenarLinhasDeCertidao é a mesma regra", iguais(idsDe(ordenarLinhasDeCertidao(FAM as any) as any), esperado))
 }
 

@@ -16,11 +16,11 @@ import {
 import { useAgora } from "@/src/lib/torre-agora"
 import { api, erroDe, useTorre, type Desfazer } from "./torre-base"
 import type { LinhaTorre } from "./tipos"
+import { PerguntaDaAba } from "./PerguntaDaAba"
 import { TerceirosRegua } from "./TerceirosRegua"
-import { CobrarPedidoModal, CobrarTodosModal, ContatosDoPedidoModal, type DadosDaCobranca } from "./TerceirosModais"
+import { CobrarTodosModal, type DadosDaCobranca } from "./TerceirosModais"
 import "./terceiros.css"
 
-type Visao = "pedido" | "orgao"
 type Retorno = { ok: boolean; mensagem?: string }
 
 interface RespostaDaCobranca { ok?: boolean; desfazer?: Desfazer | null; cobradas?: number; ignoradas?: Array<{ motivo: string }>; mensagem?: string }
@@ -36,30 +36,19 @@ function aceitar(r: { ok: boolean; data: RespostaDaCobranca }): Retorno & { cobr
 export function TorreTerceiros({ linhas, versao }: { linhas: LinhaTorre[]; versao: number }) {
   const { avisar, recarregar } = useTorre()
   const router = useRouter()
-  const [visao, setVisao] = useState<Visao>("pedido")
-  const [cobrar, setCobrar] = useState<PedidoDeTerceiro | null>(null)
   const [todos, setTodos] = useState(false)
-  const [contatos, setContatos] = useState<PedidoDeTerceiro | null>(null)
   // "Hoje" só depois de montar (hidratação): `null` no servidor e no primeiro render; o instante real (a cada minuto) depois.
   const agora = useAgora()
 
   const pedidos = useMemo(() => (agora ? pedidosDeTerceiros(linhas, agora) : []), [linhas, agora])
   const resumo = useMemo(() => (agora ? resumoDeTerceiros(linhas, agora) : null), [linhas, agora])
   const idsVencidos = useMemo(() => (agora ? idsParaCobrar(linhas, agora) : []), [linhas, agora])
-  const grupos = useMemo(() => (visao === "orgao" ? agruparPorOrgao(pedidos) : []), [visao, pedidos])
+  const grupos = useMemo(() => agruparPorOrgao(pedidos), [pedidos])
   const pedidosVencidos = useMemo(() => pedidos.filter((p) => p.cobrar), [pedidos])
 
   const cobrarIds = async (tarefaIds: number[], d: DadosDaCobranca) =>
     aceitar(await api<RespostaDaCobranca>("/api/torre/terceiros/cobrar", "POST", { tarefaIds, canal: d.canal, proximaEmDias: d.proximaEmDias }))
 
-  const cobrarUm = async (p: PedidoDeTerceiro, d: DadosDaCobranca): Promise<Retorno> => {
-    const r = await cobrarIds([p.taskId], d)
-    if (!r.ok) return r
-    setCobrar(null)
-    avisar(`Cobrança registrada · ${p.pessoa}`, r.desfazer ?? null)
-    recarregar()
-    return { ok: true }
-  }
   const cobrarVencidos = async (d: DadosDaCobranca): Promise<Retorno> => {
     const r = await cobrarIds(idsVencidos, d)
     if (!r.ok) return r
@@ -75,36 +64,16 @@ export function TorreTerceiros({ linhas, versao }: { linhas: LinhaTorre[]; versa
     recarregar()
   }
 
-  const linhaDoPedido = (p: PedidoDeTerceiro) => (
-    <div key={p.taskId} className="tor-row ter-g" data-pedido={p.taskId}>
-      <div>
-        <div className="ter-quem">{p.certidao}</div>
-        <div className="small">{p.pessoa} · {p.familia}</div>
-      </div>
-      <div>
-        <div className="ter-orgao">{p.orgao ?? "—"}</div>
-        <div className="small">{p.cobrancas}</div>
-      </div>
-      <div className="ter-cobrar-em">{p.pedidaHa}</div>
-      <div className={`ter-cobrar-em ${p.cobrarEm.tom === "vencida" ? "vencida" : p.cobrarEm.tom === "hoje" ? "hoje" : ""}`}>{p.cobrarEm.texto}</div>
-      <div className="ter-acoes">
-        {p.cobrar
-          ? <button className="tor-btn pri" onClick={() => setCobrar(p)}>Cobrar</button>
-          : p.processoId != null && <button className="tor-btn ter-ver-btn" onClick={() => router.push(`/torre/processo/${p.processoId}`)}>Ver</button>}
-        <button className="tor-btn" onClick={() => setContatos(p)}>Contatos</button>
-      </div>
-    </div>
-  )
-
   return (
     <div>
+      <PerguntaDaAba aba="terceiros" />
       <div className="ter-cab">
-        <div className="ter-trilha"><Link href="/torre?aba=visao">Torre de Controle</Link> › Terceiros</div>
+        <div className="ter-trilha"><Link href="/torre?aba=hoje">Torre de Controle</Link> › Terceiros</div>
         <h1 className="ter-titulo">Terceiros · quem de fora está nos devendo resposta</h1>
       </div>
 
       <div className="ter-kpis" role="group" aria-label="Resumo por tipo de terceiro">
-        <div className="ter-kpi" title="Todos os pedidos que esperam resposta de fora, com ou sem responsável na tarefa. O cartão 'Aguardando terceiros' da Visão geral conta só os que têm responsável; os sem responsável entram em 'Sem responsável'."><b className="ter-kpi-n">{resumo ? milhar(resumo.aguardando) : "…"}</b><span className="ter-kpi-l">aguardando terceiros (com ou sem responsável)</span></div>
+        <div className="ter-kpi" title="Todos os pedidos que esperam resposta de fora, com ou sem responsável na tarefa — o MESMO número da visão 'Aguardando terceiros' da aba Tarefas; os sem responsável entram em 'Sem responsável'."><b className="ter-kpi-n">{resumo ? milhar(resumo.aguardando) : "…"}</b><span className="ter-kpi-l">aguardando terceiros (com ou sem responsável)</span></div>
         <div className="ter-kpi"><b className="ter-kpi-n">{resumo ? milhar(resumo.comCartorios) : "…"}</b><span className="ter-kpi-l">com cartórios</span></div>
         <div className="ter-kpi"><b className="ter-kpi-n">{resumo ? milhar(resumo.comOCliente) : "…"}</b><span className="ter-kpi-l">com o cliente</span></div>
         <div className="ter-kpi"><b className="ter-kpi-n">{resumo ? `${milhar(resumo.tradutora)} · ${milhar(resumo.juizo)} · ${milhar(resumo.consulado)}` : "…"}</b><span className="ter-kpi-l">tradutora · juízo · consulado</span></div>
@@ -114,45 +83,44 @@ export function TorreTerceiros({ linhas, versao }: { linhas: LinhaTorre[]; versa
 
       <div className="tor-card">
         <div className="ter-card-topo">
-          <h2 className="ter-card-titulo">Pedidos esperando resposta</h2>
-          <div className="ter-ver" role="group" aria-label="Ver">
-            <span className="ter-ver-rot">Ver:</span>
-            <button className={`tor-btn ${visao === "pedido" ? "pri" : ""}`} aria-pressed={visao === "pedido"} onClick={() => setVisao("pedido")}>por pedido</button>
-            <button className={`tor-btn ${visao === "orgao" ? "pri" : ""}`} aria-pressed={visao === "orgao"} onClick={() => setVisao("orgao")}>agrupado por cartório (para cobrar junto)</button>
-          </div>
+          <h2 className="ter-card-titulo">Órgãos que nos devem resposta · {grupos.length}</h2>
           <button
             className="tor-btn pri" disabled={!agora}
             onClick={() => (idsVencidos.length ? setTodos(true) : avisar("Nenhum pedido com data de cobrança vencida ou de hoje."))}
           >Cobrar todos os vencidos ({resumo ? resumo.paraCobrar : "…"})</button>
         </div>
 
-        <div className="tor-scroll">
-          <div className="tor-hd ter-g"><span>Certidão · pessoa · família</span><span>Pedida a</span><span>Pedida há</span><span>Cobrar em</span><span>Ações</span></div>
-          {agora && pedidos.length === 0 && <div className="ter-vazio">Nenhum pedido esperando resposta de terceiros.</div>}
+        <div className="tor-scroll" data-testid="terceiros-orgaos">
+          <div className="tor-hd ter-g"><span>Órgão</span><span>Pedidos</span><span>A cobrar</span><span>Escaladas</span><span>Ações</span></div>
+          {agora && grupos.length === 0 && <div className="ter-vazio">Nenhum pedido esperando resposta de terceiros.</div>}
           {!agora && <div className="ter-vazio">Carregando terceiros…</div>}
-          {visao === "pedido" && pedidos.map(linhaDoPedido)}
-          {visao === "orgao" && grupos.map((g) => (
-            <div key={g.orgaoId ?? "sem"}>
-              <div className="ter-grupo">
-                <span className="ter-grupo-nome">{g.nome}</span>
-                <span className="ter-grupo-sub">{subtituloDoGrupo(g.pedidos.length)}</span>
-                {g.orgaoId != null && <button className="tor-btn" onClick={() => void cobrarCartorio(g.orgaoId!, g.nome, g.pedidos)}>Cobrar este cartório ({g.pedidos.length})</button>}
+          {grupos.map((g) => {
+            const aCobrar = g.pedidos.filter((p) => p.cobrar).length
+            const escaladas = g.pedidos.filter((p) => p.escalada).length
+            return (
+              <div key={g.orgaoId ?? "sem"} className="tor-row ter-g" data-orgao={g.orgaoId ?? "sem"}>
+                <div className="ter-quem">{g.nome}</div>
+                <div>{g.pedidos.length}</div>
+                <div className={aCobrar ? "ter-cobrar-em vencida" : "ter-cobrar-em"}>{aCobrar}</div>
+                <div className={escaladas ? "ter-cobrar-em vencida" : "ter-cobrar-em"}>{escaladas}</div>
+                <div className="ter-acoes">
+                  {g.orgaoId != null && <button className="tor-btn" onClick={() => void cobrarCartorio(g.orgaoId!, g.nome, g.pedidos)}>Cobrar este órgão ({g.pedidos.length})</button>}
+                  {/* Os PEDIDOS (tarefas) moram na aba Tarefas — aqui só o link (L1). */}
+                  <Link className="tor-btn ter-ver-btn" href={g.orgaoId != null ? `/torre?aba=tarefas&visao=aguard&orgao=${g.orgaoId}` : "/torre?aba=tarefas&visao=aguard"}>Ver os {g.pedidos.length} em Tarefas</Link>
+                </div>
               </div>
-              {g.pedidos.map(linhaDoPedido)}
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         <div className="ter-nota">
-          A lista é por pedido. "Agrupado por cartório" serve só para cobrar junto o que está no mesmo lugar; não há ranking nem média por cartório, porque a maioria aparece uma vez só. Quem decide quando cobrar é a data de cobrança de cada pedido (padrão: 7 dias depois do pedido ou da última cobrança). "Cobrar" registra no histórico da certidão e marca a próxima data.
+          Esta aba lista ÓRGÃOS, não tarefas: cada pedido (certidão · pessoa · família), com o botão Cobrar da linha, está na aba Tarefas (visão "Aguardando terceiros"). Não há ranking nem média por cartório; o número de pedidos é o da própria lista. Quem decide quando cobrar é a data de cobrança.
         </div>
       </div>
 
       <TerceirosRegua versao={versao} />
 
-      {cobrar && <CobrarPedidoModal pedido={cobrar} onFechar={() => setCobrar(null)} onEnviar={(d) => cobrarUm(cobrar, d)} />}
       {todos && <CobrarTodosModal n={idsVencidos.length} cartorios={cartoriosDistintos(pedidosVencidos)} onFechar={() => setTodos(false)} onEnviar={cobrarVencidos} />}
-      {contatos && <ContatosDoPedidoModal pedido={contatos} onFechar={() => setContatos(null)} />}
     </div>
   )
 }

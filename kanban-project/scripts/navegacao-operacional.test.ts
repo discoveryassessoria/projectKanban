@@ -72,13 +72,12 @@ async function main() {
   // Operação, 25/09/2026).
   for (const [tela, arquivo] of [
     ['Minha Fila', 'src/components/operacao/tabela-familia.tsx'],
-    ['Tarefas e Projetos / Kanban global', 'src/components/operacao/visao-global.tsx'],
     ['notificações', 'lib/operacional/tarefa-comandos.ts'],
   ] as const) {
     ok(`§36-§38) ${tela} usa o helper canônico`,
       /urlOperacionalDaTarefa/.test(semComentarios(ler(arquivo))))
   }
-  const espalhadas = ['src/components/operacao/tabela-familia.tsx', 'src/components/operacao/visao-global.tsx']
+  const espalhadas = ['src/components/operacao/tabela-familia.tsx']
     .filter((f) => /`\/kanban\?/.test(semComentarios(ler(f))))
   ok('§39) e ninguém concatena URL à mão', espalhadas.length === 0, espalhadas.join(', ') || 'nenhuma')
 
@@ -273,8 +272,6 @@ async function main() {
     !existsSync(join(RAIZ, 'src/components/operacao/tarefa-operacional.tsx')),
     'era um segundo lugar para executar a mesma etapa')
   ok('§1) a Minha Fila não monta executor de etapa', !/StepEditorRouter/.test(tela))
-  const global = semComentarios(ler('src/components/operacao/visao-global.tsx'))
-  ok('§17) a visão global também não', !/StepEditorRouter/.test(global))
 
   // O executor vive num lugar só.
   const varrer = (dir: string, acc: string[] = []): string[] => {
@@ -322,7 +319,6 @@ async function main() {
   // ══════════════════════════════════════════════════════════════════════════
   const superficies = [
     ['Minha Fila / cockpit', 'src/components/operacao/tabela-familia.tsx'],
-    ['Visão global (Tarefas e Projetos)', 'src/components/operacao/visao-global.tsx'],
   ] as const
   for (const [nome, arq] of superficies) {
     const src = semComentarios(ler(arq))

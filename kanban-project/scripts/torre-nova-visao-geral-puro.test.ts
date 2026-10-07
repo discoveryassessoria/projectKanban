@@ -1,13 +1,16 @@
-// scripts/torre-nova-visao-geral-puro.test.ts — Visão geral (frente B1): regras PURAS do funil, da frase do dia e dos detalhes da Situação.
+// scripts/torre-nova-visao-geral-puro.test.ts — regras PURAS (frente B1) do funil, da frase do dia e dos detalhes da Situação.
+// CONSOLIDAÇÃO 06/10/2026: a Visão geral (TorreVisaoGeral/TorreKpis/TorreFunil) saiu da Torre e virou a aba HOJE (só alarmes). As regras puras
+// (lib/operacional/torre-funil-puro.ts, torre-topo.ts, torre-kpis.ts) seguem valendo e são provadas aqui; o que era TELA virou a prova de que
+// a tela saiu e de que o número de cada alarme de Hoje = a lista que ele abre.
 //   npx tsx scripts/torre-nova-visao-geral-puro.test.ts   (sem banco)
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import {
   permanenciasConcluidas, tempoMedioPorFase, textoDaAmostra, maiorGargalo, textoDoGargalo, textoDoTempoMedio, textoDaMeta, estourouAMeta, classeDoFunil,
   funilDasFases, gargaloDaSemana, sentidoDoBacklog, hrefDaFase, textoDaFaseNasPalavras, ESCOPO_VAZIO,
   type LinhaParaGargalo, type DadosDoFunilPorEscopo,
 } from "../lib/operacional/torre-funil-puro"
 import { fraseDoDia, textoDaFrase, milhar, distribuicaoPorPais, detalheDosTerceiros, familiasSemResponsavel, corDaTendencia, rotuloDecisoes } from "../lib/operacional/torre-topo"
-import { hrefDoKpi } from "../src/components/torre/TorreKpis"
+import { ALARMES_DE_HOJE, numeroDoAlarme, linhasDoAlarme, urlDoAlarme } from "../lib/operacional/torre-hoje"
 import { CARTOES_DA_AGENDA, CARTOES_DA_SITUACAO, KPI_POR_CHAVE, numeroDoKpi, linhasDoKpi, type LinhaParaKpi } from "../lib/operacional/torre-kpis"
 
 let passou = 0, falhou = 0
@@ -48,7 +51,7 @@ ok("dois registros do MESMO processo na fase: 2 permanências (amostras) mas 1 p
 const doFunil = funilDasFases({ fases: [{ key: "e", label: "Emissão", condicional: false }], processos: [], linhas: [], escopo: { tempos: { e: { mediaDias: 3.9, amostras: 1, processos: 1 } }, metas: { e: null }, semana: { processosAbertos: 0, protocolados: 0, tarefasAbertas: 0, tarefasFechadas: 0 } } })
 ok("a linha do funil já traz o texto com a amostra (é o que a tela imprime)", doFunil.linhas[0].tempoTexto === "4 dias · 1 processo", doFunil.linhas[0].tempoTexto)
 ok("leitor antigo da rota (sem o campo processos): mostra só a média, como antes", textoDoTempoMedio({ mediaDias: 12.4, amostras: 3 }, 15) === "12 dias")
-ok("a tela só imprime o texto pronto (nenhuma conta nova no componente)", /f\.tempoTexto\b/.test(ler("src/components/torre/TorreFunil.tsx")))
+ok("o componente do funil saiu da Torre (TorreFunil não existe mais); o texto pronto continua vindo da lib pura", !existsSync("src/components/torre/TorreFunil.tsx") && doFunil.linhas[0].tempoTexto === "4 dias · 1 processo")
 
 console.log("\ntexto: tempo, meta, estouro")
 ok("sem amostra → —", textoDoTempoMedio(undefined, 30) === "—" && textoDoTempoMedio({ mediaDias: 0, amostras: 0 }, 30) === "—")
@@ -85,7 +88,7 @@ ok("barra com total 0 não quebra (0.0%)", funilDasFases({ fases, processos: [],
 ok("gargalo da semana = a fase que estourou a meta", gargaloDaSemana(f.linhas)?.key === "e")
 ok("sem estouro, a fase com mais parados; sem parados, nenhuma", gargaloDaSemana(funilDasFases({ fases, processos: procs, linhas: [], escopo: ESCOPO_VAZIO }).linhas)?.key === "e" && gargaloDaSemana(funilDasFases({ fases, processos: [procs[0]], linhas: [], escopo: ESCOPO_VAZIO }).linhas) === null)
 ok("backlog: cresce / diminui / se mantém", sentidoDoBacklog({ tarefasAbertas: 212, tarefasFechadas: 186 }) === "cresce" && sentidoDoBacklog({ tarefasAbertas: 1, tarefasFechadas: 2 }) === "diminui" && sentidoDoBacklog({ tarefasAbertas: 2, tarefasFechadas: 2 }) === "estavel")
-ok("link da fase: ?aba=processos&fase=<chave>, mantendo país e busca", hrefDaFase("emissao_documental") === "/torre?aba=processos&fase=emissao_documental" && hrefDaFase("x", { pais: "italia", q: "bel" }) === "/torre?aba=processos&fase=x&pais=italia&q=bel")
+ok("link da fase: ?aba=familias&fase=<chave>, mantendo país e busca", hrefDaFase("emissao_documental") === "/torre?aba=familias&fase=emissao_documental" && hrefDaFase("x", { pais: "italia", q: "bel" }) === "/torre?aba=familias&fase=x&pais=italia&q=bel")
 ok("'Fase = etapa do processo (primeira → última)' vem do cadastro", textoDaFaseNasPalavras(fases) === "etapa do processo (Emissão → Genealogia)" && textoDaFaseNasPalavras([]) === "etapa do processo")
 
 console.log("\nfrase do dia")
@@ -111,20 +114,19 @@ ok("Σ da partição = tarefas abertas", numeroDoKpi("ninguem", ls, AG) + numero
 ok("processos por país, maior primeiro", distribuicaoPorPais([{ pais: "Espanha" }, { pais: "Itália" }, { pais: "Itália" }, { pais: null }]) === "Itália 2 · Espanha 1 · Sem país 1")
 ok("tendência: cor é bom/ruim (processos↑ bom; sem responsável↑ ruim; abertas neutra)", corDaTendencia("processos", "up") === "boa" && corDaTendencia("ninguem", "down") === "boa" && corDaTendencia("cartorio", "up") === "ruim" && corDaTendencia("abertas", "up") === "neutra")
 
-console.log("\ncada cartão leva à lista que ele conta")
-ok("o clique vai para ?aba=tarefas&kpi=<chave>; 'Tarefas abertas' = lista inteira (sem kpi); país e busca mantidos", hrefDoKpi("venc") === "/torre?aba=tarefas&kpi=venc" && hrefDoKpi("abertas") === "/torre?aba=tarefas" && hrefDoKpi("cob", { pais: "italia", q: "x" }) === "/torre?aba=tarefas&kpi=cob&pais=italia&q=x")
-ok("todo cartão da Situação e da Agenda tem número = tamanho da lista filtrada", [...CARTOES_DA_SITUACAO, ...CARTOES_DA_AGENDA].every((k) => numeroDoKpi(k, ls, AG) === linhasDoKpi(k, ls, AG).length))
+console.log("\ncada número de HOJE leva à lista que ele conta (os cartões da Visão geral viraram alarmes)")
+ok("o clique vai para ?aba=tarefas&kpi=<chave> ou &visao=<chave>", urlDoAlarme(ALARMES_DE_HOJE.find((a) => a.chave === "atrasadas")!) === "/torre?aba=tarefas&kpi=venc" && urlDoAlarme(ALARMES_DE_HOJE.find((a) => a.chave === "bloqueadas")!) === "/torre?aba=tarefas&visao=bloqueadas")
+ok("no máximo seis alarmes, todos com número = tamanho da lista que abrem (mesma função)", ALARMES_DE_HOJE.length <= 6 && ALARMES_DE_HOJE.every((a) => numeroDoAlarme(a, ls as never, AG) === linhasDoAlarme(a, ls as never, AG).length))
+ok("todo alarme que abre um KPI usa uma chave aceita na URL (filtra=true)", ALARMES_DE_HOJE.every((a) => a.abre.tipo !== "kpi" || KPI_POR_CHAVE[a.abre.kpi].filtra))
+ok("todo cartão da Situação e da Agenda (regras puras) tem número = tamanho da lista filtrada", [...CARTOES_DA_SITUACAO, ...CARTOES_DA_AGENDA].every((k) => numeroDoKpi(k, ls, AG) === linhasDoKpi(k, ls, AG).length))
 ok("todo cartão que filtra tem chave aceita na URL (filtra=true) — o resto é a lista inteira", [...CARTOES_DA_SITUACAO, ...CARTOES_DA_AGENDA].every((k) => KPI_POR_CHAVE[k].filtra || k === "abertas"))
 
-console.log("\nestático: textos e ordem do protótipo")
-const kp = ler("src/components/torre/TorreKpis.tsx"), vg = ler("src/components/torre/TorreVisaoGeral.tsx"), fu = ler("src/components/torre/TorreFunil.tsx")
-ok("rótulos 'Situação · onde está o trabalho agora' e 'Agenda · prazos de todas as certidões'", kp.includes("Situação · onde está o trabalho agora") && kp.includes("Agenda · prazos de todas as certidões"))
-ok("subtítulos dos cartões", kp.includes("certidões e passos em andamento") && kp.includes("aguardando a equipe: solicitar, conferir, traduzir"))
-ok("botão da faixa 'Revisar o dia · N decisões'", kp.includes("▶ Revisar o dia · "))
-ok("colunas do funil: Fase · Processos · Situação · Tempo médio · Meta · Maior gargalo", ["Fase", "Processos", "Situação", "Tempo médio", "Meta", "Maior gargalo"].every((c) => fu.includes(`>${c}<`)) && fu.includes("Clique numa fase.") && fu.includes("no ritmo") && fu.includes("atenção") && fu.includes("parado"))
-ok("a Visão geral monta, em ordem: TorreKpis → TorreFunil → Precisa de você (#pdv) → 5 palavras", (() => { const a = vg.indexOf("<TorreKpis"), b = vg.indexOf("<TorreFunil"), c = vg.indexOf('id="pdv"'), e2 = vg.indexOf("As 5 palavras da Torre:"); return a > 0 && b > a && c > b && e2 > c })())
-ok("as 5 palavras literais", ["uma família", "a unidade de trabalho (uma certidão de uma pessoa)", "onde a certidão está (solicitar, aguardando, conferir, pronta)", "a única data que manda", "quando cobrar o terceiro"].every((x) => vg.includes(x)))
-ok("sem 'sem histórico' nem 'Com o cartório'/'ninguém' visível", ![kp, vg, fu].some((s) => /sem hist[óo]rico|com o cart[óo]rio|sem ningu[ée]m|ningu[é]m/i.test(s.replace(/\/\/[^\n]*/g, ""))))
+console.log("\nestático: a Visão geral saiu; a frase do dia vive em Hoje")
+ok("TorreVisaoGeral, TorreKpis e TorreFunil não existem mais", ["TorreVisaoGeral", "TorreKpis", "TorreFunil", "TorreBriefing", "TorreRevisao"].every((f) => !existsSync(`src/components/torre/${f}.tsx`)))
+const hoje = ler("src/components/torre/TorreHoje.tsx"), casco = ler("src/components/torre/Torre.tsx")
+ok("Hoje mostra a frase do dia (o antigo Briefing) e os números clicáveis; o casco monta a frase com briefingDoDia sobre os MESMOS conjuntos", /data-testid="frase-do-dia"/.test(hoje) && /ALARMES_DE_HOJE\.map/.test(hoje) && /briefingDoDia\(/.test(casco) && /frase=\{textoDoBriefing\}/.test(casco))
+ok("sem 'Revisar o dia', 'As 5 palavras da Torre' nem '#pdv' na Torre", ![hoje, casco, ler("src/components/torre/TorreCabecalho.tsx")].map((x) => x.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1")).some((x) => /Revisar o dia|As 5 palavras da Torre|id="pdv"/.test(x)))
+ok("sem 'sem histórico' nem 'Com o cartório'/'ninguém' visível em Hoje", !/sem hist[óo]rico|com o cart[óo]rio|sem ningu[ée]m|ningu[é]m/i.test(hoje.replace(/\/\/[^\n]*/g, "")))
 
 console.log(`\n${falhou === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${passou} ok, ${falhou} falhas`)
 process.exit(falhou === 0 ? 0 : 1)

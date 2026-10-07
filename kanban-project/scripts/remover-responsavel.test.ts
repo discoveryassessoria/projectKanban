@@ -109,8 +109,7 @@ async function main() {
 
     secao("TELAS — só pelo botão; '— selecione —' nunca remove")
     const gav = ler("src/components/kanban/DocumentoOperationalDrawer.tsx")
-    ok("gaveta da certidão: botão 'Remover responsável' ao lado de Delegar", /data-testid="remover-responsavel"/.test(gav) && /Remover responsável/.test(gav))
-    ok("o menu Delegar não remove: '— selecione —' é opção desabilitada e o onChange ignora vazio", /<option value="" disabled[^>]*>— selecione —<\/option>/.test(gav) && /if \(e\.target\.value\) await delegarTarefa/.test(gav))
+    ok("gaveta da certidão (Lei da Torre, L4): NÃO remove nem delega — só mostra o responsável + link 'Atribuir na Torre'", !/remover-responsavel/.test(gav) && !/Remover responsável/.test(gav) && !/Delegar/.test(gav) && /Atribuir na Torre/.test(gav) && /\/torre\?aba=tarefas&tarefa=/.test(gav))
     const tt = ler("src/components/torre/TorreTarefas.tsx")
     ok("barra de lote da aba Tarefas: botão 'Remover responsável' com o modal de confirmação", /lote\("REMOVER_RESPONSAVEL"\)/.test(tt) && /useConfirmarAtribuicao\(\)/.test(tt) && /\{modalConfirmacao\}/.test(tt))
   } finally {

@@ -138,7 +138,7 @@ async function main() {
   const foco = ler("lib/operacional/torre-foco.ts"), puro = ler("lib/operacional/torre-proxima-acao.ts"), proc = ler("lib/operacional/torre-processos.ts")
   ok("a tabela do processo lê TODAS as abertas (não só a fase atual) e a próxima ação conta o mesmo conjunto", /foco\.tarefas\.map\(\(l\) => linhaAberta/.test(foco) && /proximaAcaoDoProcesso\(foco\.tarefas, null, ordemDaFase/.test(foco) && /proximaAcaoDoProcesso\(ls, null/.test(proc) && /faseOrd\(a\) - faseOrd\(b\)/.test(puro))
   ok("o cabeçalho do grupo na aba Tarefas (abertas / sem responsável) conta o processo inteiro", /todasAbertas \?\? linhasDaFase/.test(proc))
-  ok("a página mostra a coluna Fase e o cabeçalho por grupo", /<div>Fase<\/div>/.test(ler("src/components/torre/ProcessoCertidoes.tsx")) && /data-testid="grupo-fase"/.test(ler("src/components/torre/ProcessoCertidoes.tsx")))
+  ok("a página do processo EMBUTE a tabela da aba Tarefas (TorreTarefas — mesma consulta, mesmas colunas, inclusive Fase)", /<TorreTarefas/.test(ler("src/components/torre/TorreProcessoPagina.tsx")) && /<div>Fase<\/div>|"Fase"/.test(ler("src/components/torre/TarefasTabela.tsx")))
 
 
   // ── complemento 06/10: caminho do processo = fonte única de fase; próxima ação; passo atual ─────────────────────────────
@@ -169,8 +169,8 @@ async function main() {
   const cards = cartoesDaFase({ linhas: [], encerradas: { canceladas: enc.filter((l) => l.tipo === "CANCELADA").length, naoExigidas: enc.filter((l) => l.tipo === "NAO_EXIGIDA").length }, riscoDe: () => "ritmo" })
   const fora = cards.find((c) => /Cancelada/.test(c.rotulo))!
   const aberta = filtrarEOrdenar(enc, { pessoaId: null, status: "ENCERRADAS" })
-  ok("card 'Cancelada / não exigida' = tamanho da lista que ele abre (nunca 'Nenhuma' com linhas na lista)", fora.titulo.startsWith(String(aberta.length)) && aberta.length === 3, `${fora.titulo} | ${fora.sub}`)
-  ok("a lista do processo lê as canceladas/não exigidas de TODAS as fases (sem recorte pela fase atual) e inclui as tarefas canceladas sem Documento", !/e\.faseMacroKey === faseAtualKey : faseEhDocumental/.test(foco) && /soTarefa/.test(foco))
+  ok("card 'Cancelada / não exigida': o número é o das TAREFAS canceladas (a mesma consulta e o mesmo número da aba Tarefas); as certidões SEM tarefa vêm à parte, nunca somadas", fora.titulo === "2 canceladas" && /1 não exigida pela árvore \(sem tarefa\)/.test(fora.sub) && aberta.length === 3, `${fora.titulo} | ${fora.sub}`)
+  ok("a página lê as canceladas pela MESMA função da aba Tarefas (listarCanceladasDaTorre) e separa as certidões sem tarefa", /listarCanceladasDaTorre/.test(foco) && /semTarefa: true/.test(foco) && /listarCanceladasDaTorre/.test(ler("src/app/api/torre/tarefas/canceladas/route.ts")))
 
   // ── sugestão nunca atribui sozinha ─────────────────────────────────────────────────────────────────────────────────────
   secao("SUGESTÃO — nunca atribui sem confirmação explícita (servidor e tela); origem no histórico")
@@ -178,9 +178,10 @@ async function main() {
     const t = ler(rota)
     ok(`${rota.replace("src/app/api/torre/", "")}: sem confirmação devolve a prévia (428) e não grava`, /pedirConfirmacao\(/.test(t) && /confirmacaoDoCorpo\(/.test(t))
   }
-  for (const tela of ["PainelTorreTarefa", "acoes-do-item", "TorreProcessoPagina", "TorreEquipe"]) {
+  for (const tela of ["PainelTorreTarefa", "TorreProcessoPagina", "TorreEquipe"]) {
     ok(`${tela}: passa pelo modal 'Atribuir X a Y?'`, /useConfirmarAtribuicao\(\)/.test(ler(`src/components/torre/${tela}.tsx`)) && /\{modal(Confirmacao)?\}/.test(ler(`src/components/torre/${tela}.tsx`)))
   }
+  ok("L4: as decisões do processo NÃO atribuem — ação de atribuição vira link 'Atribuir na Torre' e o acoes-do-item leva para Tarefas", /Atribuir na Torre/.test(ler("src/components/torre/ProcessoDecisoes.tsx")) && !/\/api\/tarefas\/[^"]*comando|atribuir-sugerido/.test(ler("src/components/torre/acoes-do-item.tsx")) && /torre\?aba=tarefas&visao=semdono/.test(ler("src/components/torre/acoes-do-item.tsx")))
   ok("a assinatura da prévia é conferida de novo na execução (sugestão que mudou é recusada)", /assinaturaConfirmada/.test(ler("src/services/precisa-de-voce-acoes.ts")) && /SUGESTAO_MUDOU/.test(ler("src/app/api/torre/processos/[processoId]/distribuir/route.ts")))
   ok("o histórico registra a origem: 'via sugestão do Precisa de você (confirmada…)' × 'manual'", /via sugestão do Precisa de você \(confirmada/.test(ler("src/services/precisa-de-voce-acoes.ts")) && /Origem: manual/.test(ler("lib/operacional/tarefa-comandos.ts")))
 
