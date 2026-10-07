@@ -2,6 +2,7 @@
 // src/components/torre/lote-atribuicao.tsx — as AÇÕES EM LOTE DE ATRIBUIÇÃO: "Atribuir a [pessoa (carga)]", "Remover responsável" e (onde faz sentido) "Atribuir às sugeridas".
 // UM SÓ código para a aba Tarefas e para a tabela da página do processo: as duas telas se comportam igual (mesma lista de pessoas com a carga, mesma
 // confirmação com a lista "certidão · pessoa · família", mesma confirmação extra para tarefa já iniciada, mesma porta `/api/torre/tarefas/lote`).
+import { ROTULO_ESCOLHA_DA_PESSOA } from "@/src/lib/ui/atribuicao"
 import { useEffect, useState, type ReactNode } from "react"
 import { api, erroDe, type Desfazer } from "./torre-base"
 import { useConfirmarAtribuicao } from "./ConfirmarAtribuicao"
@@ -27,10 +28,8 @@ export interface LoteDeAtribuicao {
   modal: ReactNode
 }
 
-export function useLoteDeAtribuicao({ podeEditar, onResultado, preEscolher = true }: {
+export function useLoteDeAtribuicao({ podeEditar, onResultado }: {
   podeEditar: boolean
-  /** `false` = a lista começa em "— escolha a pessoa —", sem ninguém pré-escolhido (a página do processo). */
-  preEscolher?: boolean
   /** O que cada tela faz com o resultado (aviso + "Desfazer", limpar a seleção, recarregar). */
   onResultado: (mensagem: string, desfazer: Desfazer | null) => void
 }): LoteDeAtribuicao {
@@ -43,10 +42,10 @@ export function useLoteDeAtribuicao({ podeEditar, onResultado, preEscolher = tru
     if (!podeEditar) return
     let vivo = true
     void api<{ funcionarios: PessoaDoLote[] }>("/api/operacao/atribuiveis").then((r) => {
-      if (vivo && r.ok) { setPessoas(r.data.funcionarios ?? []); setPessoaIdEstado((atual) => atual ?? (preEscolher ? r.data.funcionarios?.[0]?.id ?? null : null)) }
+      if (vivo && r.ok) { setPessoas(r.data.funcionarios ?? []); /* NUNCA pré-escolhe: o seletor começa em «— escolha a pessoa —» (regra permanente do Marco). */ setPessoaIdEstado((atual) => atual) }
     })
     return () => { vivo = false }
-  }, [podeEditar, preEscolher])
+  }, [podeEditar])
 
   const pessoa = pessoas.find((p) => p.id === pessoaId)
 
@@ -83,7 +82,7 @@ export function AcoesDeAtribuicaoEmLote({ lote, ids, ocupado = false, comSugerid
     <>
       <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>Atribuir a
         <select aria-label="Atribuir a" value={lote.pessoaId ?? ""} onChange={(e) => lote.setPessoaId(e.target.value === "" ? null : Number(e.target.value))}>
-          <option value="">— escolha a pessoa —</option>
+          <option value="">{ROTULO_ESCOLHA_DA_PESSOA}</option>
           {lote.pessoas.map((p) => <option key={p.id} value={p.id}>{p.nome} ({p.tarefasAtivas} {p.tarefasAtivas === 1 ? "ativa" : "ativas"})</option>)}
         </select>
         <button type="button" disabled={bloqueado || !lote.pessoa} onClick={() => void rodar("ATRIBUIR")()}>Atribuir</button>

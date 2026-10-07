@@ -97,7 +97,7 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
   const { postar: postarComConfirmacao, modal: modalConfirmacao } = useConfirmarAtribuicao()
   // As ações em lote da tabela (Atribuir a…, Remover responsável, Atribuir às sugeridas) são as MESMAS da aba Tarefas (lote-atribuicao.tsx).
   const lote = useLoteDeAtribuicao({
-    podeEditar: perm.editar, preEscolher: false,
+    podeEditar: perm.editar,
     onResultado: (msg, desfazer) => { avisar(msg, desfazer ? { rotulo: "Desfazer", fazer: desfazerAtribuicao(desfazer as DesfazerDeAtribuicao) } : undefined); recarregar() },
   })
   const distribuir = async () => {

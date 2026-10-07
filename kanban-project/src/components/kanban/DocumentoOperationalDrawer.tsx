@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react"
 import { useApi } from "@/src/lib/dados"
+import { ROTULO_ESCOLHA_DA_PESSOA, PESSOA_ESCOLHIDA_INICIAL } from "@/src/lib/ui/atribuicao"
 import { aguardandoOCartorio, rotuloDeEstado } from "@/lib/operacional/emissao-recebimento"
 import { rotuloStatusTarefa } from "@/src/lib/home/rotulo-status-tarefa"
 import { authHeaders } from "@/src/lib/financeiro/http"
@@ -824,7 +825,7 @@ function ConteudoDrawer({
                     <select
                       autoFocus
                       disabled={salvando}
-                      value={tarefa?.responsavelId ?? ""}
+                      value={PESSOA_ESCOLHIDA_INICIAL}
                       onChange={async (e) => {
                         if (e.target.value) await delegarTarefa(Number(e.target.value))
                         setDelegandoResp(false)
@@ -832,7 +833,7 @@ function ConteudoDrawer({
                       onBlur={() => setDelegandoResp(false)}
                       className="self-start rounded-md border border-[var(--border-default)] bg-[var(--app-background)] px-1.5 py-1 text-[12px] text-white/85 focus:outline-none focus:border-[var(--border-default)] focus:ring-1 focus:border-[var(--border-default)] disabled:opacity-50"
                     >
-                      <option value="" disabled className="bg-[var(--surface-secondary)]">— selecione —</option>
+                      <option value="" disabled className="bg-[var(--surface-secondary)]">{ROTULO_ESCOLHA_DA_PESSOA}</option>
                       {usuarios.map((u) => (
                         <option key={u.id} value={u.id} className="bg-[var(--surface-secondary)]">{u.nome}</option>
                       ))}
