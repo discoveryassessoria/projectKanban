@@ -98,5 +98,5 @@ export async function iniciarEnvioDaTarefa(args: {
     fornecedorId,
     subtarefaKeyEsperada: corrente.key,
   })
-  return r.aplicavel ? { ok: true } : { ok: false, motivo: 'estado mudou entre a leitura e a execução — tente de novo' }
+  return r.aplicavel ? { ok: true } : { ok: false, motivo: r.motivo === 'PASSO_BLOQUEADO' && r.mensagem ? r.mensagem : 'estado mudou entre a leitura e a execução — tente de novo' }
 }

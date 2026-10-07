@@ -36,6 +36,7 @@ import { chaveEvento } from "@/src/services/task-step-sync-helpers"
 import { recalcularFaseDoProcesso } from "@/src/lib/process-stage/recalcular-fase"
 import { randomUUID } from "crypto"
 import { sincronizarDocumento } from "@/src/services/genealogia/sincronizar-com-registro"
+import { MOTIVO_AGUARDANDO_GENEALOGIA, TEXTO_AGUARDANDO_GENEALOGIA } from "@/src/services/genealogia/trava-emissao-por-genealogia"
 import { projetarTarefaDoPasso, assegurarCoerenciaPassoTarefa } from "@/src/services/passo-tarefa-projecao"
 import { impactoDaReabertura, type PassoComDependencia } from "@/src/services/dependencias-do-passo"
 import type { PermissaoChave } from "@/src/lib/permissoes"
@@ -278,6 +279,24 @@ export async function visitaAtualDoDocumento(documentoId: number): Promise<Visit
   //    nunca aceita um passo cuja fase vem DEPOIS da fase atual — sem tocar em
   //    nenhuma escrita: é o mesmo `orderBy: id desc`, só que só entre os
   //    candidatos que ainda fazem sentido.
+  // 0) A TAREFA VIVA DO DOCUMENTO DIZ ONDE O TRABALHO ESTÁ. A tarefa é UMA por certidão e segue o trabalho: com a Genealogia reaberta, ela está no
+  //    «Localizar registro» — e o passo da Emissão (travado, «Aguardando Genealogia») é o de id MAIOR. Sem isto, a gaveta mostrava os passos da
+  //    Emissão para uma tarefa que está na Genealogia (caso Carlota Salvarani, 07/10/2026).
+  const tarefaViva = await prisma.tarefa.findFirst({
+    where: { documentoId, workflowInstanceId: { not: null }, statusTarefa: { notIn: ["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI", "CANCELADA", "SUPERSEDIDA"] } },
+    orderBy: { id: "desc" },
+    select: { workflowInstanceId: true, workflowInstance: { select: { ciclo: true, processoId: true, faseMacroKey: true } } },
+  })
+  if (tarefaViva?.workflowInstanceId != null && tarefaViva.workflowInstance) {
+    const temPasso = await prisma.phaseWorkflowStepInstance.count({ where: { documentoId, workflowInstanceId: tarefaViva.workflowInstanceId, status: { notIn: INATIVOS } } })
+    const ordemDela = ordens?.get(tarefaViva.workflowInstance.faseMacroKey) ?? null
+    if (temPasso > 0 && (ordemFaseAtual == null || ordemDela == null || ordemDela <= ordemFaseAtual)) {
+      return {
+        processoId: tarefaViva.workflowInstance.processoId, faseMacroKey: tarefaViva.workflowInstance.faseMacroKey,
+        workflowInstanceId: tarefaViva.workflowInstanceId, ciclo: tarefaViva.workflowInstance.ciclo,
+      }
+    }
+  }
   const candidatos = await prisma.phaseWorkflowStepInstance.findMany({
     where: { documentoId, status: { notIn: INATIVOS } },
     orderBy: { id: "desc" },
@@ -571,7 +590,12 @@ export async function montarWorkflowV2(
     // qual interface montar a partir da chave do passo — e "sem editor específico"
     // resolve para o editor PADRÃO, nunca para uma tela de erro.
     const editor = resolveWorkflowStepEditor({ stepKey: p.stepKey, phaseKey: p.faseMacroKey })
-    const subtarefas = await subtarefasDaEtapa({ stepInstanceId: p.id, fornecedorId: documento?.orgaoId ?? null }).catch(() => [])
+    const subtarefasDaDefinicao = await subtarefasDaEtapa({ stepInstanceId: p.id, fornecedorId: documento?.orgaoId ?? null }).catch(() => [])
+    // PASSO BLOQUEADO = subtarefas BLOQUEADAS, qualquer que seja o que a definição projeta (sem execução criada, a de entrada saía «Disponível»
+    // com «Iniciar →» sobre um passo travado — caso Carlota Salvarani). O motivo do passo («Aguardando Genealogia») vira o texto da subtarefa.
+    const subtarefas = p.status === "BLOQUEADO"
+      ? subtarefasDaDefinicao.map((s) => (s.concluida ? s : { ...s, status: "BLOQUEADO", disponivel: false, bloqueioTexto: p.motivo ?? "Passo bloqueado" }))
+      : subtarefasDaDefinicao
     return {
       ...op,
       id: p.id, ordem: p.ordem, stepKey: p.stepKey,
@@ -635,7 +659,7 @@ type OpResult =
       subtarefaConcluida?: string
       aindaFaltam?: Array<{ key: string; label: string; motivo: string }>
     }
-  | { ok: false; error: string; status: number }
+  | { ok: false; error: string; status: number; mensagem?: string }
 
 /** "Iniciar operação" no V2: cria os passos por-documento sob a instância da fase. */
 export async function iniciarOperacaoDocumentoV2(
@@ -796,6 +820,8 @@ function acaoDoPatch(patch: Record<string, unknown>, statusAtual: StepInstanceSt
 /** Passo carregado, do jeito que o motor de transição precisa dele. */
 export type PassoParaTransicao = {
   id: number
+  /** O motivo gravado no passo (ex.: «Aguardando Genealogia» quando a Emissão está travada). */
+  motivo?: string | null
   documentoId: number | null
   necessidadeId: number | null
   processoId: number
@@ -815,7 +841,7 @@ export type PassoParaTransicao = {
 const SELECT_PASSO_TRANSICAO = {
   id: true, documentoId: true, necessidadeId: true, processoId: true, workflowInstanceId: true,
   faseMacroKey: true, ordem: true, status: true, ciclo: true, metadata: true, stepKey: true,
-  responsavelId: true,
+  responsavelId: true, motivo: true,
 } as const
 
 /**
@@ -828,7 +854,7 @@ export async function carregarPassoAutorizado(
   stepInstanceId: number,
   patch: Record<string, unknown>,
   ctx?: ContextoLeituraWorkflow,
-): Promise<{ ok: true; passo: PassoParaTransicao } | { ok: false; error: string; status: number }> {
+): Promise<{ ok: true; passo: PassoParaTransicao } | { ok: false; error: string; status: number; mensagem?: string }> {
   const p = await prisma.phaseWorkflowStepInstance.findUnique({
     where: { id: stepInstanceId },
     select: SELECT_PASSO_TRANSICAO,
@@ -842,6 +868,10 @@ export async function carregarPassoAutorizado(
     const acao = acaoDoPatch(patch, p.status)
     if (acao) {
       if (!acaoCompativelComEstado(acao, p.status)) {
+        // A Emissão travada pela Genealogia diz POR QUÊ, em português claro (nunca só o código).
+        if (p.status === "BLOQUEADO" && p.motivo === MOTIVO_AGUARDANDO_GENEALOGIA) {
+          return { ok: false, error: "STEP_NOT_AVAILABLE:AGUARDANDO_GENEALOGIA", status: 409, mensagem: TEXTO_AGUARDANDO_GENEALOGIA }
+        }
         return { ok: false, error: "STEP_NOT_AVAILABLE", status: 409 }
       }
       if (ctx.permissoes?.[PERMISSAO_DA_ACAO[acao]] !== true) {

@@ -645,14 +645,15 @@ function SubtarefaRow({
           <div className="flex items-center gap-2 flex-wrap">
             <div className="text-[12.5px] font-semibold text-white">{ordem}. {s.label}</div>
             <span className={`text-[9.5px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border ${statusBadgeCls}`}>
-              {SUBTAREFA_STATUS_LABEL[s.status] ?? s.status}
+              {/* Passo travado pela Genealogia: o selo diz «Aguardando Genealogia», não só «Bloqueada». */}
+              {s.status === "BLOQUEADO" && s.bloqueioTexto === "Aguardando Genealogia" ? "Aguardando Genealogia" : SUBTAREFA_STATUS_LABEL[s.status] ?? s.status}
             </span>
           </div>
           {s.descricao && (
             <div className="text-[11px] text-[var(--text-secondary)] mt-1">{s.descricao}</div>
           )}
           {bloqueadaPorDependencia ? (
-            <div className="mt-2 text-[11px] text-[var(--text-secondary)]">Aguardando subtarefa anterior</div>
+            <div className="mt-2 text-[11px] text-[var(--text-secondary)]">{s.bloqueioTexto ?? "Aguardando subtarefa anterior"}</div>
           ) : !tarefaResponsavelNome ? null : (
             <>
               <div className="flex items-center gap-2 flex-wrap text-[11px] text-[var(--text-secondary)] mt-2">
