@@ -156,8 +156,10 @@ export interface CelulaPlanilha {
  * ela aparece sozinha, sem tocar em código.
  */
 export interface LinhaPlanilha {
-  /** 0 quando a linha existe por contrato (tipo declarado, documento ausente). */
+  /** O documento que a linha MOSTRA (0 quando a linha existe por contrato, documento ausente). No casamento pode ser o da união. */
   documentoId: number
+  /** O documento DESTA pessoa (0 se não tem): é com ele que o financeiro casa lançamentos. */
+  documentoProprioId: number
   /** Cônjuge relevante para ESTA linha (só o casamento costuma ter). */
   conjuge: string | null
   paiNome: string | null
@@ -247,6 +249,38 @@ interface PrecoDaColuna {
   motivo: string | null
 }
 
+// ── O QUE CADA COLUNA LÊ (07/10/2026, caso Ilaine Fogli) ──────────────────────────────────────────────────────────────────────────
+//   Data       Documento.data_registro → Documento.data_evento → (sem documento) a árvore: nascimento = Pessoa.data_nasc, óbito = Pessoa.data_obito,
+//              casamento = União.data_registro → União.data_inicio. Datas de calendário: UTC, sem deslocamento de fuso.
+//   Local      Documento (cidade - estado) → a árvore: nascimento = Pessoa.local_nasc/estado_nasc, casamento = União.local/estado.
+//   Dados do registro  Documento.cartório/livro/folha/termo → (casamento) União.cartório/livro/folha/termo. «0» e vazio = sem dado.
+//   Cônjuge    Documento.conjuge_registrado → (casamento) o outro cônjuge da União. Só a linha de casamento traz cônjuge.
+//   Genitores  Pessoa.pai / Pessoa.mae.
+//   A CERTIDÃO DE CASAMENTO é da UNIÃO: o Documento fica numa das duas pessoas (a `pessoa1` da União). A linha de casamento dos DOIS cônjuges mostra
+//   o mesmo registro — antes só quem era o dono do Documento via o casamento, e a outra pessoa aparecia com a linha vazia.
+const CAMPOS_DA_UNIAO = { data_inicio: true, data_registro: true, local: true, estado: true, pais: true, cartorio: true, livro: true, folha: true, termo: true } as const
+const CAMPOS_DO_DOCUMENTO = {
+  id: true, tipo: true, documentTypeId: true, observacoes: true, pessoaId: true,
+  cartorio: true, livro: true, folha: true, termo: true, numero_registro: true,
+  data_registro: true, data_evento: true, cidade_registro: true, estado_registro: true, conjuge_registrado: true,
+} as const
+
+export type CategoriaDoRegistro = 'NASCIMENTO' | 'CASAMENTO' | 'OBITO' | null
+export const categoriaDoRegistro = (nome: string | null | undefined): CategoriaDoRegistro => {
+  const t = (nome ?? '').toLowerCase()
+  if (/nasc/.test(t)) return 'NASCIMENTO'
+  if (/casam/.test(t)) return 'CASAMENTO'
+  if (/[óo]bito/.test(t)) return 'OBITO'
+  return null
+}
+/** «0», «00» e vazio não são dado de registro (valor padrão de cadastro): viram `null` e a tela mostra «—». */
+export const dadoDoRegistro = (v: string | null | undefined): string | null => {
+  const t = (v ?? '').trim()
+  return t === '' || /^0+$/.test(t) ? null : t
+}
+const iso = (d: Date | null | undefined): string | null => (d ? new Date(d).toISOString() : null)
+const lugar = (a: string | null | undefined, b: string | null | undefined): string | null => [a, b].map((x) => (x ?? '').trim()).filter(Boolean).join(' - ') || null
+
 /**
  * A ESTRUTURA DOCUMENTAL — quem aparece e o que cada registro diz. SEM DINHEIRO: nenhum preço, custo, total ou célula.
  *
@@ -256,8 +290,10 @@ interface PrecoDaColuna {
  * lido, quanto mais enviado ao navegador).
  */
 export interface LinhaEstrutural {
-  /** 0 quando a linha existe por contrato (tipo declarado, documento ausente). */
+  /** O documento que a linha MOSTRA (0 quando a linha existe por contrato, documento ausente). No casamento pode ser o da UNIÃO (do outro cônjuge). */
   documentoId: number
+  /** O documento que é DESTA pessoa (0 se não tem) — é com ele que o financeiro casa lançamentos: um custo nunca é contado nas duas linhas do casamento. */
+  documentoProprioId: number
   conjuge: string | null
   paiNome: string | null
   maeNome: string | null
@@ -298,6 +334,15 @@ export async function montarEstruturaDocumental(processoId: number): Promise<Blo
   const idsTipo = tiposDaPlanilha.map((t) => t.id)
   const enumsTipo = tiposDaPlanilha.map((t) => t.legacyEnumKey).filter((v): v is string => !!v)
   const tipoPorEnum = new Map(tiposDaPlanilha.filter((t) => t.legacyEnumKey).map((t) => [t.legacyEnumKey as string, t]))
+  const whereDosDocumentos = {
+    status: { notIn: [...DOCUMENTO_STATUS_NOT_IN_INATIVOS, 'INVALIDO'] as never },
+    ...(idsTipo.length || enumsTipo.length
+      ? { OR: [
+          ...(idsTipo.length ? [{ documentTypeId: { in: idsTipo } }] : []),
+          ...(enumsTipo.length ? [{ tipo: { in: enumsTipo as never } }] : []),
+        ] }
+      : { id: -1 }),
+  }
 
   // PESSOAS ATIVAS da árvore — recorte canônico. Quem saiu não deixa bloco órfão,
   // e quem é requerente do processo mas nunca entrou na árvore não aparece aqui.
@@ -308,27 +353,13 @@ export async function montarEstruturaDocumental(processoId: number): Promise<Blo
         select: {
           id: true, nome: true, sobrenome: true, numeroLinhagem: true, sexo: true, requerente: true, linhaReta: true,
           paiId: true, maeId: true,
+          // O QUE A ÁRVORE JÁ SABE desta pessoa — fallback da linha quando o documento não traz o dado (nunca inventado: é o dado dela).
+          data_nasc: true, data_obito: true, local_nasc: true, estado_nasc: true, pais_nasc: true,
           pai: { select: { nome: true, sobrenome: true } },
           mae: { select: { nome: true, sobrenome: true } },
-          unioesComoPessoa1: { select: { pessoa2: { select: { nome: true, sobrenome: true } } } },
-          unioesComoPessoa2: { select: { pessoa1: { select: { nome: true, sobrenome: true } } } },
-          documentos: {
-            where: {
-              status: { notIn: [...DOCUMENTO_STATUS_NOT_IN_INATIVOS, 'INVALIDO'] },
-              ...(idsTipo.length || enumsTipo.length
-                ? { OR: [
-                    ...(idsTipo.length ? [{ documentTypeId: { in: idsTipo } }] : []),
-                    ...(enumsTipo.length ? [{ tipo: { in: enumsTipo as never } }] : []),
-                  ] }
-                : { id: -1 }),
-            },
-            orderBy: { id: 'asc' },
-            select: {
-              id: true, tipo: true, documentTypeId: true, observacoes: true,
-              cartorio: true, livro: true, folha: true, termo: true, numero_registro: true,
-              data_registro: true, cidade_registro: true, estado_registro: true, conjuge_registrado: true,
-            },
-          },
+          unioesComoPessoa1: { select: { id: true, pessoa2Id: true, ...CAMPOS_DA_UNIAO, pessoa2: { select: { nome: true, sobrenome: true } } } },
+          unioesComoPessoa2: { select: { id: true, pessoa1Id: true, ...CAMPOS_DA_UNIAO, pessoa1: { select: { nome: true, sobrenome: true } } } },
+          documentos: { where: whereDosDocumentos, orderBy: { id: 'asc' }, select: CAMPOS_DO_DOCUMENTO },
         },
       })
     : []
@@ -367,30 +398,62 @@ export async function montarEstruturaDocumental(processoId: number): Promise<Blo
   // não uma posição familiar, e o rótulo mudaria de significado a cada árvore.
   const posicaoPorPessoa = new Map(roster.map((r) => [r.pessoaId, r.posicao]))
 
+  // Os documentos dos CÔNJUGES: a certidão de casamento fica numa das duas pessoas da união e a outra a enxerga por aqui.
+  const idsDosConjuges = [...new Set(pessoas.flatMap((p) => [...p.unioesComoPessoa1.map((u) => u.pessoa2Id), ...p.unioesComoPessoa2.map((u) => u.pessoa1Id)]))]
+  const docsDosConjuges = idsDosConjuges.length
+    ? await prisma.documento.findMany({ where: { pessoaId: { in: idsDosConjuges }, ...whereDosDocumentos }, orderBy: { id: 'asc' }, select: CAMPOS_DO_DOCUMENTO })
+    : []
+  const tipoIdDoDoc = (d: { documentTypeId: number | null; tipo: unknown }) => d.documentTypeId ?? (d.tipo ? tipoPorEnum.get(String(d.tipo))?.id ?? null : null)
+
   return pessoas.map((p) => {
     const docPorTipo = new Map<number, (typeof p.documentos)[number]>()
     for (const d of p.documentos) {
       const tipoId = d.documentTypeId ?? (d.tipo ? tipoPorEnum.get(String(d.tipo))?.id ?? null : null)
       if (tipoId != null && !docPorTipo.has(tipoId)) docPorTipo.set(tipoId, d)
     }
+    // As uniões da pessoa, com o OUTRO cônjuge de cada uma.
+    const uniaoDaPessoa = [
+      ...p.unioesComoPessoa1.map((u) => ({ ...u, outroId: u.pessoa2Id, outro: u.pessoa2 })),
+      ...p.unioesComoPessoa2.map((u) => ({ ...u, outroId: u.pessoa1Id, outro: u.pessoa1 })),
+    ]
     const linhas: LinhaEstrutural[] = tiposDaPlanilha.map((tipoLinha) => {
-      const d = docPorTipo.get(tipoLinha.id) ?? null
+      const categoria = categoriaDoRegistro(tipoLinha.name)
+      type DocEstrutural = (typeof p.documentos)[number]
+      let d = (docPorTipo.get(tipoLinha.id) ?? null) as DocEstrutural | null
+      // CASAMENTO: sem documento próprio, vale o da UNIÃO (o que está no outro cônjuge); a união escolhida é a do documento, ou a primeira.
+      let uniao = categoria === 'CASAMENTO' ? uniaoDaPessoa[0] ?? null : null
+      if (categoria === 'CASAMENTO') {
+        if (d) { const dono = d.pessoaId; uniao = uniaoDaPessoa.find((u) => u.outroId === dono) ?? uniao }
+        else {
+          for (const u of uniaoDaPessoa) {
+            const doc = docsDosConjuges.find((x) => x.pessoaId === u.outroId && tipoIdDoDoc(x) === tipoLinha.id)
+            if (doc) { d = doc as DocEstrutural; uniao = u; break }
+          }
+        }
+      }
       return {
         documentoId: d?.id ?? 0,
+        documentoProprioId: d && d.pessoaId === p.id ? d.id : (docPorTipo.get(tipoLinha.id)?.id ?? 0),
         // O cônjuge que a referência mostra é o que CONSTA NA CERTIDÃO, não o da
         // árvore. Só o registro de casamento costuma trazê-lo, e é por isso que
         // as outras linhas ficam vazias — sem nenhuma regra por tipo aqui: a
         // linha mostra o que o documento dela registrou.
-        conjuge: d?.conjuge_registrado ?? null,
+        conjuge: d?.conjuge_registrado ?? (uniao?.outro ? nomeCompleto(uniao.outro) : null),
         paiNome: p.pai ? nomeCompleto(p.pai) : null,
         maeNome: p.mae ? nomeCompleto(p.mae) : null,
         pessoaId: p.id,
         tipoDocumentoId: tipoLinha.id,
         tipoDocumentoNome: tipoLinha.name,
         tipoRegistro: tipoLinha.name,
-        dataRegistro: d?.data_registro ? new Date(d.data_registro).toISOString() : null,
-        local: d ? ([d.cidade_registro, d.estado_registro].filter(Boolean).join(' - ') || null) : null,
-        cartorio: d?.cartorio ?? null, livro: d?.livro ?? null, folha: d?.folha ?? null, termo: d?.termo ?? null,
+        // DATA: a do registro; sem ela, a do evento; sem documento, a que a ÁRVORE já tem (nunca inventada).
+        dataRegistro: iso(d?.data_registro ?? d?.data_evento ?? (categoria === 'NASCIMENTO' ? p.data_nasc : categoria === 'OBITO' ? p.data_obito : categoria === 'CASAMENTO' ? uniao?.data_registro ?? uniao?.data_inicio : null)),
+        // LOCAL: o do registro; sem ele, o da pessoa (nascimento) ou o da união (casamento). Óbito não tem local na árvore: fica «—».
+        local: lugar(d?.cidade_registro, d?.estado_registro) ?? (categoria === 'NASCIMENTO' ? lugar(p.local_nasc, p.estado_nasc) : categoria === 'CASAMENTO' ? lugar(uniao?.local, uniao?.estado) : null),
+        // DADOS DO REGISTRO: «0» e vazio não são dado. O casamento sem documento usa o que está na União.
+        cartorio: dadoDoRegistro(d?.cartorio) ?? (categoria === 'CASAMENTO' ? dadoDoRegistro(uniao?.cartorio) : null),
+        livro: dadoDoRegistro(d?.livro) ?? (categoria === 'CASAMENTO' ? dadoDoRegistro(uniao?.livro) : null),
+        folha: dadoDoRegistro(d?.folha) ?? (categoria === 'CASAMENTO' ? dadoDoRegistro(uniao?.folha) : null),
+        termo: dadoDoRegistro(d?.termo) ?? (categoria === 'CASAMENTO' ? dadoDoRegistro(uniao?.termo) : null),
         numeroRegistro: d?.numero_registro ?? null,
         observacao: d?.observacoes ?? null,
         localizado: d ? estaLocalizado(d) : false,
@@ -583,7 +646,7 @@ export async function montarPlanilhaDocumental(processoId: number): Promise<Plan
         const configResolvida = res.tipo === 'RESOLVIDO' ? res.configId : null
         const itemId = configResolvida != null ? itemDaConfig.get(configResolvida) ?? null : null
 
-        const chave = `${le.documentoId}::${configResolvida}`
+        const chave = `${le.documentoProprioId}::${configResolvida}`
         const obrs = configResolvida != null ? realizadoPorCelula.get(chave) ?? [] : []
         const aplica = configResolvida != null && aplicavel.has(chave)
         const preco = configResolvida != null ? precoPorConfig.get(configResolvida) : undefined
