@@ -237,6 +237,8 @@
   ]
  },
  "arquivos": [
+    "scripts/planilha-documental-projecao.test.ts",
+    "scripts/planilha-documental-sem-valores.test.ts",
     "scripts/emissao-aguardando-e-registrar-recebimento.test.ts",
     "scripts/processo-etapa2-fase-filtro-conta.test.ts",
     "scripts/lote-atribuir-na-pagina-do-processo.test.ts",

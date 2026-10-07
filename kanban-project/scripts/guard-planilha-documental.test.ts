@@ -348,7 +348,7 @@ ok("a ambiguidade vira pendência visível", /mais de uma Configuração Finance
 
 // NADA POR CÉLULA — o custo cresce com o cadastro, não com a família.
 ok("a interseção é resolvida uma vez, fora do laço de pessoas",
-  projecao.indexOf("const intersecao = new Map") < projecao.indexOf("const blocos: BlocoPessoa[] = pessoas.map"))
+  projecao.indexOf("const intersecao = new Map") < projecao.indexOf("const blocos: BlocoPessoa[] = estrutura.map"))
 ok("o preço é resolvido por CONFIG distinta, não por célula", /for \(const configId of configsUsadas\)/.test(projecao))
 ok("os combinados vêm numa consulta só", /await overridesDoProcesso\(processoId\)/.test(projecao))
 const corpoCelula = projecao.slice(projecao.indexOf("const celulas: CelulaPlanilha[]"), projecao.indexOf("totalGeralCent +="))

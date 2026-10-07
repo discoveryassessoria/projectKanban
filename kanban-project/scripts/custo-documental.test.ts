@@ -45,7 +45,7 @@ interface Criado {
 const criado: Criado = { matrizIds: [], econIds: [], configIds: [], tabelaIds: [], tipoDocExtraIds: [], documentoExtraIds: [] }
 
 async function montarCenario() {
-  const oferta = await garantirOferta(prisma, { countryKey: "italia", countryLabel: "Itália", nationalityKey: "italiana", nationalityLabel: "Italiana", modalityKey: "teste", modalityLabel: "Teste" })
+  const oferta = await garantirOferta(prisma, { countryKey: "italia", countryLabel: "Itália", nationalityKey: "italiana", nationalityLabel: "Italiana", modalityKey: "judicial", modalityLabel: "Judicial" })
   const tipoProc = await prisma.tipoProcessoNacionalidade.create({
     data: {
       code: `TP-${TS}`.slice(0, 40), name: `Tipo ${TAG}`,

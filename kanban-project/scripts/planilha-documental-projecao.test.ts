@@ -123,7 +123,7 @@ async function config(sufixo: string, valor: number | null): Promise<number> {
 }
 
 async function montarPalco(): Promise<Palco> {
-  const oferta = await garantirOferta(prisma, { countryKey: "espanha", countryLabel: "Espanha", nationalityKey: "espanhola", nationalityLabel: "Espanhola", modalityKey: "descendencia", modalityLabel: "Descendência" })
+  const oferta = await garantirOferta(prisma, { countryKey: "espanha", countryLabel: "Espanha", nationalityKey: "espanhola", nationalityLabel: "Espanhola", modalityKey: "judicial", modalityLabel: "Judicial" })
   const tipo = await prisma.tipoProcessoNacionalidade.create({
     data: {
       code: MARCA, name: `${MARCA} tipo`, paisId: oferta.paisId,

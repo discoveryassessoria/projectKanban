@@ -23,6 +23,7 @@ import { useState } from "react"
 import { FileText, Filter, Search, CheckCircle2, Clock, ChevronDown, Ban } from "lucide-react"
 import type { EncerramentoDoDocumento } from "@/src/lib/process-stage/estrutura-operacional-core"
 import { dataHoraSP } from "@/lib/operacional/historico-filtros"
+import { PlanilhaDocumentalView, type BlocoDaPlanilha, type LinhaDaPlanilha } from "@/src/components/financeiro/v3/PlanilhaDocumentalView"
 
 // ============================================================
 // TIPOS
@@ -91,7 +92,12 @@ export interface ProcessoDocumentosBibliotecaProps {
   onAbrirDetalhes: (docId: number) => void
   /** "Reabrir" da certidão cancelada (porta canônica). Ausente ⇒ só "Ver motivo". Devolve a mensagem de erro, ou null. */
   onReabrirCertidao?: (tarefaId: number, motivo: string) => Promise<string | null>
+  /** O processo — para a «Planilha documental» (a mesma de Financeiro → Custos, SEM valores). Ausente ⇒ o seletor de visão não aparece. */
+  processoId?: number
 }
+
+type Vista = "lista" | "painel" | "planilha"
+const VISTAS: ReadonlyArray<readonly [Vista, string]> = [["lista", "Lista"], ["painel", "Painel"], ["planilha", "Planilha documental"]]
 
 const FILTERS = [
   "Todos", "Linha reta", "Fora da linha", "Pendentes",
@@ -123,7 +129,9 @@ export function ProcessoDocumentosBiblioteca({
   foraDaLinha,
   onAbrirDetalhes,
   onReabrirCertidao,
+  processoId,
 }: ProcessoDocumentosBibliotecaProps) {
+  const [vista, setVista] = useState<Vista>("lista")
   const [filtro, setFiltro] = useState<string>("Todos")
   const [statusFiltro, setStatusFiltro] = useState<StatusFiltro>("todos")
   const [busca, setBusca] = useState("")
@@ -158,6 +166,22 @@ export function ProcessoDocumentosBiblioteca({
     return true
   }
 
+  // A PLANILHA OBEDECE AOS MESMOS FILTROS DA LISTA. Linha com documento: o mesmo `matchFilter` do item (e a linhagem do grupo dele). Linha sem
+  // documento (o registro que falta): só os filtros que não dependem de status do documento — linhagem, busca e «ativas».
+  const linhagemDoDocumento = new Map<number, string>()
+  const itemPorId = new Map<number, BibDocItem>()
+  for (const g of [...linhaPrincipal, ...foraDaLinha]) for (const d of g.documents) { itemPorId.set(d.id, d); linhagemDoDocumento.set(d.id, g.lineage) }
+  const filtrarLinhaDaPlanilha = (b: BlocoDaPlanilha, l: LinhaDaPlanilha): boolean => {
+    const item = l.documentoId ? itemPorId.get(l.documentoId) : undefined
+    if (item) return matchFilter(item, linhagemDoDocumento.get(item.id) ?? (b.linhagemPrincipal ? "Linha reta" : "Fora da linha"))
+    const lineage = b.linhagemPrincipal ? "Linha reta" : "Fora da linha"
+    if (statusFiltro === "cancelada" || statusFiltro === "nao_exigida") return false
+    if (filtro === "Linha reta") return lineage === "Linha reta" && sobBusca(b, l)
+    if (filtro === "Fora da linha") return lineage !== "Linha reta" && sobBusca(b, l)
+    return filtro === "Todos" && sobBusca(b, l)
+  }
+  const sobBusca = (b: BlocoDaPlanilha, l: LinhaDaPlanilha) => !busca || `${b.nome} ${l.tipoRegistro ?? ""}`.toLowerCase().includes(busca.toLowerCase())
+
   return (
     <div className="h-full overflow-y-auto bg-[var(--surface-popover)]">
       {/* ABAIXO DE lg: 1 coluna (a barra de 300px cai para baixo do conteúdo
@@ -175,6 +199,14 @@ export function ProcessoDocumentosBiblioteca({
               <h2 className="text-[21px] font-extrabold text-white/95">Documentos</h2>
               <span className="text-[13px] text-[var(--text-secondary)]">Biblioteca documental consolidada do processo.</span>
             </div>
+            {processoId != null && (
+              <div className="ml-auto inline-flex overflow-hidden rounded-lg border border-[var(--border-strong)]" role="group" aria-label="Visão dos documentos">
+                {VISTAS.map(([v, rotulo]) => (
+                  <button key={v} onClick={() => setVista(v)} aria-pressed={vista === v}
+                    className={`px-3.5 py-2 text-[12.5px] font-semibold ${vista === v ? "bg-[var(--accent-primary)] text-[var(--accent-ink)]" : "text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"}`}>{rotulo}</button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* 8 KPIs — 2 colunas em mobile, cresce até 8 num desktop largo */}
@@ -229,7 +261,33 @@ export function ProcessoDocumentosBiblioteca({
             </div>
           </div>
 
+          {/* PLANILHA DOCUMENTAL — a mesma de Custos, sem valores, respeitando os filtros acima. */}
+          {vista === "planilha" && processoId != null && (
+            <PlanilhaDocumentalView processoId={processoId} semValores filtrarLinha={filtrarLinhaDaPlanilha} />
+          )}
+
+          {/* PAINEL — uma visão por pessoa, a partir dos mesmos números da lista. */}
+          {vista === "painel" && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 mb-6">
+              {[...linhaPrincipal, ...foraDaLinha]
+                .filter((g) => g.documents.some((d) => matchFilter(d, g.lineage)))
+                .map((g) => (
+                  <div key={g.personId} className="bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl p-3.5" data-testid="painel-pessoa">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <b className="text-[13px] font-extrabold text-white/95">{g.personName}</b>
+                      <span className="text-[11px] text-[var(--text-muted)]">{g.lineage === "Linha reta" ? `Geração ${g.generation}` : g.role}</span>
+                    </div>
+                    <div className="mt-2 text-[12px] text-[var(--text-secondary)]">
+                      {g.stats.readyForProtocol} de {g.stats.totalDocuments} prontas para protocolo · {g.stats.pending} pendente{g.stats.pending === 1 ? "" : "s"}
+                      {g.stats.cancelled + g.stats.notRequired > 0 ? ` · ${g.stats.cancelled + g.stats.notRequired} cancelada/não exigida` : ""}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          )}
+
           {/* Seção LINHA PRINCIPAL */}
+          {vista === "lista" && <>
           <div className="mb-6">
             <div className="border-l-[3px] border-[var(--border-default)] pl-3 mb-3.5">
               <b className="text-[13px] font-extrabold text-white/95 tracking-wide">LINHA PRINCIPAL · TRANSMISSÃO DE CIDADANIA</b>
@@ -258,6 +316,7 @@ export function ProcessoDocumentosBiblioteca({
               ))
             )}
           </div>
+          </>}
         </div>
 
         {/* ============== COLUNA LATERAL ============== */}
