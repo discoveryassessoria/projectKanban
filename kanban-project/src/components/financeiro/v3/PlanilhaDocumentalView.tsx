@@ -96,9 +96,12 @@ const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", curren
 const dataBR = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—"
 
+/** «0» e vazio não são dado (valor padrão de cadastro): viram «—». O servidor já os limpa; aqui é a rede de segurança. */
+const semZero = (v: string | null | undefined): string | null => { const t = (v ?? "").trim(); return t === "" || /^0+$/.test(t) ? null : t }
 const dadosDoRegistro = (l: Linha): string => {
-  if (!l.livro && !l.folha && !l.termo) return "—"
-  return `Livro ${l.livro || "—"} / Folhas ${l.folha || "—"} / Termo ${l.termo || "—"}`
+  const livro = semZero(l.livro), folha = semZero(l.folha), termo = semZero(l.termo)
+  if (!livro && !folha && !termo) return "—"
+  return `Livro ${livro || "—"} / Folhas ${folha || "—"} / Termo ${termo || "—"}`
 }
 
 /**
@@ -436,7 +439,14 @@ function BlocoPessoa({
         {/* Largura mínima: o suficiente para o Total caber sem rolagem no painel
             do processo. Acima disso a tabela ocupa o que houver; abaixo, o
             container rola — que é como o Discovery trata tabela larga. */}
-        <table className="w-full min-w-[860px] border-collapse text-xs">
+        {/* SEM VALORES (aba Documentos): as 7 colunas essenciais CABEM na largura da tela — larguras proporcionais e texto que quebra linha, sem rolagem lateral
+            no desktop. Com valores (Custos) a tabela é mais larga e o container rola, como sempre. */}
+        <table className={`w-full border-collapse text-xs ${semValores ? "table-fixed" : "min-w-[860px]"}`}>
+          {semValores && (
+            <colgroup>
+              {["6%", "16%", "10%", "17%", "19%", "16%", "16%"].map((w, i) => <col key={i} style={{ width: w }} />)}
+            </colgroup>
+          )}
           <thead>
             <tr className="border-b border-[var(--border-default)] bg-[var(--surface-primary)] text-left text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
               {[rotuloPrimeira, ...CABECALHOS_FIXOS.slice(1)].map((h) => (
@@ -455,11 +465,11 @@ function BlocoPessoa({
                 className="border-b border-[var(--border-default)] last:border-0 hover:bg-[var(--surface-hover)]"
               >
                 <td className="px-2 py-1 text-[var(--text-muted)]">{bloco.geracao ?? "—"}</td>
-                <td className="whitespace-nowrap px-2 py-1 text-[var(--text-primary)]">{l.tipoRegistro ?? "—"}</td>
+                <td className={`${semValores ? "break-words" : "whitespace-nowrap"} px-2 py-1 text-[var(--text-primary)]`}>{l.tipoRegistro ?? "—"}</td>
                 <td className="whitespace-nowrap px-2 py-1 tabular-nums">{dataBR(l.dataRegistro)}</td>
-                <td className="min-w-[90px] px-2 py-1">{l.local ?? l.cartorio ?? "—"}</td>
-                <td className="px-2 py-1">{dadosDoRegistro(l)}</td>
-                <td className="px-2 py-1">{l.conjuge ?? "—"}</td>
+                <td className={`${semValores ? "break-words" : "min-w-[90px]"} px-2 py-1`}>{l.local ?? l.cartorio ?? "—"}</td>
+                <td className={`${semValores ? "break-words " : ""}px-2 py-1`}>{dadosDoRegistro(l)}</td>
+                <td className={`${semValores ? "break-words " : ""}px-2 py-1`}>{l.conjuge ?? "—"}</td>
                 <td className="px-2 py-1 leading-tight">
                   {l.paiNome || l.maeNome ? (
                     <>

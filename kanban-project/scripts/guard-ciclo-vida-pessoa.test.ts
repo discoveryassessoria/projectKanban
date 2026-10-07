@@ -360,6 +360,8 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "projeção da Planilha Documental: monta e limpa o próprio cenário (marca PLANILHA-PROJ)",
   "scripts/planilha-documental-sem-valores.test.ts":
     "planilha documental sem valores: monta e limpa o próprio cenário (marca PLSV)",
+  "scripts/planilha-dados-do-registro-ilaine.test.ts":
+    "planilha — dados do registro (caso Ilaine): monta e limpa o próprio cenário (marca ILA)",
   "scripts/guard-estado-derivado.test.ts":
     "guard do estado derivado (cita os padrões de escrita que procura, como este arquivo)",
 
