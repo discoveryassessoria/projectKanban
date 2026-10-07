@@ -12,6 +12,7 @@
 //   f  As 4 subtarefas da Emissão são obrigatórias; anexo/comprovante/dado preenchido NUNCA é obrigatório — cadastro publicado.
 //   g  A certidão só entra em Feito com os 4 passos concluídos.
 //   i  Contadores batem: sem responsável + com cada pessoa = abertas (cabeçalho × tabela × Caminho).
+//   j  Fluxo do recebimento: nenhuma subtarefa da Emissão concluída fora de ordem, e nenhuma gravada «Disponível» enquanto depende de outra.
 //
 // (b) seletores sem pessoa, (d) atribuição só na página do processo e (h) contador repetido são regras de TELA/CÓDIGO: vigiadas pelo teste
 // da suíte (varredura do código) e pelo script (varredura + tela). Aqui ficam as que se provam com DADO.
@@ -22,7 +23,7 @@ import { MOTIVO_AGUARDANDO_GENEALOGIA } from '@/src/services/genealogia/trava-em
 import { compararCertidoesDaFamilia } from '@/lib/operacional/ordem-certidoes'
 import { SUBTAREFA_PEDIDO_ENVIADO, SUBTAREFA_CONFIRMACAO, SUBTAREFA_CERTIDAO_RECEBIDA, SUBTAREFA_CONFERENCIA } from '@/lib/operacional/emissao-recebimento'
 
-export type RegraDoMarco = 'a' | 'c' | 'e' | 'f' | 'g' | 'i'
+export type RegraDoMarco = 'a' | 'c' | 'e' | 'f' | 'g' | 'i' | 'j'
 
 /** O detalhe do processo lido UMA vez por rodada (as regras e, i e o script leem o mesmo). */
 type Detalhe = Awaited<ReturnType<typeof import('@/lib/operacional/torre-foco')['detalheDoProcesso']>>
@@ -52,6 +53,7 @@ export const TITULO_DA_REGRA: Record<RegraDoMarco, string> = {
   f: 'Subtarefa da Emissão opcional, ou anexo/dado obrigatório',
   g: 'Certidão concluída sem os 4 passos concluídos',
   i: 'Contadores que não batem',
+  j: 'Subtarefa da Emissão fora de ordem ou com selo «Disponível» sendo que depende de outra',
 }
 
 const TAREFA_ENCERRADA = ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI', 'CANCELADA', 'SUPERSEDIDA']
@@ -269,13 +271,50 @@ export async function detectarRegraI(): Promise<ViolacaoDoMarco[]> {
   return out
 }
 
+// ── j ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+const DEPENDENCIA_DA_EMISSAO: Record<string, string | null> = {
+  [SUBTAREFA_PEDIDO_ENVIADO]: null, [SUBTAREFA_CONFIRMACAO]: SUBTAREFA_PEDIDO_ENVIADO,
+  [SUBTAREFA_CERTIDAO_RECEBIDA]: SUBTAREFA_CONFIRMACAO, [SUBTAREFA_CONFERENCIA]: SUBTAREFA_CERTIDAO_RECEBIDA,
+}
+/** PURA: o que está errado numa sequência de estados de subtarefa da Emissão (chave → estado). */
+export function problemasDeOrdemDaEmissao(estados: Readonly<Record<string, string>>): string[] {
+  const out: string[] = []
+  for (const [k, dep] of Object.entries(DEPENDENCIA_DA_EMISSAO)) {
+    const e = estados[k]
+    if (!dep || e == null) continue
+    const depOk = estados[dep] === 'CONCLUIDO'
+    if (e === 'CONCLUIDO' && !depOk) out.push(`«${k}» concluída sem «${dep}» concluída (passo pulado)`)
+    else if ((e === 'DISPONIVEL' || e === 'PENDENTE') && !depOk) out.push(`«${k}» gravada «${e}» mas depende de «${dep}», que não foi concluída (o selo mentiria)`)
+  }
+  return out
+}
+export async function detectarRegraJ(): Promise<ViolacaoDoMarco[]> {
+  const ctx = await processosAtivos()
+  const exec = await prisma.subtaskExecution.findMany({
+    where: { supersededAt: null, stepInstance: { processoId: { in: ctx.ids }, faseMacroKey: 'emissao_documental', status: { notIn: ['SUPERSEDIDO', 'CANCELADO', 'DISPENSADO'] as never } } },
+    select: { stepInstanceId: true, subtaskKey: true, status: true, stepInstance: { select: { processoId: true, documentoId: true } } },
+  })
+  const por = new Map<number, typeof exec>()
+  for (const e of exec) por.set(e.stepInstanceId, [...(por.get(e.stepInstanceId) ?? []), e])
+  const docIds = [...new Set(exec.map((e) => e.stepInstance.documentoId).filter((x): x is number => x != null))]
+  const docs = docIds.length ? await prisma.documento.findMany({ where: { id: { in: docIds } }, select: { id: true, tipo: true, pessoa: { select: { nome: true, sobrenome: true } } } }) : []
+  const docPor = new Map(docs.map((d) => [d.id, d]))
+  const out: ViolacaoDoMarco[] = []
+  for (const [stepId, es] of por) {
+    const probs = problemasDeOrdemDaEmissao(Object.fromEntries(es.map((e) => [e.subtaskKey, e.status])))
+    const d = es[0].stepInstance.documentoId != null ? docPor.get(es[0].stepInstance.documentoId) : undefined
+    for (const p of probs) out.push({ regra: 'j', processoId: es[0].stepInstance.processoId, familia: ctx.nome(es[0].stepInstance.processoId), certidao: d ? String(d.tipo) : null, pessoa: nomeDe(d?.pessoa), detalhe: p, entidade: 'PhaseWorkflowStepInstance', registroId: stepId })
+  }
+  return out
+}
+
 export async function detectarRegrasDoMarco(opts: { profundo?: boolean } = {}): Promise<{ violacoes: ViolacaoDoMarco[]; porRegra: Record<RegraDoMarco, number> }> {
   limparMemoDeDetalhes()
   const todas = [
     ...(await detectarRegraA()), ...(await detectarRegraC()), ...(await detectarRegraE(opts)),
-    ...(await detectarRegraF()), ...(await detectarRegraG()), ...(opts.profundo ? await detectarRegraI() : []),
+    ...(await detectarRegraF()), ...(await detectarRegraG()), ...(opts.profundo ? await detectarRegraI() : []), ...(await detectarRegraJ()),
   ]
-  const porRegra = { a: 0, c: 0, e: 0, f: 0, g: 0, i: 0 } as Record<RegraDoMarco, number>
+  const porRegra = { a: 0, c: 0, e: 0, f: 0, g: 0, i: 0, j: 0 } as Record<RegraDoMarco, number>
   for (const v of todas) porRegra[v.regra]++
   return { violacoes: todas, porRegra }
 }

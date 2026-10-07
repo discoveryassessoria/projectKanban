@@ -15,6 +15,7 @@
 
 import { useState } from "react"
 import { LAYER } from "@/src/lib/ui/layers"
+import { CampoDataTexto } from "@/src/components/ui/campo-data-texto"
 
 /** yyyy-mm-dd (input date) a partir de um ISO — sem hora, o próprio input não tem. */
 function paraInputDate(iso: string | null): string {
@@ -66,7 +67,7 @@ export function RepactuarPrazoModal({
 
         <label className="block space-y-1">
           <span className={rot}>Novo prazo</span>
-          <input type="date" value={novoPrazo} onChange={(e) => setNovoPrazo(e.target.value)} className={inp} />
+          <CampoDataTexto value={novoPrazo} onChange={setNovoPrazo} className={inp} />
         </label>
 
         <label className="block space-y-1">

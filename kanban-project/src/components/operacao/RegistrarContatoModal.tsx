@@ -17,6 +17,7 @@
 
 import { useState } from "react"
 import { LAYER } from "@/src/lib/ui/layers"
+import { CampoDataHoraTexto } from "@/src/components/ui/campo-data-texto"
 
 export const CANAIS_DE_CONTATO_UI = [
   { v: "EMAIL", l: "E-mail" },
@@ -113,7 +114,7 @@ export function RegistrarContatoModal({
 
         <label className="block space-y-1">
           <span className={rot}>Quando aconteceu (opcional — padrão agora)</span>
-          <input type="datetime-local" value={dataContato} onChange={(e) => setDataContato(e.target.value)} className={inp} />
+          <CampoDataHoraTexto value={dataContato} onChange={setDataContato} className={inp} aria-label="Quando aconteceu" />
         </label>
 
         {erro && <div className="text-[12px] text-red-700 bg-[var(--surface-secondary)] rounded-lg px-3 py-2">{erro}</div>}

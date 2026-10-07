@@ -24,8 +24,6 @@ import { DocumentoOperationalDrawer } from "@/src/components/kanban/DocumentoOpe
 import { TarefaTransversalModal } from "@/src/components/kanban/TarefaTransversalModal"
 import { RegistrarContatoModal, type DadosDeContato } from "./RegistrarContatoModal"
 import { AdiarAcompanhamentoModal } from "./AdiarAcompanhamentoModal"
-import { RegistrarRecebimentoModal } from "./RegistrarRecebimentoModal"
-import { podeRegistrarRecebimento } from "@/lib/operacional/emissao-recebimento"
 import type { LinhaOperacaoV3, RespostaTarefas, Vista, AgruparFilaPor, FiltroRadar, FiltroQuick } from "./operacao-v3-tipos"
 import {
   relCls, acompTxtCompleto, passoLabelDe, faseLabelDe, orgaoTxt, orgaoCls,
@@ -145,7 +143,6 @@ export function OperacaoV3({ gestor = false, naTorre = false, abaInicial = null 
   const [transversalProcessoId, setTransversalProcessoId] = useState<number | null>(null)
   const [contatoModal, setContatoModal] = useState<{ tipo: "unica"; taskId: number } | { tipo: "lote"; ids: number[] } | null>(null)
   const [adiarModal, setAdiarModal] = useState<{ taskId: number } | null>(null)
-  const [recebimentoModal, setRecebimentoModal] = useState<LinhaOperacaoV3 | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const avisar = useCallback((msg: string) => {
@@ -256,9 +253,6 @@ export function OperacaoV3({ gestor = false, naTorre = false, abaInicial = null 
   }, [contatoModal, avisar, dados])
 
   const adiar = useCallback((taskId: number) => setAdiarModal({ taskId }), [])
-
-  // REGISTRAR RECEBIMENTO: quem fez o pedido, o responsável e o administrador. O servidor confere de novo; aqui só decide se o botão aparece.
-  const podeRegistrar = useCallback((t: LinhaOperacaoV3) => usuario?.id != null && podeRegistrarRecebimento({ tipo: usuario.tipo ?? "", userId: usuario.id, responsavelId: t.responsavelId, pedidoPorId: t.pedidoPorId ?? null }), [usuario])
 
   const enviarAdiar = useCallback(async (dadosAdiar: { dias: number; motivo: string }): Promise<{ ok: boolean; mensagem?: string }> => {
     if (!adiarModal) return { ok: false }
@@ -423,7 +417,6 @@ export function OperacaoV3({ gestor = false, naTorre = false, abaInicial = null 
               quick={quick} clearQuick={() => setQuick(null)} col={col} setCol={setCol}
               onAbrir={(id) => setDrawerTaskId(id)} onCobrar={cobrar}
               onVerFamilia={(fam) => { setTab("fam"); setFamOpen({ fam, estagio: "cartorio" }); setFamUltimo((m) => ({ ...m, [fam]: "cartorio" })) }}
-              podeRegistrar={podeRegistrar} onRegistrarRecebimento={setRecebimentoModal}
             />
           )}
           {tab === "acomp" && (
@@ -531,15 +524,6 @@ export function OperacaoV3({ gestor = false, naTorre = false, abaInicial = null 
           subtitulo={contatoModal.tipo === "unica" ? undefined : "O mesmo contato é registrado em cada certidão vencida selecionada."}
           onFechar={() => setContatoModal(null)}
           onEnviar={enviarContato}
-        />
-      )}
-
-      {recebimentoModal && (
-        <RegistrarRecebimentoModal
-          tarefaId={recebimentoModal.taskId} documentoId={recebimentoModal.documentoId}
-          titulo={`${recebimentoModal.titulo}${recebimentoModal.familiaNome ? ` · ${recebimentoModal.familiaNome}` : ""}`}
-          onFechar={() => setRecebimentoModal(null)}
-          onRegistrado={(texto, aviso) => { setRecebimentoModal(null); avisar(`${texto}. A certidão foi para A fazer (conferir e validar).${aviso ? ` ${aviso}` : ""}`); dados.recarregar() }}
         />
       )}
 

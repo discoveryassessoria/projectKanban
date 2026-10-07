@@ -162,10 +162,11 @@ async function main() {
     const abas = readFileSync("src/components/operacao/operacao-v3-abas.tsx", "utf8")
     const modal = readFileSync("src/components/operacao/RegistrarRecebimentoModal.tsx", "utf8")
     const wf = readFileSync("src/components/kanban/workflow/WorkflowTab.tsx", "utf8")
-    ok("a aba Aguardando tem o botão «Registrar recebimento» na linha", /Registrar recebimento/.test(abas) && /podeRegistrar\?\.\(t\)/.test(abas))
-    ok("a gaveta tem o botão no passo 2 (Receber confirmação do pedido)", /SUBTAREFA_CONFIRMACAO && !s\.concluida/.test(wf) && /Registrar recebimento/.test(wf))
-    ok("as duas telas usam o MESMO modal", /RegistrarRecebimentoModal/.test(wf) && /RegistrarRecebimentoModal/.test(readFileSync("src/components/operacao/operacao-v3.tsx", "utf8")))
-    ok("o modal pede a data (sugere hoje), anexo OPCIONAL e confirmação antes de gravar", /type="date"/.test(modal) && /Anexar a certidão \(opcional\)/.test(modal) && /confirmado: true/.test(modal) && /Confirmar/.test(modal))
+    // FLUXO ÚNICO (07/10/2026): a linha do Aguardando só tem «Abrir»; o recebimento se registra no passo 2 da gaveta («Iniciar →» abre o modal).
+    ok("a linha do Aguardando NÃO tem atalho de recebimento (só «Abrir»)", !/>\s*Registrar recebimento\s*</.test(abas) && !/podeRegistrar/.test(abas))
+    ok("a gaveta abre o modal pelo «Iniciar →» do passo 2 (Receber confirmação do pedido)", /SUBTAREFA_CONFIRMACAO && !s\.concluida/.test(wf) && /iniciar-registrar-recebimento/.test(wf) && /<RegistrarRecebimentoModal/.test(wf))
+    ok("só a gaveta usa o modal (nem a Operação nem a Torre o abrem por conta própria)", !/RegistrarRecebimentoModal/.test(readFileSync("src/components/operacao/operacao-v3.tsx", "utf8")))
+    ok("o modal pede a data dd/mm/aaaa (sugere hoje), anexo OPCIONAL e confirmação antes de gravar", /CampoDataTexto/.test(modal) && /Anexar a certidão \(opcional\)/.test(modal) && /confirmado: true/.test(modal) && /Confirmar/.test(modal))
     ok("o anexo não é exigido: o botão Continuar só depende da data", /disabled=\{enviando \|\| !dia\}/.test(modal) && !/required/.test(modal))
   } finally {
     await prisma.documentoArquivo.deleteMany({ where: { documento: { descricao: { startsWith: MARCA } } } })

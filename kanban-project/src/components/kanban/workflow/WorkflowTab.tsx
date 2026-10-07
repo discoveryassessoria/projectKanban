@@ -701,17 +701,18 @@ function SubtarefaRow({
             </>
           )}
         </div>
-        {onRegistrarRecebimento && (
+        {onRegistrarRecebimento ? (
+          // FLUXO ÚNICO DO RECEBIMENTO: no passo 2 («Receber confirmação do pedido») o ÚNICO botão é «Iniciar →», e ele abre «Registrar recebimento»
+          // (data, anexo opcional, confirmação) — que conclui os passos 2 e 3 e libera o 4 com quem registrou como responsável.
           <button
             onClick={onRegistrarRecebimento}
-            data-testid="registrar-recebimento-passo"
-            title="A certidão chegou do cartório: conclui «Receber confirmação do pedido» e «Receber certidão» e libera a conferência"
-            className="px-2.5 py-1.5 text-[10.5px] font-semibold bg-[var(--action-primary)] text-[var(--action-primary-ink)] rounded transition-colors whitespace-nowrap"
+            data-testid="iniciar-registrar-recebimento"
+            title="Abre «Registrar recebimento»: conclui «Receber confirmação do pedido» e «Receber certidão» e libera a conferência"
+            className="px-2.5 py-1.5 text-[10.5px] font-semibold bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-[var(--action-primary-ink)] rounded transition-colors whitespace-nowrap"
           >
-            Registrar recebimento
+            Iniciar →
           </button>
-        )}
-        {podeAgir ? (
+        ) : podeAgir ? (
           <button
             onClick={() => onOpenCentral(s.key)}
             className="px-2.5 py-1.5 text-[10.5px] font-semibold bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-[var(--action-primary-ink)] rounded transition-colors whitespace-nowrap"

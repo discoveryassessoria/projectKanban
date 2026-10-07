@@ -261,8 +261,15 @@ export async function subtarefasDaEtapa(args: {
     // precisa REFLETIR isso antes mesmo de existir execução persistida, do
     // contrário a tela mostraria "Disponível" por uma fresta entre o passo
     // liberar e a escrita automática acontecer.
+    //
+    // O SELO NUNCA MENTE (07/10/2026, caso Maria del Consuelo): subtarefa com dependência/condição/canal PENDENTE não pode aparecer «Disponível» — nem
+    // quando a execução gravada ficou em DISPONIVEL/PENDENTE (materializada antes de a dependência concluir). O que está em andamento, aguardando
+    // terceiro ou concluído é FATO e continua valendo; o resto, bloqueado por causa, é BLOQUEADO. Esta é a ÚNICA lógica de status de subtarefa — as
+    // gavetas só imprimem o que sai daqui.
     const status: EstadoDaSubtarefa = execucao
-      ? (execucao.status as EstadoDaSubtarefa)
+      ? (bloqueioCodigo && (execucao.status === ESTADOS_DA_SUBTAREFA.DISPONIVEL || execucao.status === ESTADOS_DA_SUBTAREFA.PENDENTE)
+          ? ESTADOS_DA_SUBTAREFA.BLOQUEADO
+          : (execucao.status as EstadoDaSubtarefa))
       : bloqueioCodigo
         ? ESTADOS_DA_SUBTAREFA.BLOQUEADO
         : d.esperaExternaAoLiberar === true
@@ -693,7 +700,7 @@ export async function concluirSubtarefaCorrentePeloPasso(args: {
    */
   subtarefaKeyEsperada?: string
 }): Promise<
-  | { aplicavel: false; motivo?: "SUBTAREFA_INCORRETA" | "SEM_SUBTAREFA_ABERTA" | "PROTOCOLO_OBRIGATORIO" | "PASSO_BLOQUEADO"; /** Em português claro, quando o motivo for o passo bloqueado. */ mensagem?: string }
+  | { aplicavel: false; motivo?: "SUBTAREFA_INCORRETA" | "SEM_SUBTAREFA_ABERTA" | "PROTOCOLO_OBRIGATORIO" | "PASSO_BLOQUEADO" | "DEPENDENCIA_PENDENTE"; /** Em português claro, quando o motivo for o passo bloqueado. */ mensagem?: string }
   | {
       aplicavel: true
       subtarefaKey: string
@@ -738,6 +745,11 @@ export async function concluirSubtarefaCorrentePeloPasso(args: {
   }
 
   if (!corrente) return { aplicavel: false, motivo: "SEM_SUBTAREFA_ABERTA" }
+
+  // FORA DE ORDEM NUNCA: a subtarefa corrente ainda depende de outra que não foi concluída (ou não se aplica) — não se conclui, por nenhuma porta.
+  if (corrente.bloqueioCodigo === CAUSAS_DE_BLOQUEIO.DEPENDENCIA_PENDENTE || corrente.bloqueioCodigo === CAUSAS_DE_BLOQUEIO.CONDICAO_DE_ENTRADA) {
+    return { aplicavel: false, motivo: "DEPENDENCIA_PENDENTE", mensagem: corrente.bloqueioTexto ?? "Esta etapa ainda depende de outra que não foi concluída." }
+  }
 
   // BUG 2 (rodada de ajustes Operação v3, 26/09/2026): subtarefa marcada
   // `exigeProtocolo` (cadastro — StepSubtaskDefinition.exigeProtocolo) NUNCA

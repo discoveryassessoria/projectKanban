@@ -12,6 +12,7 @@ import { docTipoTxt } from "@/src/components/operacao/operacao-v3-derivacoes"
 import { api, erroDe, useTorre, type Desfazer } from "./torre-base"
 import type { LinhaTorre } from "./tipos"
 import type { AcaoComModal } from "./tarefas-tipos"
+import { CampoDataTexto } from "@/src/components/ui/campo-data-texto"
 
 export const MINIMO_JUSTIFICATIVA = 5
 export const AVISO_INVALIDA = "Escreva pelo menos 5 letras para liberar o botão"
@@ -130,7 +131,7 @@ export function ModalDaAcao({ acao, linha, agora, onFechar, onFeito }: {
         return { ok: true }
       }}>
         <label>Nova data
-          <input type="date" value={campo} onChange={(e) => setCampo(e.target.value)} aria-label="Nova data" />
+          <CampoDataTexto value={campo} onChange={setCampo} aria-label="Nova data" />
         </label>
         {campo && !diasOk && <div className="tf-aviso amb">A próxima cobrança pode ficar de amanhã a 15 dias à frente.</div>}
       </TarefasModal>
@@ -155,7 +156,7 @@ export function ModalDaAcao({ acao, linha, agora, onFechar, onFeito }: {
         return { ok: true }
       }}>
         <label>Novo prazo
-          <input type="date" value={campo} onChange={(e) => setCampo(e.target.value)} aria-label="Novo prazo" />
+          <CampoDataTexto value={campo} onChange={setCampo} aria-label="Novo prazo" />
         </label>
       </TarefasModal>
     )
@@ -225,7 +226,7 @@ export function ModalRepactuarLote({ n, onFechar, onEnviar }: {
     <TarefasModal titulo="Repactuar prazo em lote" texto={`${n} ${n === 1 ? "tarefa selecionada" : "tarefas selecionadas"}`} botao="Repactuar" podeConfirmar={!!data} onFechar={onFechar}
       onConfirmar={(just) => onEnviar(isoDoDia(data), just, ddmm(data))}>
       <label>Novo prazo
-        <input type="date" value={data} onChange={(e) => setData(e.target.value)} aria-label="Novo prazo" />
+        <CampoDataTexto value={data} onChange={setData} aria-label="Novo prazo" />
       </label>
     </TarefasModal>
   )
