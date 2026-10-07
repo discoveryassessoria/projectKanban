@@ -5,6 +5,7 @@
 // (`processo-pausa.ts`), reabrir certidão (`reabrir-certidao`), avanço forçado (`advance/force`), comentários (`/api/comentarios`).
 // Nada daqui calcula regra: o servidor entrega os textos e os números; esta página desenha, filtra a tabela e chama as portas.
 import { useConfirmarAtribuicao } from "./ConfirmarAtribuicao"
+import { useLoteDeAtribuicao } from "./lote-atribuicao"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
@@ -93,6 +94,11 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
   }, [avisar, recarregar])
 
   const { postar: postarComConfirmacao, modal: modalConfirmacao } = useConfirmarAtribuicao()
+  // As ações em lote da tabela (Atribuir a…, Remover responsável, Atribuir às sugeridas) são as MESMAS da aba Tarefas (lote-atribuicao.tsx).
+  const lote = useLoteDeAtribuicao({
+    podeEditar: perm.editar,
+    onResultado: (msg, desfazer) => { avisar(msg, desfazer ? { rotulo: "Desfazer", fazer: desfazerAtribuicao(desfazer as DesfazerDeAtribuicao) } : undefined); recarregar() },
+  })
   const distribuir = async () => {
     setOcupado(true)
     const r = await postarComConfirmacao<{ ok: boolean; mensagem: string; desfazer: DesfazerDeAtribuicao | null; error?: string }>(`/api/torre/processos/${processoId}/distribuir`)
@@ -106,7 +112,6 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
   const [escolha, setEscolha] = useState<number[] | null>(null)
   const [erroEscolha, setErroEscolha] = useState<string | null>(null)
   const atribuir = (tarefaId: number) => { setErroEscolha(null); setEscolha([tarefaId]) }
-  const atribuirVarias = (ids: number[]) => { setErroEscolha(null); setEscolha(ids) }
   const atribuirA = async (ids: number[], responsavelId: number) => {
     setOcupado(true); setErroEscolha(null)
     const feitas: number[] = []
@@ -181,7 +186,7 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
             status={statusDaLista} onStatus={setStatusDaLista}
             d={d} agora={agora} podeAtribuir={perm.editar} ocupado={ocupado}
             onHistorico={(l) => setModal({ tipo: "historico", certidao: { documentoId: l.documentoId, tarefaId: l.tarefaId, rotulo: [l.titulo, l.pessoa].filter(Boolean).join(" · ") } })}
-            onAtribuir={atribuir} onAtribuirVarias={atribuirVarias}
+            onAtribuir={atribuir} lote={lote}
             onMotivo={(l) => setModal({ tipo: "motivo", linha: l })} onReabrir={(l) => setModal({ tipo: "reabrir", linha: l })}
             onVerHistorico={() => setModal({ tipo: "historico", certidao: null })}
           />

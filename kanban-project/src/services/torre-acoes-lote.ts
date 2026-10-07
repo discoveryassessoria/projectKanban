@@ -91,6 +91,77 @@ export async function atribuirEmLote(args: { tarefaIds: number[]; responsavelId:
   }
 }
 
+// ─── ATRIBUIR (escolhido) e ATRIBUIR ÀS SUGERIDAS — a PRÉVIA da confirmação ─────────────────────────────────────────────────────────────────
+
+const ENCERRADAS = ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI', 'CANCELADA', 'SUPERSEDIDA']
+const PASSO_JA_INICIADO = ['EM_ANDAMENTO', 'EXECUTADO', 'AGUARDANDO', 'AGUARDANDO_APROVACAO', 'CONCLUIDO']
+
+interface TarefaDaPrevia {
+  id: number; titulo: string; statusTarefa: string; responsavelId: number | null; responsavel: { nome: string } | null
+  processo: { nome: string; arvore: { nome: string } | null } | null
+  workflowStepInstance: { status: string; startedAt: Date | null } | null
+}
+const SELECT_DA_PREVIA = {
+  id: true, titulo: true, statusTarefa: true, responsavelId: true, responsavel: { select: { nome: true } },
+  processo: { select: { nome: true, arvore: { select: { nome: true } } } },
+  workflowStepInstance: { select: { status: true, startedAt: true } },
+} as const
+/** "Certidão · pessoa · família": a tarefa é SEMPRE identificada por certidão + pessoa + família (o título já traz certidão · pessoa). */
+const rotuloDaTarefa = (t: TarefaDaPrevia) => `${t.titulo}${t.processo ? ` · ${t.processo.arvore?.nome ?? t.processo.nome}` : ''}`
+const jaIniciada = (t: TarefaDaPrevia) => t.statusTarefa === 'EM_ANDAMENTO' || (!!t.workflowStepInstance && (t.workflowStepInstance.startedAt != null || PASSO_JA_INICIADO.includes(String(t.workflowStepInstance.status))))
+
+/** A prévia da atribuição escolhida pela pessoa: "Atribuir 15 tarefas a Daniela Brait: certidão · pessoa · família; …". Nada é gravado. `null` = nada a atribuir. */
+export async function previaDeAtribuir(tarefaIds: number[], responsavelId: number): Promise<import('@/src/lib/torre-confirmacao').PreviaDeConfirmacao | null> {
+  const destino = await prisma.usuario.findUnique({ where: { id: responsavelId }, select: { id: true, nome: true } })
+  if (!destino) return null
+  const ts = (await prisma.tarefa.findMany({ where: { id: { in: tarefaIds }, statusTarefa: { notIn: ENCERRADAS as never } }, select: SELECT_DA_PREVIA, orderBy: { id: 'asc' } })) as unknown as TarefaDaPrevia[]
+  if (ts.length === 0) return null
+  const linhas = ts.map(rotuloDaTarefa)
+  const deQuem = [...new Set(ts.filter((t) => t.responsavelId != null && t.responsavelId !== responsavelId).map((t) => t.responsavel?.nome ?? `usuário ${t.responsavelId}`))]
+  const iniciadas = ts.filter(jaIniciada).length
+  return {
+    pergunta: `${deQuem.length > 0 ? 'Transferir' : 'Atribuir'} ${ts.length} ${ts.length === 1 ? 'tarefa' : 'tarefas'} a ${destino.nome}${deQuem.length > 0 ? ` (hoje de ${deQuem.join(', ')})` : ''}: ${linhas.join('; ')}?`,
+    itens: [{ pessoa: destino.nome, quantidade: ts.length, tarefas: linhas }],
+    assinatura: ts.map((t) => `${t.id}:${responsavelId}`).join(','),
+    ...(iniciadas > 0 ? { exigeConfirmacaoDeAndamento: true, alerta: `${iniciadas} ${iniciadas === 1 ? 'tarefa já foi iniciada' : 'tarefas já foram iniciadas'}: o andamento é preservado e o novo responsável continua de onde parou.` } : {}),
+  }
+}
+
+/** "Atribuir às sugeridas": quem o motor de elegibilidade sugere (aptidão comprovada) para cada tarefa selecionada — o plano da prévia É o da execução. */
+export async function planoDasSugeridas(tarefaIds: number[], agora = new Date()): Promise<Array<{ usuarioId: number; nome: string; tarefaIds: number[] }>> {
+  const { planoDeAtribuicao } = await import('@/lib/operacional/precisa-de-voce')
+  const abertas = await prisma.tarefa.findMany({ where: { id: { in: tarefaIds }, statusTarefa: { notIn: ENCERRADAS as never } }, select: { id: true } })
+  const plano = await planoDeAtribuicao(abertas.map((t) => t.id), agora)
+  return plano.atribuicoes.map((a) => ({ usuarioId: a.usuarioId, nome: a.nome, tarefaIds: a.tarefaIds }))
+}
+
+export async function previaDasSugeridas(tarefaIds: number[], agora = new Date()): Promise<import('@/src/lib/torre-confirmacao').PreviaDeConfirmacao | null> {
+  const plano = await planoDasSugeridas(tarefaIds, agora)
+  if (plano.length === 0) return null
+  const todas = plano.flatMap((a) => a.tarefaIds)
+  const ts = (await prisma.tarefa.findMany({ where: { id: { in: todas } }, select: SELECT_DA_PREVIA, orderBy: { id: 'asc' } })) as unknown as TarefaDaPrevia[]
+  const por = new Map(ts.map((t) => [t.id, t]))
+  const itens = plano.map((a) => ({ pessoa: a.nome, quantidade: a.tarefaIds.length, tarefas: a.tarefaIds.map((id) => (por.get(id) ? rotuloDaTarefa(por.get(id)!) : `#${id}`)) }))
+  const iniciadas = ts.filter(jaIniciada).length
+  return {
+    pergunta: `Atribuir às sugeridas (${todas.length} ${todas.length === 1 ? 'tarefa' : 'tarefas'}): ${itens.map((i) => `${i.quantidade} a ${i.pessoa} (${i.tarefas.join('; ')})`).join(' · ')}?`,
+    itens, assinatura: plano.flatMap((a) => a.tarefaIds.map((id) => `${id}:${a.usuarioId}`)).sort().join(','),
+    ...(iniciadas > 0 ? { exigeConfirmacaoDeAndamento: true, alerta: `${iniciadas} ${iniciadas === 1 ? 'tarefa já foi iniciada' : 'tarefas já foram iniciadas'}: o andamento é preservado.` } : {}),
+  }
+}
+
+/** Atribui cada grupo à pessoa que o plano escolheu (origem "via sugestão … (confirmada)"). */
+export async function atribuirAsSugeridasEmLote(args: { tarefaIds: number[]; autorId: number; autorNome?: string | null }): Promise<ResultadoDoLote> {
+  const plano = await planoDasSugeridas(args.tarefaIds)
+  const itens: ResultadoDoLote['itens'] = []
+  for (const g of plano) {
+    const r = await atribuirEmLote({ tarefaIds: g.tarefaIds, responsavelId: g.usuarioId, autorId: args.autorId, motivo: `via sugestão do Precisa de você (Atribuir às sugeridas, confirmada${args.autorNome ? ` por ${args.autorNome}` : ''})` })
+    itens.push(...r.itens)
+  }
+  const feitas = itens.filter((i) => i.ok).map((i) => i.tarefaId)
+  return { acao: 'ATRIBUIR', total: itens.length, sucesso: feitas.length, falha: itens.length - feitas.length, itens, desfazer: feitas.length > 0 ? { tipo: 'ATRIBUICAO', tarefaIds: feitas } : null }
+}
+
 // ─── REMOVER RESPONSÁVEL (devolver à fila de distribuição) ───────────────────
 
 /** A PRÉVIA da remoção — nomeia pessoa por pessoa e tarefa por tarefa; nada é gravado. `null` = nenhuma das tarefas tem responsável. */

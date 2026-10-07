@@ -5,6 +5,7 @@
 // Os dados são `d.tabela` (montados em `torre-foco.ts` a partir das MESMAS linhas da aba Tarefas); aqui só se filtra, ordena e desenha.
 import { TEXTO_DA_REGRA_DE_ORDEM } from "@/lib/operacional/ordem-certidoes"
 import { Fragment, useMemo, useState } from "react"
+import { AcoesDeAtribuicaoEmLote, type LoteDeAtribuicao } from "./lote-atribuicao"
 import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 import { diaMesDoPrazo } from "@/src/lib/tarefa/texto-prazo"
 import {
@@ -19,12 +20,13 @@ const TOM_PRAZO = { critico: "tpr-c-verm", atencao: "tpr-c-amb", ritmo: "", } as
 const descricaoDaIgual = (l: LinhaDaTabela): string =>
   [l.passo ? `${l.passo.rotulo}${l.passo.total ? ` · ${l.passo.ordem}/${l.passo.total}` : ""}` : null, l.statusRotulo, l.responsavelNome ?? "sem responsável", l.dataPrazo ? diaMesDoPrazo(l.dataPrazo) : null].filter(Boolean).join(" · ")
 
-export function ProcessoCertidoes({ d, agora, status, onStatus, podeAtribuir, ocupado, onAtribuir, onAtribuirVarias, onMotivo, onReabrir, onVerHistorico, onHistorico }: {
+export function ProcessoCertidoes({ d, agora, status, onStatus, podeAtribuir, ocupado, onAtribuir, lote, onMotivo, onReabrir, onVerHistorico, onHistorico }: {
   d: DetalheDoProcesso; agora: Date; podeAtribuir: boolean; ocupado: boolean
   /** O filtro de status vive na página: o bloco "Cancelada / não exigida" e este select mexem no MESMO estado. */
   status: FiltroDeStatusDaTabela; onStatus: (s: FiltroDeStatusDaTabela) => void
   onAtribuir: (tarefaId: number) => void
-  onAtribuirVarias: (tarefaIds: number[]) => void
+  /** As ações em lote de atribuição — o MESMO código da aba Tarefas (`lote-atribuicao.tsx`): Atribuir a…, Remover responsável, Atribuir às sugeridas. */
+  lote: LoteDeAtribuicao
   onMotivo: (l: LinhaDaTabela) => void
   onReabrir: (l: LinhaDaTabela) => void
   onVerHistorico: () => void
@@ -45,7 +47,8 @@ export function ProcessoCertidoes({ d, agora, status, onStatus, podeAtribuir, oc
   const colapsa = !expandido && pessoaId == null && semFiltroDeStatus && resumo.ocultas.length > 0
   const visiveis = colapsa ? resumo.visiveis : trabalho
 
-  const marcaveis = trabalho.filter((l) => l.podeAtribuir && l.tarefaId != null)
+  // Qualquer tarefa ABERTA é selecionável (com ou sem responsável): dá para atribuir, transferir ou remover o responsável em lote.
+  const marcaveis = trabalho.filter((l) => l.tipo === "ABERTA" && l.tarefaId != null)
   const todasMarcadas = marcaveis.length > 0 && marcaveis.every((l) => marcadas.has(l.chave))
   const alternar = (chave: string) => setMarcadas((m) => { const n = new Set(m); if (n.has(chave)) n.delete(chave); else n.add(chave); return n })
   const marcadasAtribuiveis = marcaveis.filter((l) => marcadas.has(l.chave))
@@ -57,7 +60,7 @@ export function ProcessoCertidoes({ d, agora, status, onStatus, podeAtribuir, oc
     const aberta = l.tipo === "ABERTA"
     return (
       <div key={l.chave} className="tpr-grade tpr-tr" data-linha={l.chave}>
-        <div>{l.podeAtribuir && l.tarefaId != null
+        <div>{l.tipo === "ABERTA" && l.tarefaId != null
           ? <input type="checkbox" className="tpr-chk" aria-label="Selecionar" checked={marcadas.has(l.chave)} onChange={() => alternar(l.chave)} />
           : null}</div>
         <div className="cert"><b>{l.titulo}</b><span>{nomePessoa}{l.geracao ? ` · ${l.geracao}` : ""}</span></div>
@@ -117,7 +120,7 @@ export function ProcessoCertidoes({ d, agora, status, onStatus, podeAtribuir, oc
       {marcadasAtribuiveis.length > 0 && (
         <div className="tpr-lote" role="status">
           <b>{marcadasAtribuiveis.length}</b> {marcadasAtribuiveis.length === 1 ? "selecionada" : "selecionadas"}
-          <button type="button" className="tpr-btn peq pri" disabled={ocupado || !podeAtribuir} onClick={() => { onAtribuirVarias(marcadasAtribuiveis.map((l) => l.tarefaId!)); setMarcadas(new Set()) }}>Atribuir às sugeridas</button>
+          {podeAtribuir && <AcoesDeAtribuicaoEmLote lote={lote} ids={marcadasAtribuiveis.map((l) => l.tarefaId!)} ocupado={ocupado} comSugeridas depois={() => setMarcadas(new Set())} />}
           <button type="button" className="tpr-btn peq" onClick={() => setMarcadas(new Set())}>Limpar seleção</button>
         </div>
       )}
