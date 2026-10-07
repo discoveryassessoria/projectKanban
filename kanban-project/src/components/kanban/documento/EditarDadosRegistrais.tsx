@@ -2,7 +2,7 @@
 // ============================================================================
 // "EDITAR" DA ABA DADOS REGISTRAIS (06/10/2026) — corrige evento, localidade e referência registral de uma certidão em QUALQUER fase. Não reabre o passo, não muda
 // a fase, não cancela nada, não reenvia ao cartório. Pede o MOTIVO quando o "Localizar registro" já estava concluído; AVISA se o pedido ao cartório já saiu com os dados
-// antigos; AVISA quando o valor digitado difere do que a árvore tem (vale o registro). Regras e textos: `src/lib/genealogia/dados-registrais-edicao.ts`.
+// antigos; quando o valor digitado difere do que a árvore tem, o servidor recusa e pede a escolha explícita (árvore · cadastro · cancelar). Regras e textos: `src/lib/genealogia/dados-registrais-edicao.ts`.
 // ============================================================================
 "use client"
 
@@ -12,12 +12,11 @@ import { createPortal } from "react-dom"
 import { Loader2 } from "lucide-react"
 import { LAYER } from "@/src/lib/ui/layers"
 import {
-  CAMPOS_EDITAVEIS, MOTIVO_MINIMO, avisoDoRequerimentoEnviado, conflitosComArvore, mudancasDaEdicao, mostrarMudanca, type ChaveEditavel, type ValoresEditaveis,
+  CAMPOS_EDITAVEIS, MOTIVO_MINIMO, avisoDoRequerimentoEnviado, mudancasDaEdicao, mostrarMudanca, type ChaveEditavel, type ValoresEditaveis,
 } from "@/src/lib/genealogia/dados-registrais-edicao"
-import { textoDoAvisoDeConflito, CAMPOS_SINCRONIZAVEIS } from "@/src/lib/genealogia/sincronizacao-registral"
+import { ModalConfirmacaoArvore, divergenciasDaResposta, type DivergenciaDaArvore, type EscolhasDaArvore } from "@/src/components/kanban/documento/ModalConfirmacaoArvore"
 
 interface Contexto { documentoId: number; pessoaNome: string; passoConcluido: boolean; requerimentoEnviadoEm: string | null; valores: Record<string, string | null> }
-interface ArvoreValores { evento: string | null; campos: Array<{ chave: string; rotulo: string; origem: string; tipo: "data" | "texto"; arvore: string | null }> }
 interface Aplicado { chave: string; rotulo: string; pessoaNome: string; arvoreTexto: string; registroTexto: string; tipo: string; logId?: number }
 
 const auth = () => ({ "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` })
@@ -26,10 +25,10 @@ const lab = "block text-[10px] uppercase font-semibold tracking-wider text-[var(
 
 export function EditarDadosRegistrais({ documentoId, onFechar, onSaved }: { documentoId: number; onFechar: () => void; onSaved?: () => void }) {
   const [ctx, setCtx] = useState<Contexto | null>(null)
-  const [arvore, setArvore] = useState<ArvoreValores | null>(null)
   const [form, setForm] = useState<Record<string, string>>({})
   const [motivo, setMotivo] = useState("")
-  const [confirmados, setConfirmados] = useState<Set<string>>(new Set())
+  // Divergência com a árvore: o SERVIDOR recusa (409) e devolve o que difere; a pessoa escolhe e o salvamento é refeito com a escolha.
+  const [divergencias, setDivergencias] = useState<DivergenciaDaArvore[] | null>(null)
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [aplicados, setAplicados] = useState<Aplicado[] | null>(null)
@@ -37,46 +36,32 @@ export function EditarDadosRegistrais({ documentoId, onFechar, onSaved }: { docu
 
   useEffect(() => {
     let vivo = true
-    void Promise.all([
-      fetch(`/api/documentos/${documentoId}/dados-registrais`, { headers: auth() }).then((r) => (r.ok ? r.json() : null)),
-      fetch(`/api/documentos/${documentoId}/arvore-valores`, { headers: auth() }).then((r) => (r.ok ? r.json() : null)),
-    ]).then(([c, a]) => {
+    void fetch(`/api/documentos/${documentoId}/dados-registrais`, { headers: auth() }).then((r) => (r.ok ? r.json() : null)).then((c) => {
       if (!vivo) return
       if (!c) { setErro("Não foi possível carregar os dados desta certidão."); return }
       setCtx(c)
-      setArvore(a)
       setForm(Object.fromEntries(CAMPOS_EDITAVEIS.map((f) => [f.chave, c.valores[f.chave] ?? ""])))
     })
     return () => { vivo = false }
   }, [documentoId])
 
   const mudancas = useMemo(() => (ctx ? mudancasDaEdicao(ctx.valores as ValoresEditaveis, form as ValoresEditaveis) : []), [ctx, form])
-  // Conflito com a árvore: só dos campos que ESTA edição mudou (não se reclama do que ninguém tocou).
-  const conflitos = useMemo(() => {
-    if (!arvore) return []
-    const tocados = new Set(mudancas.map((m) => m.chave as string))
-    return conflitosComArvore(arvore.campos, Object.fromEntries(Object.entries(form).filter(([k]) => tocados.has(k))))
-  }, [arvore, form, mudancas])
   const aviso = useMemo(() => (ctx ? avisoDoRequerimentoEnviado(ctx.requerimentoEnviadoEm, mudancas) : null), [ctx, mudancas])
-  const pendentesDeConfirmacao = conflitos.filter((c) => !confirmados.has(`${c.campo.chave}=${c.novo}`))
   const motivoOk = !ctx?.passoConcluido || motivo.trim().length >= MOTIVO_MINIMO
-  const podeSalvar = !!ctx && mudancas.length > 0 && motivoOk && pendentesDeConfirmacao.length === 0 && !salvando
+  const podeSalvar = !!ctx && mudancas.length > 0 && motivoOk && !salvando
 
   const mudar = (chave: ChaveEditavel, v: string) => setForm((f) => ({ ...f, [chave]: v }))
-  const comoDataDoRegistro = (novo: string) => {
-    // "É a data do registro": o valor digitado era a data do REGISTRO, não a do evento — vai para o campo certo e a data do evento volta ao que era.
-    setForm((f) => ({ ...f, data_registro: novo, data_evento: ctx?.valores.data_evento ?? "" }))
-  }
-
-  const salvar = async () => {
+  const salvar = async (decisoes?: EscolhasDaArvore) => {
     if (!ctx) return
     setSalvando(true); setErro(null)
     try {
       const r = await fetch(`/api/documentos/${documentoId}/dados-registrais`, {
         method: "PATCH", headers: auth(),
-        body: JSON.stringify({ valores: Object.fromEntries(mudancas.map((m) => [m.chave, form[m.chave] === "" ? null : form[m.chave]])), motivo, confirmouRequerimentoEnviado: aviso != null }),
+        body: JSON.stringify({ valores: Object.fromEntries(mudancas.map((m) => [m.chave, form[m.chave] === "" ? null : form[m.chave]])), motivo, confirmouRequerimentoEnviado: aviso != null, ...(decisoes ? { decisoes } : {}) }),
       })
       const j = await r.json().catch(() => ({}))
+      const divergentes = divergenciasDaResposta(r.status, j)
+      if (divergentes) { setDivergencias(divergentes); return }
       if (!r.ok || j.ok === false) { setErro(j.error ?? "Não foi possível salvar."); return }
       onSaved?.()
       if (Array.isArray(j.sincronizados) && j.sincronizados.length > 0) setAplicados(j.sincronizados)
@@ -135,23 +120,6 @@ export function EditarDadosRegistrais({ documentoId, onFechar, onSaved }: { docu
               </div>
             ))}
 
-            {conflitos.map((c) => {
-              const confirmado = confirmados.has(`${c.campo.chave}=${c.novo}`)
-              const arvoreCampo = CAMPOS_SINCRONIZAVEIS.find((x) => x.chave === c.campo.chave) ?? { ...c.campo, evento: "NASCIMENTO" as const, alvo: "PESSOA" as const, coluna: "", origem: "data_evento" as const }
-              return (
-                <div key={c.campo.chave} data-testid="aviso-conflito-arvore" className="mb-2 p-2.5 rounded-md border border-[var(--warning-text)]/40 text-[12.5px] text-[var(--text-primary)]">
-                  {textoDoAvisoDeConflito(arvoreCampo as never, c.arvore, c.novo)}
-                  <div className="mt-1.5 flex gap-2 flex-wrap">
-                    <button type="button" disabled={confirmado} onClick={() => setConfirmados((s) => new Set(s).add(`${c.campo.chave}=${c.novo}`))}
-                      className="px-2.5 py-1 rounded-md text-[12px] font-semibold bg-[var(--accent-primary)] text-white disabled:opacity-50">{confirmado ? "Confirmado" : "Confirmar"}</button>
-                    {c.origem === "data_evento" && (
-                      <button type="button" data-testid="atalho-data-do-registro" onClick={() => comoDataDoRegistro(c.novo)} className="px-2.5 py-1 rounded-md text-[12px] border border-[var(--border-default)]">É a data do registro</button>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-
             {aviso && <div data-testid="aviso-requerimento-enviado" className="mb-2 p-2.5 rounded-md border border-[var(--warning-text)]/40 text-[12.5px] text-[var(--warning-text)]">{aviso}</div>}
 
             {ctx.passoConcluido && (
@@ -173,6 +141,13 @@ export function EditarDadosRegistrais({ documentoId, onFechar, onSaved }: { docu
         )}
         {erro && !ctx && <div className="text-[12px] text-[var(--warning-text)]">{erro}</div>}
       </div>
+      {divergencias && (
+        <ModalConfirmacaoArvore
+          divergencias={divergencias} salvando={salvando}
+          onCancelar={() => setDivergencias(null)}
+          onDecidir={(escolhas) => { setDivergencias(null); void salvar(escolhas) }}
+        />
+      )}
     </div>,
     document.body,
   )

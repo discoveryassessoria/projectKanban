@@ -1,10 +1,11 @@
 // src/app/api/documentos/route.ts
 // ✅ ATUALIZADO: Automação para EM_BUSCA (cria tarefa de busca) e SOLICITAR (cria subtarefa dentro da busca)
 
+import { aplicarPlanoNaArvore, aplicarSubstituicoes, decisoesDoCorpo, planejarConfirmacao, respostaDeConfirmacao } from "@/src/services/genealogia/confirmacao-arvore"
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { TipoDocumento, StatusDocumento } from "@prisma/client"
-import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { resolverNecessidadeDeDocumento } from '@/src/services/necessidade-documental'
 import { reconciliarEconomicoDoProcesso } from '@/src/lib/motor/matriz-economica'
 import { notificarDocumentoAlterado } from '@/src/services/registral/gancho-documental'
@@ -223,6 +224,14 @@ export async function POST(request: NextRequest) {
       necessidadeIdFinal = nec?.id ?? null
     }
 
+    // CONFIRMAÇÃO ÁRVORE × CADASTRO (07/10/2026): dado registral diferente do da árvore só é gravado com a escolha explícita (`decisoes`); sem ela, 409.
+    const uniaoDaNecessidade = necessidadeIdFinal ? (await prisma.necessidadeDocumental.findUnique({ where: { id: necessidadeIdFinal }, select: { uniaoId: true } }))?.uniaoId ?? null : null
+    const plano = await planejarConfirmacao({
+      documentoId: null, criacao: { pessoaId: parseInt(pessoaId), tipo: tipoEnum ?? tipoCadastro?.legacyEnumKey ?? null, uniaoId: uniaoDaNecessidade },
+      novos: { data_evento, data_registro, cidade_registro, estado_registro, pais_registro, cartorio, livro, folha, termo }, atuais: {}, decisoes: decisoesDoCorpo(body),
+    })
+    if (plano.pendentes.length > 0) return NextResponse.json(respostaDeConfirmacao(plano.pendentes), { status: 409 })
+
     const documento = await prisma.documento.create({
       data: {
         pessoaId: parseInt(pessoaId),
@@ -265,6 +274,8 @@ export async function POST(request: NextRequest) {
         arquivo_apostila_url: arquivo_apostila_url || null,
         // Observações
         observacoes: observacoes || null,
+        // Escolha «o correto é o da árvore»: a Genealogia assume o valor da árvore (vem por último para valer sobre o digitado).
+        ...aplicarSubstituicoes({}, plano),
       },
       include: {
         pessoa: {
@@ -276,6 +287,10 @@ export async function POST(request: NextRequest) {
         }
       }
     })
+    if (plano.itens.length > 0) {
+      const autorPlano = await extrairUsuarioComPermissoes(request).catch(() => null)
+      await aplicarPlanoNaArvore(plano, { documentoId: documento.id, autorId: autorPlano?.userId ?? null })
+    }
 
     // ✅ AUTOMAÇÃO DE TAREFAS
     const statusFinal = (status as StatusDocumento) || 'PENDENTE'

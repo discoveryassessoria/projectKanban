@@ -9,6 +9,7 @@ import type { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { notificarDocumentoAlterado } from "@/src/services/registral/gancho-documental"
 import { sincronizarDocumento, type ResultadoDaSincronizacao } from "@/src/services/genealogia/sincronizar-com-registro"
+import { aplicarPlanoNaArvore, aplicarSubstituicoes, mensagemDaConfirmacao, planejarConfirmacao, type DecisoesDeConfirmacao, type DivergenciaPendente } from "@/src/services/genealogia/confirmacao-arvore"
 import {
   CAMPOS_EDITAVEIS, avisoDoRequerimentoEnviado, motivoValido, mostrarMudanca, mudancasDaEdicao, normalizarCampo,
   type MudancaDeCampo, type ValoresEditaveis,
@@ -52,6 +53,7 @@ export async function contextoDeEdicao(documentoId: number): Promise<ContextoDeE
 export type ResultadoDaEdicao =
   | { ok: true; mudancas: MudancaDeCampo[]; sincronizacao: ResultadoDaSincronizacao; aviso: string | null }
   | { ok: false; codigo: "NAO_ENCONTRADO" | "SEM_MUDANCA" | "MOTIVO_OBRIGATORIO" | "REQUERIMENTO_JA_ENVIADO" | "INVALIDO"; mensagem: string; aviso?: string | null }
+  | { ok: false; codigo: "CONFIRMACAO_ARVORE"; mensagem: string; divergencias: DivergenciaPendente[] }
 
 export async function editarDadosRegistrais(args: {
   documentoId: number
@@ -60,6 +62,8 @@ export async function editarDadosRegistrais(args: {
   motivo?: string | null
   /** O usuário viu o aviso "o pedido ao cartório já saiu com …" e confirmou. */
   confirmouRequerimentoEnviado?: boolean
+  /** Escolha explícita, por campo, quando o valor digitado difere da árvore (`confirmacao-arvore.ts`). */
+  decisoes?: DecisoesDeConfirmacao
 }): Promise<ResultadoDaEdicao> {
   const { documentoId, autorId } = args
   const ctx = await contextoDeEdicao(documentoId)
@@ -80,6 +84,12 @@ export async function editarDadosRegistrais(args: {
   const aviso = avisoDoRequerimentoEnviado(ctx.requerimentoEnviadoEm, mudancas)
   if (aviso && args.confirmouRequerimentoEnviado !== true) return { ok: false, codigo: "REQUERIMENTO_JA_ENVIADO", mensagem: aviso, aviso }
 
+  // CONFIRMAÇÃO ÁRVORE × CADASTRO: valor diferente do da árvore só grava com a escolha explícita; sem ela, recusa.
+  const plano = await planejarConfirmacao({ documentoId, novos: args.valores as never, atuais: doc as never, decisoes: args.decisoes ?? {} })
+  if (plano.pendentes.length > 0) {
+    return { ok: false, codigo: "CONFIRMACAO_ARVORE", mensagem: mensagemDaConfirmacao(plano.pendentes), divergencias: plano.pendentes }
+  }
+
   const dados: Record<string, Date | string | null> = {}
   for (const m of mudancas) {
     const c = CAMPOS_EDITAVEIS.find((x) => x.chave === m.chave)!
@@ -92,6 +102,7 @@ export async function editarDadosRegistrais(args: {
     motivo: motivo.motivo, passoJaConcluido: ctx.passoConcluido, requerimentoJaEnviado: aviso != null, requerimentoEnviadoEm: aviso != null ? ctx.requerimentoEnviadoEm : null,
     avisoRequerimento: aviso,
   }
+  Object.assign(dados, aplicarSubstituicoes({}, plano)) // «o correto é o da árvore»: a Genealogia assume o valor da árvore
   await prisma.$transaction(async (tx) => {
     await tx.documento.update({ where: { id: documentoId }, data: dados as Prisma.DocumentoUpdateInput })
     for (const p of processos.length ? processos : [{ id: null as number | null }]) {
@@ -105,6 +116,7 @@ export async function editarDadosRegistrais(args: {
     }
   })
 
+  await aplicarPlanoNaArvore(plano, { documentoId, autorId })
   notificarDocumentoAlterado({ documentoId, motivo: "documento_alterado" }).catch((e) => console.error("[dados registrais → gancho registral]", e))
   const sincronizacao = await sincronizarDocumento(documentoId, autorId, "EDICAO_DOS_DADOS_REGISTRAIS")
   return { ok: true, mudancas, sincronizacao, aviso }

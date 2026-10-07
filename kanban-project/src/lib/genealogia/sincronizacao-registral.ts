@@ -15,7 +15,7 @@
 
 export type EventoRegistral = "NASCIMENTO" | "CASAMENTO" | "OBITO"
 export type AlvoDaSincronizacao = "PESSOA" | "UNIAO"
-export type OrigemNoRegistro = "data_evento" | "cidade_registro" | "estado_registro" | "pais_registro"
+export type OrigemNoRegistro = "data_evento" | "cidade_registro" | "estado_registro" | "pais_registro" | "data_registro" | "cartorio" | "livro" | "folha" | "termo"
 
 export interface CampoSincronizavel {
   /** Chave estável (`PESSOA.data_nasc`, `UNIAO.local`…). */
@@ -40,6 +40,13 @@ export const CAMPOS_SINCRONIZAVEIS: readonly CampoSincronizavel[] = [
   { chave: "UNIAO.estado", alvo: "UNIAO", coluna: "estado", evento: "CASAMENTO", origem: "estado_registro", tipo: "texto", rotulo: "estado do casamento" },
   { chave: "UNIAO.pais", alvo: "UNIAO", coluna: "pais", evento: "CASAMENTO", origem: "pais_registro", tipo: "texto", rotulo: "país do casamento" },
   { chave: "PESSOA.data_obito", alvo: "PESSOA", coluna: "data_obito", evento: "OBITO", origem: "data_evento", tipo: "data", rotulo: "data do óbito" },
+  // Só o CASAMENTO tem onde guardar a referência do registro na árvore (a União). Nascimento e óbito: Pessoa não tem data de registro, cartório, livro, folha nem termo
+  // — sem equivalente, sem comparação e sem modal. Cada campo só contra o seu: cartório é CARTÓRIO (nunca cidade); livro, folha e termo, cada um com o seu.
+  { chave: "UNIAO.data_registro", alvo: "UNIAO", coluna: "data_registro", evento: "CASAMENTO", origem: "data_registro", tipo: "data", rotulo: "data do registro do casamento" },
+  { chave: "UNIAO.cartorio", alvo: "UNIAO", coluna: "cartorio", evento: "CASAMENTO", origem: "cartorio", tipo: "texto", rotulo: "cartório do casamento" },
+  { chave: "UNIAO.livro", alvo: "UNIAO", coluna: "livro", evento: "CASAMENTO", origem: "livro", tipo: "texto", rotulo: "livro do casamento" },
+  { chave: "UNIAO.folha", alvo: "UNIAO", coluna: "folha", evento: "CASAMENTO", origem: "folha", tipo: "texto", rotulo: "folha do casamento" },
+  { chave: "UNIAO.termo", alvo: "UNIAO", coluna: "termo", evento: "CASAMENTO", origem: "termo", tipo: "texto", rotulo: "termo do casamento" },
 ]
 
 /** O tipo do documento (enum legado) → o evento da certidão. `null` = não é certidão de nascimento/casamento/óbito. */
@@ -62,6 +69,11 @@ export interface ValoresDoRegistro {
   cidade_registro?: string | null
   estado_registro?: string | null
   pais_registro?: string | null
+  data_registro?: Date | string | null
+  cartorio?: string | null
+  livro?: string | null
+  folha?: string | null
+  termo?: string | null
 }
 
 // ─── normalização e texto ───────────────────────────────────────────────────
@@ -82,7 +94,10 @@ export const mesmoTexto = (a: string | null | undefined, b: string | null | unde
 /** O valor do campo no registro (normalizado: data `AAAA-MM-DD`, texto aparado) ou `null` se vazio. */
 export function valorDoRegistro(campo: CampoSincronizavel, registro: ValoresDoRegistro): string | null {
   const bruto = registro[campo.origem]
-  return campo.tipo === "data" ? diaDe(bruto as Date | string | null | undefined) : textoDeCampo(bruto as string | null | undefined)
+  if (campo.tipo === "data") return diaDe(bruto as Date | string | null | undefined)
+  const t = textoDeCampo(bruto as string | null | undefined)
+  // «0» é o valor padrão do cadastro de livro/folha/termo: não é dado (nem se compara, nem preenche a árvore).
+  return t != null && (campo.origem === "livro" || campo.origem === "folha" || campo.origem === "termo") && /^0+$/.test(t) ? null : t
 }
 
 /** O valor atual na árvore, no mesmo formato. */
@@ -108,6 +123,9 @@ export function mesmoLugar(campo: Pick<CampoSincronizavel, "origem">, a: string,
   if (campo.origem === "estado_registro") return nomeDeUf(a) === nomeDeUf(b)
   return baseDoLugar(a) === baseDoLugar(b)
 }
+
+/** O texto sem o sufixo entre parênteses («SP (2º Subd.)» → «SP»; «São Paulo (Lapa)» → «São Paulo») — o que a Genealogia assume quando vale o valor da árvore. */
+export const semParenteses = (v: string): string => v.replace(/\s*\([^)]*\)\s*$/, "").trim()
 
 export type TipoDeDiferenca = "PREENCHER" | "CONFLITO"
 
