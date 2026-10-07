@@ -25,6 +25,8 @@ interface DocCompact {
   statusShort: string     // "recebido", "não iniciado", "em busca", etc.
   statusClass: string     // "received" | "pending" | "searching" | "requesting" | "waiting" | "returned" | "other"
   isRecebido: boolean
+  /** Passo 4 (Conferir e validar) concluído — a coluna «Certidão» só diz «Validada» com isto. */
+  isValidado: boolean
   /**
    * CANCELAR NUNCA ESCONDE, SÓ MARCA: documento CANCELADO ou NÃO EXIGIDO (a árvore deixou de exigir) continua na lista da
    * pessoa — `encerramento` diz quem, quando e por quê. `null` = documento ativo.
@@ -384,6 +386,7 @@ export async function GET(
         statusShort: derivado.statusShort,
         statusClass: derivado.statusClass,
         isRecebido: derivado.isRecebido,
+        isValidado: derivado.isValidado,
         encerramento: encerramentos.get(d.id) ?? null,
         analiseOk: analiseConcluida && d.analysisStatus === "ready" && !idsComDivergenciaAberta.has(d.id),
         arquivoUrl: d.arquivo_url ?? null,

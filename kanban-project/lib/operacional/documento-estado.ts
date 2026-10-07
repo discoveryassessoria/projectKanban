@@ -22,6 +22,35 @@ import type { StatusTarefa } from "@prisma/client"
 const STATUS_TERMINAL_SUCESSO: StatusTarefa[] = ["CONCLUIDO_RECEBIDO"]
 const STATUS_TERMINAL: StatusTarefa[] = ["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI", "CANCELADA", "SUPERSEDIDA"]
 
+// ─── RECEBIDA × VALIDADA — UMA lógica, no servidor (07/10/2026) ──────────────────────────────────────────────────────────────────────
+// Localizar registro (Genealogia) NÃO recebe nem valida a certidão: só preenche dados registrais e árvore. A Tarefa da Genealogia termina em
+// CONCLUIDO_RECEBIDO — o MESMO valor de qualquer tarefa que conclui com sucesso — e ler «alguma tarefa concluída» fazia a bolinha da árvore dizer
+// «Recebido» e a aba Documentos dizer «Validada» sem que a Emissão tivesse começado.
+//   RECEBIDA  = «Receber certidão» concluída na Emissão (Registrar recebimento), ou receber_certidao_retificada, ou a Tarefa de Emissão concluída,
+//               ou o recebimento direto (upload do cliente/lote, que grava Documento.status RECEBIDO/ENTREGUE).
+//   VALIDADA  = «Conferir e validar certidão» concluída (passo 4), ou a Tarefa de Emissão concluída (que só conclui com os 4 passos).
+// Tarefa da Genealogia NUNCA conta. A bolinha da árvore, a coluna «Certidão» e as contagens leem esta função e nenhuma outra.
+export const FASE_GENEALOGIA = "genealogia"
+export const SUBTAREFAS_DE_RECEBIMENTO = ["receber_certidao", "receber_certidao_retificada"] as const
+export const SUBTAREFAS_DE_VALIDACAO = ["conferir_validar_certidao", "conferir_validar_certidao_retificada"] as const
+export const STATUS_DOCUMENTO_DE_RECEBIMENTO_DIRETO = ["RECEBIDO", "ENTREGUE"] as const
+
+export interface EvidenciasDaCertidao {
+  /** `Documento.status` gravado por upload do cliente / lote de arquivos. */
+  statusDocumento: string | null
+  /** Subtarefa de recebimento CONCLUÍDA na Emissão. */
+  recebimentoRegistrado: boolean
+  /** Subtarefa «Conferir e validar» CONCLUÍDA na Emissão. */
+  validacaoRegistrada: boolean
+  /** Tarefa CONCLUIDO_RECEBIDO de fase DIFERENTE da Genealogia (a Emissão concluiu os 4 passos). */
+  tarefaDeEmissaoConcluida: boolean
+}
+export function etapaDaCertidao(ev: EvidenciasDaCertidao): { recebida: boolean; validada: boolean } {
+  const validada = ev.validacaoRegistrada || ev.tarefaDeEmissaoConcluida
+  const recebida = validada || ev.recebimentoRegistrado || (ev.statusDocumento != null && (STATUS_DOCUMENTO_DE_RECEBIMENTO_DIRETO as readonly string[]).includes(ev.statusDocumento))
+  return { recebida, validada }
+}
+
 export interface EstadoDocumento {
   documentoId: number
   /** A Tarefa viva (não terminal) mais recente deste documento, se existir. */
@@ -34,8 +63,10 @@ export interface EstadoDocumento {
     faseMacroKey: string | null
     dataPrazo: Date | null
   } | null
-  /** Alguma Tarefa deste documento já concluiu com sucesso, em qualquer fase. */
+  /** A certidão foi RECEBIDA (ver `etapaDaCertidao`) — a Tarefa da Genealogia não conta. */
   jaRecebido: boolean
+  /** A certidão foi VALIDADA (passo 4 da Emissão concluído) — implica `jaRecebido`. */
+  validado: boolean
   /** Nenhuma Tarefa nunca existiu para este documento — ninguém começou. */
   nuncaIniciado: boolean
 }
@@ -47,6 +78,21 @@ export async function estadoOperacionalDosDocumentos(documentoIds: number[]): Pr
   const mapa = new Map<number, EstadoDocumento>()
   if (documentoIds.length === 0) return mapa
 
+  const [docs, execucoes] = await Promise.all([
+    prisma.documento.findMany({ where: { id: { in: documentoIds } }, select: { id: true, status: true } }),
+    prisma.subtaskExecution.findMany({
+      where: { supersededAt: null, status: "CONCLUIDO", subtaskKey: { in: [...SUBTAREFAS_DE_RECEBIMENTO, ...SUBTAREFAS_DE_VALIDACAO] }, stepInstance: { documentoId: { in: documentoIds } } },
+      select: { subtaskKey: true, stepInstance: { select: { documentoId: true } } },
+    }),
+  ])
+  const statusDoc = new Map(docs.map((d) => [d.id, d.status as string]))
+  const recebimentoPorDoc = new Set<number>(), validacaoPorDoc = new Set<number>()
+  for (const e of execucoes) {
+    const id = e.stepInstance.documentoId
+    if (id == null) continue
+    if ((SUBTAREFAS_DE_RECEBIMENTO as readonly string[]).includes(e.subtaskKey)) recebimentoPorDoc.add(id)
+    else validacaoPorDoc.add(id)
+  }
   const tarefas = await prisma.tarefa.findMany({
     where: { documentoId: { in: documentoIds } },
     select: {
@@ -67,6 +113,12 @@ export async function estadoOperacionalDosDocumentos(documentoIds: number[]): Pr
   for (const documentoId of documentoIds) {
     const doDocumento = porDocumento.get(documentoId) ?? []
     const viva = doDocumento.find((t) => !STATUS_TERMINAL.includes(t.statusTarefa)) ?? null
+    const etapa = etapaDaCertidao({
+      statusDocumento: statusDoc.get(documentoId) ?? null,
+      recebimentoRegistrado: recebimentoPorDoc.has(documentoId),
+      validacaoRegistrada: validacaoPorDoc.has(documentoId),
+      tarefaDeEmissaoConcluida: doDocumento.some((t) => STATUS_TERMINAL_SUCESSO.includes(t.statusTarefa) && t.faseMacroKey !== FASE_GENEALOGIA),
+    })
     mapa.set(documentoId, {
       documentoId,
       tarefaViva: viva
@@ -80,7 +132,8 @@ export async function estadoOperacionalDosDocumentos(documentoIds: number[]): Pr
             dataPrazo: viva.dataPrazo,
           }
         : null,
-      jaRecebido: doDocumento.some((t) => STATUS_TERMINAL_SUCESSO.includes(t.statusTarefa)),
+      jaRecebido: etapa.recebida,
+      validado: etapa.validada,
       nuncaIniciado: doDocumento.length === 0,
     })
   }
@@ -136,7 +189,10 @@ export interface RotuloDoEstado {
   status: string
   statusShort: string
   statusClass: string
+  /** Recebida (inclui validada). */
   isRecebido: boolean
+  /** Validada: o passo 4 da Emissão foi concluído. */
+  isValidado: boolean
   emOperacao: boolean
 }
 
@@ -148,14 +204,15 @@ export function rotularEstadoDoDocumento(rawStatus: string, estado: EstadoDocume
     statusClass: classeCompactaDoEstado(status),
   })
   if (OVERRIDES_AINDA_VIVOS.has(rawStatus)) {
-    return { ...rotular(rawStatus), isRecebido: false, emOperacao: false }
+    return { ...rotular(rawStatus), isRecebido: false, isValidado: false, emOperacao: false }
   }
   const viva = estado?.tarefaViva
   if (viva) {
-    return { ...rotular(viva.coluna ?? "EM_ANDAMENTO"), isRecebido: false, emOperacao: true }
+    // Tarefa viva: o rótulo é o da operação; mas o recebimento já registrado (passo 3) e a validação (passo 4) continuam valendo para a coluna «Certidão».
+    return { ...rotular(viva.coluna ?? "EM_ANDAMENTO"), isRecebido: estado?.jaRecebido === true, isValidado: estado?.validado === true, emOperacao: true }
   }
   if (estado?.jaRecebido) {
-    return { ...rotular("RECEBIDO"), isRecebido: true, emOperacao: false }
+    return { ...rotular("RECEBIDO"), isRecebido: true, isValidado: estado.validado === true, emOperacao: false }
   }
-  return { ...rotular("PENDENTE"), isRecebido: false, emOperacao: false }
+  return { ...rotular("PENDENTE"), isRecebido: false, isValidado: false, emOperacao: false }
 }

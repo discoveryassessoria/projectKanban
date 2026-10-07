@@ -35,6 +35,7 @@ interface DocCompact {
   statusShort: string
   statusClass: string
   isRecebido: boolean
+  isValidado: boolean
   /** Cancelado ou não exigido: continua na lista, esmaecido, com quem/quando/por quê. `null` = ativo. */
   encerramento: EncerramentoDoDocumento | null
   analiseOk: boolean
@@ -113,9 +114,12 @@ interface ProcessoDocumentosProps {
 // status genérico do doc -> estágio "certidão" da biblioteca
 function certStatusFromDoc(
   status: string,
-  isRecebido: boolean
+  isRecebido: boolean,
+  isValidado: boolean
 ): "validada" | "recebida" | "pendente" | "nao_aplica" {
-  if (isRecebido) return "validada"
+  // «Validada» só com o passo 4 da Emissão concluído; «Recebida» só com o recebimento registrado (decisão do SERVIDOR: documento-estado.ts).
+  if (isValidado) return "validada"
+  if (isRecebido) return "recebida"
   const s = status.toLowerCase()
   if (s === "recebido" || s === "entregue") return "recebida"
   // CANCELADO/INVALIDO são terminais — a exigência acabou (cancelada) ou o
@@ -214,7 +218,7 @@ function mapearBiblioteca(data: ProcessoDocumentosData) {
     const docsOrdenados = [...aplicaveis].sort(porEventoDeVida)
     const docs: BibDocItem[] = docsOrdenados.map((d) => {
       const encerrado = !documentoAtivo(d.status)
-      const certSt = certStatusFromDoc(d.status, d.isRecebido)
+      const certSt = certStatusFromDoc(d.status, d.isRecebido, d.isValidado)
       // Certidão recebida não é certidão liberada: falta a Análise Documental
       // (comparação com a árvore) confirmar que não há divergência em aberto.
       // Sem isto, "pronto para protocolo" virava verdade só de o arquivo ter
