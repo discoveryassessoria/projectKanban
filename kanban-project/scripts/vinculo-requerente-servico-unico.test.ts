@@ -107,6 +107,19 @@ async function main() {
   ok("a verificação está registrada (INT-004, ERRO, sem correção automática) e na Saúde do Sistema", /INT-004/.test(readFileSync("lib/saude/verificacoes/vinculo-requerente-arvore.ts", "utf8")) && /correcaoAutomatica: null/.test(readFileSync("lib/saude/verificacoes/vinculo-requerente-arvore.ts", "utf8")) && /vinculo-requerente-arvore/.test(readFileSync("lib/saude/index.ts", "utf8")) && antes >= 0)
   await prisma.requerente.deleteMany({ where: { id: { in: [edison.id, emerson.id] } } })
 
+  secao("D) Troca de dois vínculos cruzados (passa por vazio, uma transação)")
+  const x1 = await mkReq("Xavier"), x2 = await mkReq("Yara")
+  const q1 = await mkPes("Xavier"), q2 = await mkPes("Yara")
+  await svc.incluirNoProcesso(prisma, proc.id, [x1.id, x2.id])
+  await svc.definirPessoaDoRequerente(prisma, x1.id, q2.id); await svc.definirPessoaDoRequerente(prisma, x2.id, q1.id) // cruzados
+  const t = await svc.trocarPessoasDeRequerentes({ requerenteA: x1.id, requerenteB: x2.id, autorId: null })
+  const [rx1, rx2] = await Promise.all([prisma.requerente.findUniqueOrThrow({ where: { id: x1.id } }), prisma.requerente.findUniqueOrThrow({ where: { id: x2.id } })])
+  ok("depois da troca cada requerente aponta para a pessoa do seu nome", rx1.personId === q1.id && rx2.personId === q2.id && t.requerenteA.para === q1.id)
+  ok("o vínculo ao processo ficou como estava (nada apagado nem removido)", (await vinc(proc.id)).filter((x) => [x1.id, x2.id].includes(x.requerenteId)).every((x) => x.removidoEm == null))
+  ok("o fato entra no histórico", (await prisma.logAuditoria.count({ where: { acao: "REQUERENTES_PESSOAS_TROCADAS", entidadeId: x1.id } })) === 1)
+  ok("troca de requerente sem pessoa é recusada", (await erro(() => svc.trocarPessoasDeRequerentes({ requerenteA: x1.id, requerenteB: r1.id }))) === "REQUERENTE_SEM_PESSOA")
+  await prisma.requerente.deleteMany({ where: { id: { in: [x1.id, x2.id] } } })
+
   // limpeza
   await prisma.processoRequerente.deleteMany({ where: { processoId: { in: [proc.id, outroProc.id] } } })
   await prisma.requerente.deleteMany({ where: { id: { in: [r1.id, r2.id, r3.id] } } })

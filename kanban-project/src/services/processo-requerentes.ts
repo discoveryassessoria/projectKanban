@@ -184,3 +184,38 @@ export async function atualizarRequerentesDoProcesso(args: { processoId: number;
 export async function vincularNaCriacaoDoProcesso(tx: Prisma.TransactionClient, processoId: number, requerenteIds: number[]): Promise<void> {
   await incluirNoProcesso(tx, processoId, requerenteIds)
 }
+
+// ─── TROCA DE DOIS VÍNCULOS CRUZADOS ─────────────────────────────────────────────────────────────────────────────────────────
+
+export interface ResultadoDaTroca { requerenteA: { id: number; de: number; para: number }; requerenteB: { id: number; de: number; para: number } }
+
+/**
+ * Troca as pessoas de DOIS requerentes (A passa a apontar para a pessoa de B e vice-versa) — o conserto do vínculo CRUZADO. `Requerente.personId` é único, então a
+ * troca direta violaria o índice: passa por vazio, na MESMA transação (zera A → liga B à pessoa de A → liga A à pessoa de B). Cada ligação passa pela guarda
+ * (o requerente tem de estar ativo num processo da árvore da pessoa). Não toca em ProcessoRequerente nem na marca `Pessoa.requerente`; o que segue a PESSOA
+ * (certidões, solicitações, protocolos, tarefas) não muda de lugar. Registra o fato no histórico.
+ */
+export async function trocarPessoasDeRequerentes(args: { requerenteA: number; requerenteB: number; autorId?: number | null; db?: Prisma.TransactionClient }): Promise<ResultadoDaTroca> {
+  const executar = async (tx: Prisma.TransactionClient): Promise<ResultadoDaTroca> => {
+    const [a, b] = await Promise.all([
+      tx.requerente.findUnique({ where: { id: args.requerenteA }, select: { id: true, nome: true, personId: true } }),
+      tx.requerente.findUnique({ where: { id: args.requerenteB }, select: { id: true, nome: true, personId: true } }),
+    ])
+    if (!a || !b) throw new VinculoRecusado("REQUERENTE_NAO_ENCONTRADO", "Requerente não encontrado.")
+    if (a.id === b.id) throw new VinculoRecusado("REQUERENTE_NAO_ENCONTRADO", "Escolha dois requerentes diferentes.")
+    if (a.personId == null || b.personId == null) throw new VinculoRecusado("REQUERENTE_SEM_PESSOA", "Os dois requerentes precisam estar ligados a uma pessoa para trocar.")
+    const [pa, pb] = [a.personId, b.personId]
+    await definirPessoaDoRequerente(tx, a.id, null) // libera a pessoa de A (o índice é único)
+    await definirPessoaDoRequerente(tx, b.id, pa)
+    await definirPessoaDoRequerente(tx, a.id, pb)
+    await tx.logAuditoria.create({
+      data: {
+        acao: "REQUERENTES_PESSOAS_TROCADAS", entidade: "Requerente", entidadeId: a.id, usuarioId: args.autorId ?? null,
+        descricao: `Vínculos trocados — «${a.nome}» (requerente ${a.id}): pessoa ${pa} → ${pb}; «${b.nome}» (requerente ${b.id}): pessoa ${pb} → ${pa}.`,
+        detalhes: { requerenteA: a.id, requerenteB: b.id, pessoaDeAAntes: pa, pessoaDeBAntes: pb } as Prisma.InputJsonValue,
+      },
+    })
+    return { requerenteA: { id: a.id, de: pa, para: pb }, requerenteB: { id: b.id, de: pb, para: pa } }
+  }
+  return args.db ? executar(args.db) : prisma.$transaction(executar, { timeout: 60_000, maxWait: 20_000 })
+}
