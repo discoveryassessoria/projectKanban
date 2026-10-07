@@ -12,6 +12,7 @@
 //   f  As 4 subtarefas da Emissão são obrigatórias; anexo/comprovante/dado preenchido NUNCA é obrigatório — cadastro publicado.
 //   g  A certidão só entra em Feito com os 4 passos concluídos.
 //   i  Contadores batem: sem responsável + com cada pessoa = abertas (cabeçalho × tabela × Caminho).
+//   l  Certidão recebida/validada SÓ com o passo da Emissão correspondente concluído (Localizar registro na Genealogia nunca recebe nem valida).
 //   j  Fluxo do recebimento: nenhuma subtarefa da Emissão concluída fora de ordem, e nenhuma gravada «Disponível» enquanto depende de outra.
 //
 // (b) seletores sem pessoa, (d) atribuição só na página do processo e (h) contador repetido são regras de TELA/CÓDIGO: vigiadas pelo teste
@@ -23,7 +24,7 @@ import { MOTIVO_AGUARDANDO_GENEALOGIA } from '@/src/services/genealogia/trava-em
 import { compararCertidoesDaFamilia } from '@/lib/operacional/ordem-certidoes'
 import { SUBTAREFA_PEDIDO_ENVIADO, SUBTAREFA_CONFIRMACAO, SUBTAREFA_CERTIDAO_RECEBIDA, SUBTAREFA_CONFERENCIA } from '@/lib/operacional/emissao-recebimento'
 
-export type RegraDoMarco = 'a' | 'c' | 'e' | 'f' | 'g' | 'i' | 'j'
+export type RegraDoMarco = 'a' | 'c' | 'e' | 'f' | 'g' | 'i' | 'j' | 'l'
 
 /** O detalhe do processo lido UMA vez por rodada (as regras e, i e o script leem o mesmo). */
 type Detalhe = Awaited<ReturnType<typeof import('@/lib/operacional/torre-foco')['detalheDoProcesso']>>
@@ -54,6 +55,7 @@ export const TITULO_DA_REGRA: Record<RegraDoMarco, string> = {
   g: 'Certidão concluída sem os 4 passos concluídos',
   i: 'Contadores que não batem',
   j: 'Subtarefa da Emissão fora de ordem ou com selo «Disponível» sendo que depende de outra',
+  l: 'Certidão recebida/validada sem o passo de recebimento/validação da Emissão concluído',
 }
 
 const TAREFA_ENCERRADA = ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI', 'CANCELADA', 'SUPERSEDIDA']
@@ -308,13 +310,54 @@ export async function detectarRegraJ(): Promise<ViolacaoDoMarco[]> {
   return out
 }
 
+// ── l ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/**
+ * Certidão que APARECE como recebida/validada sem o passo da Emissão que a faz assim. PURA: recebe o que foi lido.
+ *  • recebida sem «Receber certidão» concluída  → só pode vir de recebimento direto (upload/lote) ou de tarefa de Emissão concluída por fora do passo;
+ *  • validada sem «Conferir e validar» concluída → tarefa de Emissão CONCLUÍDA sem o passo 4;
+ *  • a leitura oficial (`estadoOperacionalDosDocumentos`) diz recebida/validada, mas só há Tarefa da GENEALOGIA — a regressão que este vigia existe para pegar.
+ */
+export function problemasDeRecebimento(a: { statusDocumento: string | null; recebimentoConcluido: boolean; validacaoConcluida: boolean; tarefaDeEmissaoConcluida: boolean; tarefaDaGenealogiaConcluida: boolean; leituraDizRecebida: boolean }): string[] {
+  const out: string[] = []
+  const recebimentoDireto = a.statusDocumento === 'RECEBIDO' || a.statusDocumento === 'ENTREGUE'
+  if ((recebimentoDireto || a.tarefaDeEmissaoConcluida) && !a.recebimentoConcluido) out.push(`aparece como RECEBIDA (${recebimentoDireto ? `Documento.status ${a.statusDocumento}` : 'tarefa de Emissão concluída'}) mas «Receber certidão» não foi concluída na Emissão`)
+  if (a.tarefaDeEmissaoConcluida && !a.validacaoConcluida) out.push('aparece como VALIDADA (tarefa de Emissão concluída) mas «Conferir e validar certidão» não foi concluída')
+  if (a.leituraDizRecebida && a.tarefaDaGenealogiaConcluida && !a.recebimentoConcluido && !a.tarefaDeEmissaoConcluida && !recebimentoDireto) out.push('a leitura diz RECEBIDA só porque a Genealogia (Localizar registro) concluiu — a Genealogia nunca recebe nem valida')
+  return out
+}
+export async function detectarRegraL(): Promise<ViolacaoDoMarco[]> {
+  const ctx = await processosAtivos()
+  const docs = await prisma.documento.findMany({
+    where: { pessoa: { arvore: { processos: { some: { id: { in: ctx.ids } } } } }, status: { notIn: ['CANCELADO', 'NAO_EXIGIDO'] as never } },
+    select: { id: true, tipo: true, status: true, pessoa: { select: { nome: true, sobrenome: true, arvore: { select: { processos: { select: { id: true }, take: 1 } } } } } },
+  })
+  if (docs.length === 0) return []
+  const ids = docs.map((d) => d.id)
+  const [tarefas, execs, { estadoOperacionalDosDocumentos, FASE_GENEALOGIA, SUBTAREFAS_DE_RECEBIMENTO, SUBTAREFAS_DE_VALIDACAO }] = await Promise.all([
+    prisma.tarefa.findMany({ where: { documentoId: { in: ids }, statusTarefa: 'CONCLUIDO_RECEBIDO' }, select: { documentoId: true, faseMacroKey: true } }),
+    prisma.subtaskExecution.findMany({ where: { supersededAt: null, status: 'CONCLUIDO', subtaskKey: { in: ['receber_certidao', 'receber_certidao_retificada', 'conferir_validar_certidao', 'conferir_validar_certidao_retificada'] }, stepInstance: { documentoId: { in: ids } } }, select: { subtaskKey: true, stepInstance: { select: { documentoId: true } } } }),
+    import('@/lib/operacional/documento-estado'),
+  ])
+  const estados = await estadoOperacionalDosDocumentos(ids)
+  const emissao = new Set<number>(), genealogia = new Set<number>(), recebeu = new Set<number>(), validou = new Set<number>()
+  for (const t of tarefas) if (t.documentoId != null) (t.faseMacroKey === FASE_GENEALOGIA ? genealogia : emissao).add(t.documentoId)
+  for (const e of execs) { const id = e.stepInstance.documentoId; if (id == null) continue; ((SUBTAREFAS_DE_RECEBIMENTO as readonly string[]).includes(e.subtaskKey) ? recebeu : validou).add(id) }
+  const out: ViolacaoDoMarco[] = []
+  for (const d of docs) {
+    const probs = problemasDeRecebimento({ statusDocumento: d.status as string, recebimentoConcluido: recebeu.has(d.id), validacaoConcluida: validou.has(d.id), tarefaDeEmissaoConcluida: emissao.has(d.id), tarefaDaGenealogiaConcluida: genealogia.has(d.id), leituraDizRecebida: estados.get(d.id)?.jaRecebido === true })
+    const processoId = d.pessoa.arvore?.processos[0]?.id ?? null
+    for (const p of probs) out.push({ regra: 'l', processoId, familia: ctx.nome(processoId), certidao: d.tipo ? String(d.tipo) : null, pessoa: nomeDe(d.pessoa), detalhe: p, entidade: 'Documento', registroId: d.id })
+  }
+  return out
+}
+
 export async function detectarRegrasDoMarco(opts: { profundo?: boolean } = {}): Promise<{ violacoes: ViolacaoDoMarco[]; porRegra: Record<RegraDoMarco, number> }> {
   limparMemoDeDetalhes()
   const todas = [
     ...(await detectarRegraA()), ...(await detectarRegraC()), ...(await detectarRegraE(opts)),
-    ...(await detectarRegraF()), ...(await detectarRegraG()), ...(opts.profundo ? await detectarRegraI() : []), ...(await detectarRegraJ()),
+    ...(await detectarRegraF()), ...(await detectarRegraG()), ...(opts.profundo ? await detectarRegraI() : []), ...(await detectarRegraJ()), ...(await detectarRegraL()),
   ]
-  const porRegra = { a: 0, c: 0, e: 0, f: 0, g: 0, i: 0, j: 0 } as Record<RegraDoMarco, number>
+  const porRegra = { a: 0, c: 0, e: 0, f: 0, g: 0, i: 0, j: 0, l: 0 } as Record<RegraDoMarco, number>
   for (const v of todas) porRegra[v.regra]++
   return { violacoes: todas, porRegra }
 }
