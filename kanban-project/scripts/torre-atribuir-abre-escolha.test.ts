@@ -10,7 +10,7 @@ const semComentarios = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace
 const pagina = semComentarios(ler("src/components/torre/TorreProcessoPagina.tsx")), tarefas = semComentarios(ler("src/components/torre/TorreTarefas.tsx"))
 
 console.log("Página do processo (tabela de certidões)")
-ok("«Atribuir» da linha e do lote só ABREM a escolha (setEscolha)", /const atribuir = \(tarefaId: number\) => \{ setErroEscolha\(null\); setEscolha\(\[tarefaId\]\) \}/.test(pagina) && /const atribuirVarias = \(ids: number\[\]\) => \{ setErroEscolha\(null\); setEscolha\(ids\) \}/.test(pagina))
+ok("«Atribuir» da linha só ABRE a escolha (setEscolha); o lote usa a barra compartilhada (lote-atribuicao)", /const atribuir = \(tarefaId: number\) => \{ setErroEscolha\(null\); setEscolha\(\[tarefaId\]\) \}/.test(pagina))
 ok("a escolha é a lista de funcionários da Operação (SeletorResponsavel)", /<SeletorResponsavel/.test(pagina) && /operacao\/kit-operacional/.test(pagina))
 ok("quem escolhe atribui pela porta canônica de comando (atribuir) — não pela sugestão", /\/api\/tarefas\/\$\{id\}\/comando/.test(pagina) && /acao: "atribuir", responsavelId/.test(pagina))
 ok("a página não chama mais atribuir-sugerido (só o «Distribuir» automático existe)", !/atribuir-sugerido/.test(pagina))

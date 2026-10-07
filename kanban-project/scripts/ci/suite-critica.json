@@ -237,6 +237,7 @@
   ]
  },
  "arquivos": [
+    "scripts/lote-atribuir-na-pagina-do-processo.test.ts",
     "scripts/remover-responsavel.test.ts",
     "scripts/localizar-registro-pessoa-tardia.test.ts",
     "scripts/regras-fixas-integridade.test.ts",

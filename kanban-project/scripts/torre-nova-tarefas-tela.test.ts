@@ -11,7 +11,7 @@ const ok = (n: string, c: boolean) => { if (c) { passou++; console.log(`  ✅ ${
 const secao = (t: string) => console.log(`\n${t}`)
 const ler = (p: string) => readFileSync(p, "utf8")
 const D = "src/components/torre/"
-const tt = ler(D + "TorreTarefas.tsx"), fx = ler(D + "TorreFiltros.tsx"), vs = ler(D + "VisoesSalvas.tsx"), tab = ler(D + "TarefasTabela.tsx"), gav = ler(D + "TarefasGaveta.tsx")
+const la = ler(D + "lote-atribuicao.tsx"), tt = ler(D + "TorreTarefas.tsx") + la, fx = ler(D + "TorreFiltros.tsx"), vs = ler(D + "VisoesSalvas.tsx"), tab = ler(D + "TarefasTabela.tsx"), gav = ler(D + "TarefasGaveta.tsx")
 const mod = ler(D + "TarefasModais.tsx"), tra = ler(D + "TarefasTransversal.tsx"), fei = ler(D + "TorreFeito.tsx"), vin = ler(D + "VincularOrgaoLoteModal.tsx"), pai = ler(D + "PainelTorreTarefa.tsx")
 const lib = ler("lib/operacional/torre-tarefas-tela.ts")
 const tudo = [tt, fx, vs, tab, gav, mod, tra, fei, vin, pai].join("\n")

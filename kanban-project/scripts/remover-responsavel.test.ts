@@ -112,7 +112,7 @@ async function main() {
     ok("gaveta da certidão: botão 'Remover responsável' ao lado de Delegar", /data-testid="remover-responsavel"/.test(gav) && /Remover responsável/.test(gav))
     ok("o menu Delegar não remove: '— selecione —' é opção desabilitada e o onChange ignora vazio", /<option value="" disabled[^>]*>— selecione —<\/option>/.test(gav) && /if \(e\.target\.value\) await delegarTarefa/.test(gav))
     const tt = ler("src/components/torre/TorreTarefas.tsx")
-    ok("barra de lote da aba Tarefas: botão 'Remover responsável' com o modal de confirmação", /lote\("REMOVER_RESPONSAVEL"\)/.test(tt) && /useConfirmarAtribuicao\(\)/.test(tt) && /\{modalConfirmacao\}/.test(tt))
+    ok("barra de lote da aba Tarefas: botão 'Remover responsável' com o modal de confirmação", /<AcoesDeAtribuicaoEmLote/.test(tt) && (() => { const la = ler("src/components/torre/lote-atribuicao.tsx"); return /rodar\("REMOVER_RESPONSAVEL"\)/.test(la) && /useConfirmarAtribuicao\(\)/.test(la) && /\{lote\.modal\}/.test(la) })())
   } finally {
     await c.limpar()
     await prisma.notificacaoOperacional.deleteMany({ where: { destinatario: { nome: { startsWith: MARCA } } } }).catch(() => null)

@@ -36,7 +36,7 @@ import {
   VISOES_DA_TELA, CHAVES_DE_VISAO_DA_TELA, predicadoDaVisao, contagemDaVisao, agruparParaTela, paginarGrupos, acoesDaLinha,
   type Agrupar, type AcaoDaLinha, type VisaoTarefas,
 } from "@/lib/operacional/torre-tarefas-tela"
-import { useConfirmarAtribuicao } from "./ConfirmarAtribuicao"
+import { AcoesDeAtribuicaoEmLote, useLoteDeAtribuicao } from "./lote-atribuicao"
 import "./tarefas.css"
 
 export type { VisaoTarefas }
@@ -102,8 +102,6 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
   const [visaoVista, setVisaoVista] = useState<string | null>(visaoPedida ?? null)
   const [visaoSalva, setVisaoSalva] = useState<VisaoTarefas>("todas")
   const [sel, setSel] = useState<Record<number, true>>({})
-  const [pessoas, setPessoas] = useState<Funcionario[]>([])
-  const [pessoaId, setPessoaId] = useState<number | null>(null)
   const [paises, setPaises] = useState<PaisDoFiltro[]>([])
   const [pagina, setPagina] = useState(0)
   const [chaveDaLista, setChaveDaLista] = useState("")
@@ -127,14 +125,6 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
 
   const podeEditar = !!permissoes?.editar
   const usuarioId = permissoes?.usuarioId ?? null
-  useEffect(() => {
-    if (!podeEditar) return
-    let vivo = true
-    void api<{ funcionarios: Funcionario[] }>("/api/operacao/atribuiveis").then((r) => {
-      if (vivo && r.ok) { setPessoas(r.data.funcionarios ?? []); setPessoaId((atual) => atual ?? r.data.funcionarios?.[0]?.id ?? null) }
-    })
-    return () => { vivo = false }
-  }, [podeEditar])
   useEffect(() => {
     let vivo = true
     void api<{ paises: PaisDoFiltro[] }>("/api/torre/paises").then((r) => { if (vivo && r.ok) setPaises(r.data.paises ?? []) })
@@ -200,7 +190,6 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
   }, [visaoFixaDaUrl, agrupar, dentro, onEstadoUrl])
 
   const selIds = useMemo(() => Object.keys(sel).map(Number).filter((id) => linhas.some((l) => l.taskId === id)), [sel, linhas])
-  const pessoa = pessoas.find((p) => p.id === pessoaId)
   const alternar = (ids: number[], ligar: boolean) => setSel((s) => {
     const n = { ...s }
     for (const id of ids) { if (ligar) n[id] = true; else delete n[id] }
@@ -233,20 +222,19 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
 
   // ─── AÇÕES EM LOTE (a barra) ─────────────────────────────────────────────
   const [prioridadeEscolhida, setPrioridadeEscolhida] = useState<PrioridadeDoModelo>("ALTA")
-  const { postar: postarComConfirmacao, modal: modalConfirmacao } = useConfirmarAtribuicao()
-  const lote = async (acao: "ATRIBUIR" | "REMOVER_RESPONSAVEL" | "PRIORIDADE_ALTA" | "PRIORIDADE" | "REPACTUAR" | "COBRAR", extra: Record<string, unknown> = {}, opcoes: { limpar?: boolean; ddmm?: string } = {}) => {
+  // Atribuir / Remover responsável em lote: o MESMO código da tabela da página do processo (lote-atribuicao.tsx), com confirmação.
+  const loteAtrib = useLoteDeAtribuicao({
+    podeEditar: !!permissoes?.editar,
+    onResultado: (msg, desfazer) => { avisar(msg, desfazer); setSel({}); recarregar() },
+  })
+  const lote = async (acao: "PRIORIDADE_ALTA" | "PRIORIDADE" | "REPACTUAR" | "COBRAR", extra: Record<string, unknown> = {}, opcoes: { limpar?: boolean; ddmm?: string } = {}) => {
     const { limpar = true, ddmm = "" } = opcoes
     setOcupado(true)
-    // REMOVER RESPONSÁVEL passa pelo modal de confirmação (lista de quem sai de quê); as demais ações seguem direto.
-    const r = acao === "REMOVER_RESPONSAVEL"
-      ? await postarComConfirmacao<RespLote>("/api/torre/tarefas/lote", { acao, tarefaIds: selIds, ...extra })
-      : await api<RespLote>("/api/torre/tarefas/lote", "POST", { acao, tarefaIds: selIds, ...extra })
+    const r = await api<RespLote>("/api/torre/tarefas/lote", "POST", { acao, tarefaIds: selIds, ...extra })
     setOcupado(false)
     if (r.data && typeof r.data.total === "number") {
       const n = r.data.sucesso ?? 0
-      const msg = acao === "ATRIBUIR" ? `${n} ${n === 1 ? "tarefa atribuída" : "tarefas atribuídas"} a ${pessoa?.nome ?? "a pessoa"}`
-        : acao === "REMOVER_RESPONSAVEL" ? `Responsável removido de ${n} ${n === 1 ? "tarefa" : "tarefas"} — voltaram à fila de distribuição`
-        : acao === "PRIORIDADE_ALTA" ? `Prioridade alta em ${n} ${n === 1 ? "tarefa" : "tarefas"}`
+      const msg = acao === "PRIORIDADE_ALTA" ? `Prioridade alta em ${n} ${n === 1 ? "tarefa" : "tarefas"}`
           : acao === "PRIORIDADE" ? textoDoLotePrioridade(prioridadeValida(extra.prioridade) ?? PRIORIDADE_NORMAL, n)
           : acao === "REPACTUAR" ? `${n} ${n === 1 ? "prazo repactuado" : "prazos repactuados"} para ${ddmm}`
             : `Cobrança registrada em ${n} ${n === 1 ? "tarefa" : "tarefas"}`
@@ -397,20 +385,13 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
         </div>
       )}
 
-      {modalConfirmacao}
       {visao !== "feito" && selIds.length > 0 && (
         <div className="tf-lote" role="toolbar" aria-label="Ações em lote">
           <b>{selIds.length} selecionada(s)</b>
           {permissoes?.iniciar && <button type="button" disabled={ocupado} onClick={() => void iniciarSelecionadas()}>Iniciar (enviar ao cartório)</button>}
           {podeEditar && (
             <>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>Atribuir a
-                <select aria-label="Atribuir a" value={pessoaId ?? ""} onChange={(e) => setPessoaId(Number(e.target.value))}>
-                  {pessoas.map((p) => <option key={p.id} value={p.id}>{p.nome} ({p.tarefasAtivas} {p.tarefasAtivas === 1 ? "ativa" : "ativas"})</option>)}
-                </select>
-                <button type="button" disabled={ocupado || !pessoa} onClick={() => void lote("ATRIBUIR", { responsavelId: pessoaId })}>Atribuir</button>
-              </span>
-              <button type="button" disabled={ocupado} title="Devolve as selecionadas à fila de distribuição (fica no histórico)" onClick={() => void lote("REMOVER_RESPONSAVEL")}>Remover responsável</button>
+              <AcoesDeAtribuicaoEmLote lote={loteAtrib} ids={selIds} ocupado={ocupado} />
               <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>Prioridade
                 <select aria-label="Escolher prioridade" value={prioridadeEscolhida} onChange={(e) => setPrioridadeEscolhida(e.target.value as PrioridadeDoModelo)}>
                   {PRIORIDADES_DO_LOTE.map((p) => <option key={p.valor} value={p.valor}>{p.rotulo}</option>)}
