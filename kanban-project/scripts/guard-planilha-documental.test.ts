@@ -278,7 +278,7 @@ ok("a grade não fixa larguras de coluna do arquivo", !/LARGURA_FIXA/.test(view)
 
 // A ESTRUTURA, essa continua sendo a do arquivo.
 ok("os rótulos fixos são os do arquivo",
-  /"Geração", "Registro", "Data", "Local", "Dados do registro", "Cônjuge", "Genitores"/.test(view))
+  /"Geração", "Registro", "Data do evento", "Data do registro", "Local", "Dados do registro", "Cônjuge", "Genitores"/.test(view))
 ok("o cabeçalho se repete por pessoa", /function BlocoPessoa\(/.test(view) && /<thead>/.test(view))
 ok("a seção de apoio troca o rótulo da primeira coluna", /rotuloPrimeira="Número"/.test(view))
 ok("a coluna Total fecha cada bloco", /<th[^>]*>\s*Total\s*<\/th>/.test(view))

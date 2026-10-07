@@ -1,6 +1,7 @@
 // src/components/kanban/workflow/WorkflowTab.tsx
 "use client"
 
+import { formatarDataHoraBrasilia } from "@/src/lib/datas-br"
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useApi } from "@/src/lib/dados"
 import {
@@ -165,11 +166,7 @@ const ownerColor = (key: string | null): string => {
   return "#4e6879"
 }
 
-const fmtDateTime = (iso: string | null): string => {
-  if (!iso) return "—"
-  const d = new Date(iso)
-  return d.toLocaleDateString("pt-BR") + " " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
-}
+const fmtDateTime = (iso: string | null): string => formatarDataHoraBrasilia(iso)
 
 const fmtSla = (dueAt: string | null) => {
   if (!dueAt) return { label: "no prazo", cls: "text-green-800 bg-[var(--surface-secondary)]" }

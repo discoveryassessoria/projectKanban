@@ -26,6 +26,7 @@
 // (`PainelDeclarativoDaEtapa`, por `stepInstanceId`): esta tela não sabe o que uma
 // etapa pede, só que existe uma etapa ativa e mostra o painel dela.
 
+import { formatarDataPura } from "@/src/lib/datas-br"
 import { useCallback, useEffect, useState } from "react"
 import {
   Loader2, Scale, Landmark, Building2, User, FileText, Clock, ChevronRight, X, HelpCircle, Copy, Check,
@@ -89,7 +90,7 @@ function headers(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("token") ?? localStorage.getItem("authToken") : null
   return { "Content-Type": "application/json", ...(t ? { Authorization: `Bearer ${t}` } : {}) }
 }
-const fmtDia = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString("pt-BR") : "—")
+const fmtDia = (iso?: string | null) => formatarDataPura(iso)
 
 export function PedidosDeRetificacao({ processoId, aoMudar }: { processoId: number; aoMudar?: () => void }) {
   const [pedidos, setPedidos] = useState<PedidoResumo[]>([])

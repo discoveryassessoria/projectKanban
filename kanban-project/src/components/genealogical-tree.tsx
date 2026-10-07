@@ -1,5 +1,6 @@
 "use client"
 
+import { formatarDataPura } from "@/src/lib/datas-br"
 import React, { useCallback, useState, useMemo, useEffect, forwardRef, useImperativeHandle } from "react"
 import ReactFlow, {
   addEdge,
@@ -66,11 +67,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
 
   const formatDate = (date?: Date) => {
     if (!date) return ""
-    return new Date(date).toLocaleDateString("pt-BR", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    })
+    return formatarDataPura(date)
   }
 
   const getLifeSpan = () => {
@@ -1117,7 +1114,7 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
                         <div className="font-medium">{person.nome} {person.sobrenome}</div>
                         <div className="text-sm text-gray-500">
                           {person.sexo && `${person.sexo} • `}
-                          {person.data_nasc && new Date(person.data_nasc).toLocaleDateString("pt-BR")}
+                          {person.data_nasc && formatarDataPura(person.data_nasc)}
                         </div>
                       </div>
                       <Button

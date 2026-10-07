@@ -113,7 +113,7 @@ async function main() {
   ok("vazio mostra o placeholder", /value=""/.test(renderToStaticMarkup(createElement(CampoDataTexto, { value: "", onChange: () => {} }))))
 
   secao("3b) Nenhuma tela usa input de data nativo")
-  const nativos = tudo.filter(([f, cod]) => /type="date"|type='date'|type="datetime-local"|type="month"/.test(cod.replace(/\/\/.*$/gm, "")) && !/EditorRegistralModal\.tsx$/.test(f)).map(([f]) => f)
+  const nativos = tudo.filter(([f, cod]) => /type="date"|type='date'|type="datetime-local"|type="month"|type=\{[^}]*["'](date|datetime-local|month)["']/.test(cod.replace(/\/\/.*$/gm, "")) && !/EditorRegistralModal\.tsx$/.test(f)).map(([f]) => f)
   ok("nenhum <input type=\"date\"> / datetime-local em src (o campo é CampoDataTexto)", nativos.length === 0, nativos.join(", "))
   const editor = ler("src/components/kanban/workflow/EditorRegistralModal.tsx")
   ok("o Editor Registral usa o seletor com calendário em dd/mm/aaaa (Field type=\"date\" → CampoData, nunca <input type=date>)", /type === "date" \? \(\s*<CampoData/.test(editor))

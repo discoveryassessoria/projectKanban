@@ -59,3 +59,43 @@ export function motivoDaDataInvalida(texto: string, comHora = false): string | n
   if (comHora ? !brHoraParaIso(t) : !brParaIso(t)) return comHora ? "Use dd/mm/aaaa hh:mm com data e hora reais." : "Use dd/mm/aaaa com dia, mês e ano reais."
   return null
 }
+
+// ============================================================================
+// EXIBIÇÃO — dois tipos de data, nunca misturados.
+// 1) DATA PURA (registro/evento/nascimento/óbito/casamento/emissão/validade): dia do calendário, SEM horário e SEM fuso.
+//    O banco guarda `AAAA-MM-DDT00:00:00Z`; ler no fuso do navegador/servidor (UTC-3) mostrava o DIA ANTERIOR (16/07 → 15/07).
+// 2) DATA COM HORÁRIO (movimentações, prazos, criação): instante real, exibido SEMPRE em America/Sao_Paulo.
+// ============================================================================
+
+/** DATA PURA → «dd/mm/aaaa» lendo ano-mês-dia em UTC. Vazio/inválido → `vazio` (padrão «—»). */
+export function formatarDataPura(valor: string | Date | null | undefined, vazio = "—"): string {
+  if (valor == null || valor === "") return vazio
+  if (typeof valor === "string") {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(valor.trim())
+    if (m) return `${m[3]}/${m[2]}/${m[1]}`
+    const br = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(valor.trim())
+    if (br) return valor.trim()
+  }
+  const d = valor instanceof Date ? valor : new Date(valor)
+  if (Number.isNaN(d.getTime())) return vazio
+  const p = (n: number, t = 2) => String(n).padStart(t, "0")
+  return `${p(d.getUTCDate())}/${p(d.getUTCMonth() + 1)}/${p(d.getUTCFullYear(), 4)}`
+}
+
+const FUSO_BRASILIA = "America/Sao_Paulo"
+
+/** DATA COM HORÁRIO → «dd/mm/aaaa hh:mm» no fuso de Brasília (independe do fuso do servidor/navegador). */
+export function formatarDataHoraBrasilia(valor: string | Date | null | undefined, vazio = "—"): string {
+  if (valor == null || valor === "") return vazio
+  const d = valor instanceof Date ? valor : new Date(valor)
+  if (Number.isNaN(d.getTime())) return vazio
+  const partes = new Intl.DateTimeFormat("pt-BR", { timeZone: FUSO_BRASILIA, day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(d)
+  const g = (t: string) => partes.find((p) => p.type === t)?.value ?? ""
+  return `${g("day")}/${g("month")}/${g("year")} ${g("hour")}:${g("minute")}`
+}
+
+/** Dia (sem hora) de um INSTANTE real, no fuso de Brasília — para «criado em», «concluído em». */
+export function formatarDiaBrasilia(valor: string | Date | null | undefined, vazio = "—"): string {
+  const s = formatarDataHoraBrasilia(valor, "")
+  return s ? s.slice(0, 10) : vazio
+}

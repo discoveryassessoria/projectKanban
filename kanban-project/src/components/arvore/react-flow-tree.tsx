@@ -167,7 +167,7 @@ function getGenderColors(sexo: string | null | undefined) {
 function formatDateRange(nascimento: Date | string | null | undefined, obito: Date | string | null | undefined): string {
   const formatYear = (date: Date | string | null | undefined) => {
     if (!date) return ""
-    return new Date(date).getFullYear().toString()
+    return new Date(date).getUTCFullYear().toString()
   }
   const nasc = formatYear(nascimento)
   const obit = obito ? formatYear(obito) : ""

@@ -3,6 +3,7 @@
 "use client"
 
 
+import { formatarDataPura, formatarDataHoraBrasilia, formatarDiaBrasilia } from "@/src/lib/datas-br"
 import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react"
 import { useApi } from "@/src/lib/dados"
 import { ROTULO_ESCOLHA_DA_PESSOA, PESSOA_ESCOLHIDA_INICIAL } from "@/src/lib/ui/atribuicao"
@@ -273,18 +274,11 @@ interface DocumentOperationalProjection {
 const nomeCompleto = (p: Pessoa | null): string =>
   p ? `${p.nome}${p.sobrenome ? " " + p.sobrenome : ""}` : "—"
 
-const fmtDate = (s: string | null): string => {
-  if (!s) return "—"
-  try { return new Date(s).toLocaleDateString("pt-BR") } catch { return "—" }
-}
+// DATA PURA (evento/registro/emissão/validade): ano-mês-dia sem fuso — função única em datas-br.
+const fmtDate = (s: string | null): string => formatarDataPura(s)
 
-const fmtDateTime = (s: string | null): string => {
-  if (!s) return "—"
-  try {
-    const d = new Date(s)
-    return `${d.toLocaleDateString("pt-BR")} ${d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
-  } catch { return "—" }
-}
+// DATA COM HORÁRIO: sempre no fuso de Brasília.
+const fmtDateTime = (s: string | null): string => formatarDataHoraBrasilia(s)
 
 /**
  * O PRAZO, DITO COMO O RESTO DO SISTEMA DIZ.
@@ -1337,7 +1331,7 @@ function rotuloDoGrupo(dataISO: string): string {
   const diffDias = Math.round((inicio(hoje) - inicio(d)) / 86_400_000)
   if (diffDias === 0) return "HOJE"
   if (diffDias === 1) return "ONTEM"
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
+  return formatarDiaBrasilia(d)
 }
 
 function LinhaEvento({ e }: { e: EventoAndamentoUI }) {
@@ -1350,7 +1344,7 @@ function LinhaEvento({ e }: { e: EventoAndamentoUI }) {
         <div className="flex items-baseline justify-between gap-2 flex-wrap">
           <span className={`text-[13px] font-medium ${cancelado ? "text-red-700" : "text-white"}`}>{e.titulo}</span>
           <span className="text-[10px] font-mono text-[var(--text-muted)] flex-shrink-0">
-            {new Date(e.data).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+            {formatarDataHoraBrasilia(e.data).slice(11)}
           </span>
         </div>
         <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">

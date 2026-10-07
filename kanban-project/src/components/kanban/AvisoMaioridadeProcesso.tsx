@@ -3,6 +3,7 @@
 // Faixa de aviso do processo: quem da árvore completou (ou está para completar)
 // 18 anos com o processo em andamento. Derivada na leitura — não há tabela de aviso.
 
+import { formatarDataPura } from "@/src/lib/datas-br"
 import { useApi } from "@/src/lib/dados"
 import { AlertTriangle } from "lucide-react"
 
@@ -14,7 +15,7 @@ interface Aviso {
   quando: string
 }
 
-const dataBR = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { timeZone: "UTC" })
+const dataBR = (iso: string) => formatarDataPura(iso)
 
 export function AvisoMaioridadeProcesso({ processoId }: { processoId: number }) {
   const { dados } = useApi<{ avisos?: Aviso[] }>(`/api/processos/${processoId}/avisos-maioridade`)
