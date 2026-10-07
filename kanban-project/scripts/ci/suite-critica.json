@@ -244,6 +244,7 @@
     "scripts/arvore-bolinha-certidao.test.ts",
     "scripts/vinculo-requerente-servico-unico.test.ts",
     "scripts/botao-primario-legivel.test.ts",
+    "scripts/local-obito-colunas.test.ts",
     "scripts/planilha-dados-do-registro-ilaine.test.ts",
     "scripts/regras-inegociaveis-do-marco.test.ts",
     "scripts/seletores-sem-pessoa-preselecionada.test.ts",

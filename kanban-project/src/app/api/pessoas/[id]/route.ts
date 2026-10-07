@@ -127,6 +127,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (body.pais_naturalizacao !== undefined) dataToUpdate.pais_naturalizacao = body.pais_naturalizacao
     if (body.data_emigracao !== undefined) dataToUpdate.data_emigracao = body.data_emigracao ? new Date(body.data_emigracao) : null
     if (body.local_emigracao !== undefined) dataToUpdate.local_emigracao = body.local_emigracao
+    if (body.local_obito !== undefined) dataToUpdate.local_obito = body.local_obito || null
+    if (body.estado_obito !== undefined) dataToUpdate.estado_obito = body.estado_obito || null
+    if (body.pais_obito !== undefined) dataToUpdate.pais_obito = body.pais_obito || null
     if (body.porto_embarque !== undefined) dataToUpdate.porto_embarque = body.porto_embarque
     if (body.data_chegada !== undefined) dataToUpdate.data_chegada = body.data_chegada ? new Date(body.data_chegada) : null
     if (body.porto_chegada !== undefined) dataToUpdate.porto_chegada = body.porto_chegada

@@ -205,6 +205,9 @@ export interface PessoaEntrada {
   pais_naturalizacao?: string | null
   data_emigracao?: Date | string | null
   local_emigracao?: string | null
+  /** Local do óbito (colunas próprias; antes ia em `local_emigracao`): `local_obito` já existe acima. */
+  estado_obito?: string | null
+  pais_obito?: string | null
   porto_embarque?: string | null
   data_chegada?: Date | string | null
   porto_chegada?: string | null

@@ -15,6 +15,8 @@ export interface PessoaArvore {
   pais_nasc?: string | null
   // Local de óbito
   local_obito?: string | null
+  estado_obito?: string | null
+  pais_obito?: string | null
   // Status vital
   vivo?: boolean
   // Batismo

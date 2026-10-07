@@ -2,6 +2,7 @@
 
 "use client"
 
+import { colunasDoLocalDeObito, textoDoLocalDeObito } from "@/src/lib/genealogia/local-obito"
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useApi, invalidar } from '@/src/lib/dados'
 import { jsPDF } from "jspdf"
@@ -2050,7 +2051,7 @@ function AddPersonModal({
         vivo: !isFalecido,
         casado: isCasado,
         data_obito: isFalecido && dataObito ? new Date(dataObito).toISOString() : null,
-        local_emigracao: isFalecido && localObito ? localObito.trim() : null,
+        ...(isFalecido && localObito ? colunasDoLocalDeObito(localObito) : { local_obito: null, estado_obito: null }), // colunas próprias do óbito; `local_emigracao` não é mais tocado por aqui
         comentario: comentario.trim() || null,
         requerente: requerente || 'nao',  // ✅ NOVO
         linhaReta: isLinhaReta,  // ✅ Central Operacional / Documentos
@@ -2441,7 +2442,7 @@ function EditPersonModal({
     useNascimentoPessoa({ pais: pessoa.pais_nasc || '', estado: pessoa.estado_nasc || '', cidade: pessoa.local_nasc || '', nacionalidade: pessoa.nacionalidade || '' })
   const [isFalecido, setIsFalecido] = useState(pessoa.vivo === false || !!pessoa.data_obito)
   const [dataObito, setDataObito] = useState(pessoa.data_obito ? new Date(pessoa.data_obito).toISOString().split('T')[0] : '')
-  const [localObito, setLocalObito] = useState(pessoa.local_emigracao || '')
+  const [localObito, setLocalObito] = useState(textoDoLocalDeObito(pessoa))
   const [isCasado, setIsCasado] = useState(!!uniaoExistente)
   const [dataCasamento, setDataCasamento] = useState(uniaoExistente?.data_inicio ? new Date(uniaoExistente.data_inicio).toISOString().split('T')[0] : '')
   const [localCasamento, setLocalCasamento] = useState(uniaoExistente?.local || '')
@@ -2709,7 +2710,7 @@ function EditPersonModal({
           vivo: !isFalecido,
           casado: isCasado,
           data_obito: isFalecido && dataObito ? new Date(dataObito).toISOString() : null,
-          local_emigracao: isFalecido && localObito ? localObito.trim() : null,
+          ...(isFalecido && localObito ? colunasDoLocalDeObito(localObito) : { local_obito: null, estado_obito: null }), // colunas próprias do óbito; `local_emigracao` não é mais tocado por aqui
           comentario: comentario.trim() || null,
           // Com data de nascimento válida o marcador acompanha o cálculo (função única); sem data, vale o que foi declarado.
           requerente: marcadorRequerenteParaGravar(dataNasc || null, requerente || 'nao', new Date()),

@@ -253,7 +253,7 @@ interface PrecoDaColuna {
 // ── O QUE CADA COLUNA LÊ (07/10/2026, caso Ilaine Fogli) ──────────────────────────────────────────────────────────────────────────
 //   Data do evento    Documento.data_evento → a árvore: nascimento = Pessoa.data_nasc, óbito = Pessoa.data_obito, casamento = União.data_inicio.
 //   Data do registro  Documento.data_registro → (casamento) União.data_registro. NUNCA o evento no lugar do registro, nem o contrário. Datas de calendário: UTC.
-//   Local      Documento (cidade - estado) → a árvore: nascimento = Pessoa.local_nasc/estado_nasc, casamento = União.local/estado.
+//   Local      Documento (cidade - estado) → a árvore: nascimento = Pessoa.local_nasc/estado_nasc, óbito = Pessoa.local_obito/estado_obito, casamento = União.local/estado.
 //   Dados do registro  Documento.cartório/livro/folha/termo → (casamento) União.cartório/livro/folha/termo. «0» e vazio = sem dado.
 //   Cônjuge    Documento.conjuge_registrado → (casamento) o outro cônjuge da União. Só a linha de casamento traz cônjuge.
 //   Genitores  Pessoa.pai / Pessoa.mae.
@@ -356,7 +356,7 @@ export async function montarEstruturaDocumental(processoId: number): Promise<Blo
           id: true, nome: true, sobrenome: true, numeroLinhagem: true, sexo: true, requerente: true, linhaReta: true,
           paiId: true, maeId: true,
           // O QUE A ÁRVORE JÁ SABE desta pessoa — fallback da linha quando o documento não traz o dado (nunca inventado: é o dado dela).
-          data_nasc: true, data_obito: true, local_nasc: true, estado_nasc: true, pais_nasc: true,
+          data_nasc: true, data_obito: true, local_nasc: true, estado_nasc: true, pais_nasc: true, local_obito: true, estado_obito: true,
           pai: { select: { nome: true, sobrenome: true } },
           mae: { select: { nome: true, sobrenome: true } },
           unioesComoPessoa1: { select: { id: true, pessoa2Id: true, ...CAMPOS_DA_UNIAO, pessoa2: { select: { nome: true, sobrenome: true } } } },
@@ -452,8 +452,8 @@ export async function montarEstruturaDocumental(processoId: number): Promise<Blo
         // União.data_registro. Pessoa não tem data de registro: fica «—». Nada é inventado.
         dataEvento: iso(d?.data_evento ?? (categoria === 'NASCIMENTO' ? p.data_nasc : categoria === 'OBITO' ? p.data_obito : categoria === 'CASAMENTO' ? uniao?.data_inicio : null)),
         dataRegistro: iso(d?.data_registro ?? (categoria === 'CASAMENTO' ? uniao?.data_registro : null)),
-        // LOCAL: o do registro; sem ele, o da pessoa (nascimento) ou o da união (casamento). Óbito não tem local na árvore: fica «—».
-        local: lugar(d?.cidade_registro, d?.estado_registro) ?? (categoria === 'NASCIMENTO' ? lugar(p.local_nasc, p.estado_nasc) : categoria === 'CASAMENTO' ? lugar(uniao?.local, uniao?.estado) : null),
+        // LOCAL: o do registro; sem ele, o da pessoa (nascimento) ou o da união (casamento). Óbito: o da árvore (Pessoa.local_obito/estado_obito).
+        local: lugar(d?.cidade_registro, d?.estado_registro) ?? (categoria === 'NASCIMENTO' ? lugar(p.local_nasc, p.estado_nasc) : categoria === 'OBITO' ? lugar(p.local_obito, p.estado_obito) : categoria === 'CASAMENTO' ? lugar(uniao?.local, uniao?.estado) : null),
         // DADOS DO REGISTRO: «0» e vazio não são dado. O casamento sem documento usa o que está na União.
         cartorio: dadoDoRegistro(d?.cartorio) ?? (categoria === 'CASAMENTO' ? dadoDoRegistro(uniao?.cartorio) : null),
         livro: dadoDoRegistro(d?.livro) ?? (categoria === 'CASAMENTO' ? dadoDoRegistro(uniao?.livro) : null),

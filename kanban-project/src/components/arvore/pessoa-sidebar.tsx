@@ -2,6 +2,7 @@
 
 "use client"
 
+import { textoDoLocalDeObito } from "@/src/lib/genealogia/local-obito"
 import { LinkDeAnexo } from "@/src/lib/anexos/cliente"
 import { useState, useEffect } from "react"
 import { 
@@ -766,7 +767,7 @@ function ConteudoSidebar({
                 <InfoItem 
                   icon={MapPin} 
                   label="Local de Falecimento" 
-                  value={pessoa.local_obito || pessoa.local_emigracao} 
+                  value={textoDoLocalDeObito(pessoa)} 
                 />
               </div>
             </CollapsibleSection>

@@ -110,7 +110,7 @@ async function carregarContexto(db: DB, filtro: { arvoreId?: number; documentoId
   const pessoaIds = [...new Set(registros.map((r) => r.pessoaId))]
   const uniaoIds = [...new Set(registros.map((r) => r.uniaoId).filter((x): x is number => x != null))]
   const [pessoas, unioes] = await Promise.all([
-    pessoaIds.length ? db.pessoa.findMany({ where: { id: { in: pessoaIds } }, select: { id: true, nome: true, sobrenome: true, data_nasc: true, local_nasc: true, estado_nasc: true, pais_nasc: true, data_obito: true } }) : Promise.resolve([]),
+    pessoaIds.length ? db.pessoa.findMany({ where: { id: { in: pessoaIds } }, select: { id: true, nome: true, sobrenome: true, data_nasc: true, local_nasc: true, estado_nasc: true, pais_nasc: true, data_obito: true, local_obito: true, estado_obito: true, pais_obito: true } }) : Promise.resolve([]),
     uniaoIds.length ? db.uniao.findMany({ where: { id: { in: uniaoIds } }, select: { id: true, data_inicio: true, local: true, estado: true, pais: true, data_registro: true, cartorio: true, livro: true, folha: true, termo: true } }) : Promise.resolve([]),
   ])
   return {
