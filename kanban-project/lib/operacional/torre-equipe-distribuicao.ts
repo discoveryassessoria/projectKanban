@@ -61,7 +61,7 @@ export interface DistribuicaoPlanejada {
   total: number
   /** Quantas a regra atribuiria agora e para quem. */
   porPessoa: Array<{ usuarioId: number; nome: string; quantidade: number }>
-  /** Sem apto comprovado: ficam sem dono e continuam sem responsável (você atribui em Tarefas). */
+  /** Sem apto comprovado: ficam sem dono e continuam no "Precisa de você". */
   semApto: number
   /** O apto escolhido já está no limite: segura para decisão humana. */
   seguradas: number
@@ -217,7 +217,7 @@ export async function distribuirSemResponsavel(args: { autorId: number; agora?: 
         acao: 'TORRE_EQUIPE_SEM_RESPONSAVEL_DISTRIBUIDAS', entidade: 'Tarefa', entidadeId: 0, usuarioId: args.autorId,
         descricao: `Distribuição por aptidão e carga (Torre › Equipe): ${resumo.atribuidas} de ${total} sem responsável atribuída(s)` +
           `${porPessoa.length ? ` (${porPessoa.map((p) => `${p.nome} ${p.quantidade}`).join(' · ')})` : ''}; ` +
-          `${resumo.semApto} sem apto (continuam sem responsável (você atribui em Tarefas)); ${resumo.seguradas} seguradas pelo limite de carga; ${resumo.falhas} falha(s).`,
+          `${resumo.semApto} sem apto (continuam no "Precisa de você"); ${resumo.seguradas} seguradas pelo limite de carga; ${resumo.falhas} falha(s).`,
         detalhes: JSON.parse(JSON.stringify({ total, atribuidas: resumo.atribuidas, porPessoa, semApto: resumo.semApto, seguradas: resumo.seguradas, falhas: resumo.falhas, itens })),
       },
     })

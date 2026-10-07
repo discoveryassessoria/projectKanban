@@ -36,7 +36,9 @@ import "./torre.css"
 
 export type { Aba }
 /**
- * As CINCO abas da Torre — Hoje · Tarefas · Famílias · Equipe · Terceiros (ver `torre-abas.ts`; ids antigos continuam válidos).
+ * As SETE abas da Torre, na ordem do protótipo — Visão geral · Precisa de você · Radar · Processos · Tarefas · Equipe · Terceiros.
+ * Os ids (`visao`, `precisa`, `radar`, `processos`, `tarefas`, `equipe`, `terceiros`) são ESTÁVEIS: são o `?aba=` da URL e os
+ * links antigos continuam funcionando. A lista mora em `lib/operacional/torre-abas.ts` (pura), para a tela e o teste lerem a mesma.
  */
 export const ABAS: Array<[Aba, string]> = ABAS_DA_TORRE
 const KPIS_QUE_FILTRAM = KPIS.filter((k) => k.filtra).map((k) => k.chave)
@@ -259,9 +261,8 @@ export function Torre() {
 
   const processosDaAba = useMemo(() => (filtroProc === "risco" ? processosFiltrados.filter(emRiscoCritico) : processosFiltrados), [processosFiltrados, filtroProc])
   const base = kpi ? linhasDoKpi(kpi, linhasPais, agora) : linhasPais
-  // O SELO da aba Tarefas é o TOTAL FIXO das tarefas abertas (com o país escolhido): não muda com visão, KPI, busca nem filtros — esses têm o
-  // contador próprio dentro da aba ("Mostrando N de M", número de cada visão). Assim o selo nunca contradiz "Todas as abertas".
-  const nTarefas = numeroDoKpi("abertas", linhasPais, agora)
+  // O número da aba = a lista que os filtros da barra deixam passar (a MESMA `aplicarFiltros` da tabela).
+  const nTarefas = aplicarFiltros(aplicarBusca(base, busca) as LinhaTorre[], filtros, { usuarioId: permissoes?.usuarioId ?? null, agora }).mostrando
   const filtrandoBacklogPais = filtrandoPais
   // Terceiros: "N aguardando" = a visão "Aguardando terceiros" da aba Tarefas (todo pedido com a bola com terceiro) — a MESMA lista (L3).
   const nTerceiros = numeroDoKpi("aguard", linhasPais, agora)

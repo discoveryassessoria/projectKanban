@@ -3,7 +3,7 @@
 // Os números vêm das MESMAS linhas da Operação (/api/torre/equipe → `cargaPorPessoa`, a conta única — Ativas, Atrasadas e
 // Aguard. terceiros fecham com a aba Tarefas e a Visão geral). Ausência é só REGISTRO (com sucessor sugerido); mover a carteira é
 // ação MANUAL; "Simular saída" mostra o impacto antes de aplicar e NUNCA grava; "Distribuir por aptidão e carga" só atribui a quem
-// tem aptidão comprovada (sem apto, a tarefa fica para você atribuir em Tarefas). Toda ação com efeito grava no histórico e tem Desfazer.
+// tem aptidão comprovada (sem apto, a tarefa fica para o Precisa de você). Toda ação com efeito grava no histórico e tem Desfazer.
 import { PerguntaDaAba } from "./PerguntaDaAba"
 import { useConfirmarAtribuicao } from "./ConfirmarAtribuicao"
 import { useEffect, useState } from "react"
