@@ -16,6 +16,7 @@ import {
 import { INICIOU_TORRE, ROTULO_INICIOU_TORRE, type Agrupar, type IniciouTorre } from "@/lib/operacional/torre-tarefas-tela"
 import { ROTULO_STATUS } from "@/src/lib/home/rotulo-status-tarefa"
 import type { LinhaTorre } from "./tipos"
+import { CampoDataTexto } from "@/src/components/ui/campo-data-texto"
 
 export type DentroDaFamilia = "none" | "pessoa" | "orgao" | "passo"
 export interface PaisDoFiltro { chave: string; rotulo: string }
@@ -152,14 +153,14 @@ export function TorreFiltros({
         <>
           {prazoSel === "__intervalo" && (
             <div className="tf-int" style={{ gridColumn: "span 4", display: "flex", gap: 8 }} aria-label="Intervalo do prazo">
-              <label style={{ flex: 1 }}>Prazo de<input className="tf-in" type="date" aria-label="Prazo de" value={filtros.prazoDe ?? ""} max={filtros.prazoAte ?? undefined} onChange={(e) => set("prazoDe", e.target.value || null)} /></label>
-              <label style={{ flex: 1 }}>Prazo até<input className="tf-in" type="date" aria-label="Prazo até" value={filtros.prazoAte ?? ""} min={filtros.prazoDe ?? undefined} onChange={(e) => set("prazoAte", e.target.value || null)} /></label>
+              <label style={{ flex: 1 }}>Prazo de<CampoDataTexto className="tf-in" aria-label="Prazo de" value={filtros.prazoDe ?? ""} max={filtros.prazoAte ?? undefined} onChange={(v) => set("prazoDe", v || null)} /></label>
+              <label style={{ flex: 1 }}>Prazo até<CampoDataTexto className="tf-in" aria-label="Prazo até" value={filtros.prazoAte ?? ""} min={filtros.prazoDe ?? undefined} onChange={(v) => set("prazoAte", v || null)} /></label>
             </div>
           )}
           {iniciouSel === "__intervalo" && (
             <div className="tf-int" style={{ gridColumn: "span 4", display: "flex", gap: 8 }} aria-label="Intervalo do início">
-              <label style={{ flex: 1 }}>Iniciou de<input className="tf-in" type="date" aria-label="Iniciou de" value={filtros.iniciouDe ?? ""} max={filtros.iniciouAte ?? undefined} onChange={(e) => set("iniciouDe", e.target.value || null)} /></label>
-              <label style={{ flex: 1 }}>Iniciou até<input className="tf-in" type="date" aria-label="Iniciou até" value={filtros.iniciouAte ?? ""} min={filtros.iniciouDe ?? undefined} onChange={(e) => set("iniciouAte", e.target.value || null)} /></label>
+              <label style={{ flex: 1 }}>Iniciou de<CampoDataTexto className="tf-in" aria-label="Iniciou de" value={filtros.iniciouDe ?? ""} max={filtros.iniciouAte ?? undefined} onChange={(v) => set("iniciouDe", v || null)} /></label>
+              <label style={{ flex: 1 }}>Iniciou até<CampoDataTexto className="tf-in" aria-label="Iniciou até" value={filtros.iniciouAte ?? ""} min={filtros.iniciouDe ?? undefined} onChange={(v) => set("iniciouAte", v || null)} /></label>
             </div>
           )}
         </>

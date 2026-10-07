@@ -24,6 +24,7 @@ import {
   NACIONALIDADE_OPCOES, ROTULO_TIPO_ARQUIVO, SEXO_OPCOES, TIPOS_ARQUIVO_COLETA,
   type PapelColeta, type TipoArquivoColeta,
 } from "@/src/lib/coleta/campos"
+import { CampoDataTexto } from "@/src/components/ui/campo-data-texto"
 
 interface InfoLink { consentimento: { texto: string; versao: string }; limites: { maxBytes: number; maxArquivosPorTipo: number } }
 interface ArquivoSubido { tipo: TipoArquivoColeta; chave: string; nome: string; tamanho: number; mime: string }
@@ -220,7 +221,7 @@ export default function PaginaColeta({ params }: { params: Promise<{ codigo: str
             <input className={classeCampo(erros.rg)} value={campos.rg} maxLength={20} onChange={(e) => set("rg", e.target.value)} />
           </Rotulo>
           <Rotulo texto="Data de nascimento" erro={erros.dataNascimento}>
-            <input type="date" className={classeCampo(erros.dataNascimento)} value={campos.dataNascimento} max={new Date().toISOString().slice(0, 10)} onChange={(e) => set("dataNascimento", e.target.value)} />
+            <CampoDataTexto className={classeCampo(erros.dataNascimento)} value={campos.dataNascimento} max={new Date().toISOString().slice(0, 10)} onChange={(v) => set("dataNascimento", v)} />
           </Rotulo>
           <Rotulo texto="Sexo" erro={erros.sexo}>
             <select className={classeCampo(erros.sexo)} value={campos.sexo} onChange={(e) => set("sexo", e.target.value)}>

@@ -10,7 +10,7 @@ import { textoPrazoDaTarefa } from "@/src/lib/tarefa/texto-prazo"
 import type { LinhaOperacaoV3 } from "./operacao-v3-tipos"
 import {
   fmtData, acompTxtCompleto, relCls, passoLabelDe, orgaoTxt, cobrancasTxt, prazoTarefaCls, docTipoTxt,
-  concluirLabelDe, aIniciarEfetivo, orgaoSoEmTexto, agruparDentroDaFamilia, agruparPorFamilia, agruparPorOrgao, statusTarefaTxt, statusTarefaCls,
+  aIniciarEfetivo, orgaoSoEmTexto, agruparDentroDaFamilia, agruparPorFamilia, agruparPorOrgao, statusTarefaTxt, statusTarefaCls,
   chaveDaFamilia, familiasDaAba, faseAtualDaFamilia, gargaloDaFamilia, proximoMarcoDaFamilia, type FamiliaComGrupos,
 } from "./operacao-v3-derivacoes"
 
@@ -27,7 +27,7 @@ const toggle = (col: Record<string, true>, setCol: (c: Record<string, true>) => 
 // AGUARDANDO
 // ============================================================================
 export function AbaAguardando({
-  linhas, aguardPor, setAguardPor, quick, clearQuick, col, setCol, onAbrir, onCobrar, onVerFamilia, podeRegistrar, onRegistrarRecebimento,
+  linhas, aguardPor, setAguardPor, quick, clearQuick, col, setCol, onAbrir, onCobrar, onVerFamilia,
 }: {
   linhas: LinhaOperacaoV3[]
   aguardPor: "familia" | "orgao"
@@ -40,8 +40,6 @@ export function AbaAguardando({
   onCobrar: (id: number) => void
   onVerFamilia: (fam: string) => void
   /** Quem pode registrar o recebimento desta linha (quem fez o pedido, o responsável, o administrador). */
-  podeRegistrar?: (t: LinhaOperacaoV3) => boolean
-  onRegistrarRecebimento?: (t: LinhaOperacaoV3) => void
 }) {
   const grupos = useMemo(() => (aguardPor === "orgao" ? agruparPorOrgao(linhas) : agruparPorFamilia(linhas)), [linhas, aguardPor])
 
@@ -69,21 +67,19 @@ export function AbaAguardando({
       )}
 
       {grupos.map((g) => (
-        <GrupoAguardando key={g.fam} grupo={g} col={col} setCol={setCol} onAbrir={onAbrir} onCobrar={onCobrar} onVerFamilia={aguardPor === "familia" ? onVerFamilia : undefined} podeRegistrar={podeRegistrar} onRegistrarRecebimento={onRegistrarRecebimento} />
+        <GrupoAguardando key={g.fam} grupo={g} col={col} setCol={setCol} onAbrir={onAbrir} onCobrar={onCobrar} onVerFamilia={aguardPor === "familia" ? onVerFamilia : undefined} />
       ))}
     </>
   )
 }
 
-function GrupoAguardando({ grupo, col, setCol, onAbrir, onCobrar, onVerFamilia, podeRegistrar, onRegistrarRecebimento }: {
+function GrupoAguardando({ grupo, col, setCol, onAbrir, onCobrar, onVerFamilia }: {
   grupo: FamiliaComGrupos
   col: Record<string, true>
   setCol: (c: Record<string, true>) => void
   onAbrir: (id: number) => void
   onCobrar: (id: number) => void
   onVerFamilia?: (fam: string) => void
-  podeRegistrar?: (t: LinhaOperacaoV3) => boolean
-  onRegistrarRecebimento?: (t: LinhaOperacaoV3) => void
 }) {
   const ck = `ag|${grupo.fam}`
   const aberto = !col[ck]
@@ -117,10 +113,8 @@ function GrupoAguardando({ grupo, col, setCol, onAbrir, onCobrar, onVerFamilia, 
                 <div><span className={`opv3-pill ${relCls(t.acompanhamentoPasso)}`}>{acompTxtCompleto(t.acompanhamentoPasso)}</span></div>
                 <div>{cobrancasTxt(t)}</div>
                 <div><span className={`opv3-pill ${prazoTarefaCls(t)}`}>{textoPrazoDaTarefa(t)}</span></div>
+                {/* FLUXO ÚNICO DO RECEBIMENTO (07/10/2026): a linha do Aguardando só ABRE a gaveta. Registrar recebimento é no passo 2 da gaveta («Iniciar →»). */}
                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                  {podeRegistrar?.(t) && onRegistrarRecebimento && <button className="opv3-btn opv3-sm opv3-acc" onClick={() => onRegistrarRecebimento(t)} title="A certidão chegou do cartório: registra o recebimento e libera a conferência">Registrar recebimento</button>}
-                  {t.acompanhamentoVencido && <button className="opv3-btn opv3-sm opv3-acc" onClick={() => onCobrar(t.taskId)}>Cobrar</button>}
-                  <button className="opv3-btn opv3-sm" onClick={() => onAbrir(t.taskId)}>{concluirLabelDe(t)}</button>
                   <button className="opv3-btn opv3-sm" onClick={() => onAbrir(t.taskId)}>Abrir</button>
                 </div>
               </div>
@@ -230,7 +224,6 @@ export function AbaAcompanhamento({
                         <div><span className={`opv3-pill ${prazoTarefaCls(t)}`}>{textoPrazoDaTarefa(t)}</span></div>
                         <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                           {terceiro && t.acompanhamentoVencido && <button className="opv3-btn opv3-sm opv3-acc" onClick={() => onCobrar(t.taskId)}>Cobrar</button>}
-                          <button className="opv3-btn opv3-sm" onClick={() => onAbrir(t.taskId)}>{concluirLabelDe(t)}</button>
                           <button className="opv3-btn opv3-sm" onClick={() => onAdiar(t.taskId)}>Adiar +3 d</button>
                           <button className="opv3-btn opv3-sm" onClick={() => onAbrir(t.taskId)}>Abrir</button>
                         </div>

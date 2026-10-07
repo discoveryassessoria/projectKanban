@@ -195,23 +195,13 @@ export const cobrancasTxt = (l: LinhaOperacaoV3): string =>
 
 export const prazoTarefaCls = (l: LinhaOperacaoV3): string => (l.dataPrazo == null ? "opv3-p-gry" : l.atrasada ? "opv3-p-red" : "opv3-p-blu")
 
-/** O rótulo do botão de ação, por estado — "Iniciar"/"Conferir"/"Continuar"/"Confirmado ✓"/"Recebi ✓"/"Abrir". */
+/** O rótulo do botão de ação, por estado — "Iniciar"/"Conferir"/"Continuar"/"Abrir". */
 export function acaoDe(l: LinhaOperacaoV3): { label: string; accent: boolean } {
   if (emAndamentoSemDono(l)) return { label: "Continuar", accent: true }
   if (l.aIniciar) return { label: "Iniciar", accent: true }
   if (l.faseMacroKey === "genealogia") return { label: "Continuar", accent: true }
   if (l.estadoOperacao === "FILA" && l.passoAtual && l.passoAtual.ordem + 1 === l.passoAtual.total) return { label: "Conferir", accent: true }
   return { label: "Abrir", accent: false }
-}
-
-export function concluirLabelDe(l: LinhaOperacaoV3): string {
-  if (l.origem === "TRANSVERSAL") return "Concluída ✓"
-  if (l.faseMacroKey === "genealogia") return "Registro localizado"
-  const ordem = l.passoAtual ? l.passoAtual.ordem + 1 : null
-  if (ordem === 2) return "Confirmado ✓"
-  if (ordem === 3) return "Recebi ✓"
-  if (l.passoAtual && ordem === l.passoAtual.total) return "Validar ✓"
-  return "Concluir ✓"
 }
 
 // ── BUSCA (sem acento) ───────────────────────────────────────────────────

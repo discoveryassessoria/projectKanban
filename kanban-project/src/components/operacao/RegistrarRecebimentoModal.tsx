@@ -10,6 +10,7 @@ import { useState } from "react"
 import { LAYER } from "@/src/lib/ui/layers"
 import { auth } from "./kit-operacional"
 import { uploadFiles, hashDoArquivo } from "@/src/lib/storage"
+import { CampoDataTexto } from "@/src/components/ui/campo-data-texto"
 
 const hojeSP = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date())
 
@@ -79,7 +80,7 @@ export function RegistrarRecebimentoModal({
           <>
             <label className="block space-y-1">
               <span className={rot}>Data em que a certidão foi recebida</span>
-              <input type="date" max={hojeSP()} value={dia} onChange={(e) => setDia(e.target.value)} className={inp} />
+              <CampoDataTexto max={hojeSP()} value={dia} onChange={setDia} className={inp} aria-label="Data em que a certidão foi recebida" />
               <span className="text-[10.5px] text-[var(--text-muted)]">Pode ser uma data antiga: pedidos de meses atrás também se registram aqui.</span>
             </label>
             {documentoId != null && (

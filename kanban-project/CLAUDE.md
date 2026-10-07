@@ -469,3 +469,5 @@ Combinadas várias vezes; nenhuma entrega pode quebrá-las. Teste: `scripts/regr
 - **g)** A certidão só entra em Feito com os 4 passos concluídos (R8 do vigia INT-002 + regra g do INT-003).
 - **h)** Nenhuma informação ou contador aparece repetido em dois lugares da mesma tela (detector `acharContadoresRepetidos`; telas novas com contador repetido quebram o teste).
 - **i)** Contadores batem: sem responsável + com cada pessoa = abertas (cabeçalho × tabela × Caminho — `conferirContadores`).
+- **j)** FLUXO ÚNICO DO RECEBIMENTO: a linha do Aguardando só tem «Abrir»; na gaveta, o passo 2 só tem «Iniciar →», que abre «Registrar recebimento» (conclui 2 e 3 pelo modal, anexo opcional, data passada ok). Nenhum outro caminho conclui mais de um passo sem a gaveta; passo bloqueado/fora de ordem NUNCA aparece «Disponível» e o servidor o recusa (`scripts/fluxo-recebimento-selo-datas.test.ts`, regra j do INT-003).
+- **k)** Toda data digitada é `dd/mm/aaaa` (`CampoDataTexto`, máscara fixa; valor interno ISO). `<input type="date">`/`datetime-local` é proibido em qualquer tela (o navegador mostra mm/dd/aaaa).

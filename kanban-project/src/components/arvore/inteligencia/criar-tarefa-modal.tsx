@@ -26,6 +26,7 @@ import { useApi } from "@/src/lib/dados"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { corpoDaCriacao, type RascunhoTarefa } from "@/src/lib/genealogia/operacional/tarefa-do-passo"
 import { useAbrirTarefaNaCentral } from "../fila-da-pessoa"
+import { CampoDataTexto } from "@/src/components/ui/campo-data-texto"
 
 function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
   const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
@@ -246,12 +247,12 @@ export function CriarTarefaModal({
               )}
               <label className={`block text-[11px] font-medium text-[var(--text-secondary)] ${podeAtribuir ? "" : "col-span-2"}`}>
                 Prazo (opcional)
-                <input
-                  type="date"
+                <CampoDataTexto
                   value={dataPrazo}
-                  onChange={(e) => setDataPrazo(e.target.value)}
+                  onChange={setDataPrazo}
                   disabled={ocupado}
                   className={`${CAMPO} mt-1`}
+                  aria-label="Prazo (opcional)"
                 />
               </label>
             </div>

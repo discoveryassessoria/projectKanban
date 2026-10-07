@@ -14,6 +14,7 @@ import {
   type CertidaoDoFiltro, type FiltrosDaLinhaDoTempo, type LinhaDoTempo,
 } from "@/lib/operacional/historico-linha-do-tempo"
 import "./historico-linha.css"
+import { CampoDataTexto } from "@/src/components/ui/campo-data-texto"
 
 interface Resposta {
   processo: { id: number; nome: string; codigo: string | null; pais: string | null; familiaId: number | null; familiaNome: string | null; faseAtual: string | null }
@@ -180,8 +181,8 @@ export function HistoricoLinhaDoTempo({ processoId, url, certidaoInicial }: { pr
           </label>
           {filtros.periodo === "intervalo" && (
             <>
-              <label>De<input type="date" value={filtros.de ?? ""} onChange={(e) => set("de", e.target.value || null)} /></label>
-              <label>Até<input type="date" value={filtros.ate ?? ""} onChange={(e) => set("ate", e.target.value || null)} /></label>
+              <label>De<CampoDataTexto value={filtros.de ?? ""} onChange={(v) => set("de", v || null)} /></label>
+              <label>Até<CampoDataTexto value={filtros.ate ?? ""} onChange={(v) => set("ate", v || null)} /></label>
             </>
           )}
           <label>Quem

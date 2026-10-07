@@ -23,6 +23,7 @@ import {
   FILTROS_LIMPOS, FILTROS_PADRAO, horaSP, montarVisao, queryDosFiltros, ROTULOS_DE_PERIODO,
   type ChipDeFiltro, type FiltrosDoHistorico, type PeriodoDoHistorico,
 } from "@/lib/operacional/historico-filtros"
+import { CampoDataTexto } from "@/src/components/ui/campo-data-texto"
 
 export interface RespostaDoHistorico {
   processo: { id: number; nome: string; codigo: string | null; pais: string | null; familiaId: number | null; faseAtual: string | null }
@@ -308,8 +309,8 @@ export function HistoricoDoProcesso({ processoId, url, onAbrirCertidao, onAbrirP
         </div>
         {filtros.periodo === "intervalo" && (
           <>
-            <div className="flex flex-col gap-1"><label htmlFor="hist-de" className={ROTULO_CAMPO}>De</label><input id="hist-de" type="date" className={CAMPO} value={filtros.de ?? ""} onChange={(e) => set("de", e.target.value || null)} /></div>
-            <div className="flex flex-col gap-1"><label htmlFor="hist-ate" className={ROTULO_CAMPO}>Até</label><input id="hist-ate" type="date" className={CAMPO} value={filtros.ate ?? ""} onChange={(e) => set("ate", e.target.value || null)} /></div>
+            <div className="flex flex-col gap-1"><label htmlFor="hist-de" className={ROTULO_CAMPO}>De</label><CampoDataTexto id="hist-de" className={CAMPO} value={filtros.de ?? ""} onChange={(v) => set("de", v || null)} /></div>
+            <div className="flex flex-col gap-1"><label htmlFor="hist-ate" className={ROTULO_CAMPO}>Até</label><CampoDataTexto id="hist-ate" className={CAMPO} value={filtros.ate ?? ""} onChange={(v) => set("ate", v || null)} /></div>
           </>
         )}
         <Seletor id="hist-quem" rotulo="Quem" valor={filtros.quem} opcoes={visao.opcoes.quem} aoMudar={(v) => set("quem", v)} />

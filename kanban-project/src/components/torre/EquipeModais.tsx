@@ -7,6 +7,7 @@ import { api, erroDe, useEscFecha, type Desfazer } from "./torre-base"
 import { TIPOS_DE_AUSENCIA, TEXTO_MARCAR_AUSENCIA } from "./equipe-visual"
 import type { PessoaDaEquipe } from "./equipe-tipos"
 import "./equipe.css"
+import { CampoDataTexto } from "@/src/components/ui/campo-data-texto"
 
 function ModalDaEquipe({ titulo, texto, ocupado, onFechar, children, cancelar, confirmar }: {
   titulo: string; texto: string; ocupado: boolean; onFechar: () => void; children: ReactNode
@@ -53,8 +54,8 @@ export function AusenciaModal({ pessoa, onFechar, onFeito }: { pessoa: PessoaDaE
       </label>
       <div className="eqp-campo">De · Até
         <div className="eqp-par">
-          <input type="date" aria-label="De" className="eqp-in" value={de} onChange={(e) => setDe(e.target.value)} />
-          <input type="date" aria-label="Até" className="eqp-in" value={ate} min={de || undefined} onChange={(e) => setAte(e.target.value)} />
+          <CampoDataTexto aria-label="De" className="eqp-in" value={de} onChange={setDe} />
+          <CampoDataTexto aria-label="Até" className="eqp-in" value={ate} min={de || undefined} onChange={setAte} />
         </div>
       </div>
       <label className="eqp-campo">Motivo

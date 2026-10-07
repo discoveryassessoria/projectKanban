@@ -27,6 +27,7 @@ import {
   type ResultadoContato,
 } from "@/src/lib/process-stage/andamento-etapa"
 import { CampoData } from "@/src/components/ui/campo-data"
+import { CampoDataHoraTexto } from "@/src/components/ui/campo-data-texto"
 
 // ── Vocabulário de tela (rótulos), separado do vocabulário de domínio ────────
 
@@ -364,12 +365,12 @@ export function BlocoContatos({
           <div className="grid grid-cols-2 gap-3 mb-2.5">
             <div>
               <Rotulo>Quando</Rotulo>
-              <input
-                type="datetime-local"
+              <CampoDataHoraTexto
                 value={ocorridoEm}
                 max={agoraLocalIso()}
-                onChange={(e) => setOcorridoEm(e.target.value)}
+                onChange={setOcorridoEm}
                 className={campoCls}
+                aria-label="Quando"
               />
             </div>
             <div>
