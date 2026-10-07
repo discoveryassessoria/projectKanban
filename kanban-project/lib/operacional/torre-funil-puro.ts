@@ -249,10 +249,10 @@ export type SentidoDoBacklog = 'cresce' | 'diminui' | 'estavel'
 export const sentidoDoBacklog = (s: Pick<SemanaDoFunil, 'tarefasAbertas' | 'tarefasFechadas'>): SentidoDoBacklog =>
   s.tarefasAbertas > s.tarefasFechadas ? 'cresce' : s.tarefasAbertas < s.tarefasFechadas ? 'diminui' : 'estavel'
 
-/** O link da linha: Famílias naquela fase (`?aba=familias&fase=<chave>`), mantendo país e busca da URL. */
+/** O link da linha: Processos naquela fase (`?aba=processos&fase=<chave>`), mantendo país e busca da URL. */
 export function hrefDaFase(faseKey: string, manter: { pais?: string | null; q?: string | null } = {}): string {
   const q = new URLSearchParams()
-  q.set('aba', 'familias'); q.set('fase', faseKey)
+  q.set('aba', 'processos'); q.set('fase', faseKey)
   if (manter.pais) q.set('pais', manter.pais)
   if (manter.q) q.set('q', manter.q)
   return `/torre?${q.toString()}`

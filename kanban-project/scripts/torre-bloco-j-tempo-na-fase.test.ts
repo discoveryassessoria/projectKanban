@@ -111,15 +111,15 @@ async function main() {
     const radar = readFileSync("src/components/torre/TorreRadar.tsx", "utf8")
     ok("nenhuma regra 'parado 7+ dias' (ela não existe no score — o protótipo só a cita na legenda)", !/parado 7\+/.test(radar))
     // Torre nova: a legenda segue o TEXTO do protótipo; a regra real (pontuação 3 a 5 / 6 ou mais / 15+ dias com cobrança vencida) está na dica de cada pílula.
-    ok("a legenda descreve a regra real nas dicas (3 a 5 / 6 ou mais / parado 15+ dias com cobrança vencida)", /Pontuação de risco 3 a 5/.test(radar) && /Pontuação de risco 6 ou mais/.test(radar) && /15\+ dias sem cobrança em dia/.test(radar))
+    ok("a legenda descreve a regra real nas dicas (3 a 5 / 6 ou mais / parado 15+ dias com cobrança vencida)", /Pontuação 3 a 5/.test(radar) && /Pontuação 6 ou mais/.test(radar) && /15\+ dias sem cobrança em dia/.test(radar))
     const ui = ["src/components/torre/TorreRadar.tsx", "src/components/torre/TorreProcessos.tsx", "src/components/torre/ProcessoCabecalho.tsx"].map((p) => readFileSync(p, "utf8"))
     // Torre nova: Radar e Processos formatam por `torre-fase.ts`, que DELEGA a `textoTempoNaFase` (só acrescenta "meses" a partir de 100 d).
     const fase = readFileSync("lib/operacional/torre-fase.ts", "utf8")
     ok("as três telas formatam pelo MESMO textoTempoNaFase (nenhuma monta '{n} d' à mão)", /textoTempoNaFase/.test(fase) && /textoDuracao|textoNaFase|textoDaCelulaAtual/.test(ui[0] + readFileSync("lib/operacional/torre-radar.ts", "utf8")) && /textoNaFase/.test(ui[1]) && ui[2].includes("textoTempoNaFase") && !/\{c\.dias \?\? "—"\} d/.test(ui[0]) && !/diasNaFase\} d/.test(ui[1]))
 
-    secao("Distribuição: Lei da Torre (L4) — a rota só redireciona para a aba Tarefas da Torre")
+    secao("Distribuição: o portão de permissão que já existia continua igual (o J não o alterou)")
     const dist = readFileSync("src/app/operacao/distribuicao/page.tsx", "utf8")
-    ok("redireciona para /torre?aba=tarefas (a Torre confere a permissão)", /redirect\("\/torre\?aba=tarefas"\)/.test(dist))
+    ok("continua exigindo tarefas.editar e mandando quem não tem para /operacao", /const autorizado = pode\("tarefas\.editar"\)/.test(dist) && /if \(mounted && !carregando && !autorizado\) router\.push\("\/operacao"\)/.test(dist))
   } finally {
     await prisma.phaseAdvanceLog.deleteMany({ where: { correlationId: { startsWith: MARCA } } })
     await c.limpar()

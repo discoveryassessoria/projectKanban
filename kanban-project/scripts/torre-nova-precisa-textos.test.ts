@@ -8,7 +8,7 @@
 // por aptidão comprovada, o "quanto mover" da Carga, a data "entrou ontem 14:15 / desde hoje 12:27", o rodapé e a varredura de textos
 // proibidos (vocabulário oficial) — tudo em funções puras com `agora` e fuso fixos.
 // ============================================================================
-import { readFileSync, existsSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { humanizarEstadosNoTexto } from "../src/lib/home/rotulo-status-tarefa"
 import {
   TIPOS_DO_PAINEL, ROTULO_DO_TIPO, regraDoTipo, DIAS_BLOQUEADA_PARA_DECIDIR, certidoes, decimalPt, diasDeCalendario, quandoEntrouNaFase,
@@ -112,27 +112,25 @@ ok("sem o que mover: diz isso e manda decidir na Equipe (botão 'Redistribuir' s
 const k3 = textosDaCarga({ nome: "Ana", executaveis: 10, limite: 8, vencidas: 0, filaEmSemanas: 1, mover: 3, paisDasMovidas: null, destinos: [] })
 ok("sem pessoa apta de fila livre: não finge destino", /sem pessoa apta com fila livre/.test(k3.sugestao) && /fila de 1,0 semana$/.test(k3.detalhe), `${k3.sugestao} | ${k3.detalhe}`)
 
-secao("VARREDURA — vocabulário oficial; os blocos removidos (Precisa de você, Revisão, Briefing) foram para Hoje e para a página do processo")
+secao("VARREDURA — vocabulário oficial e texto do rodapé nos arquivos da frente B2")
 const ler = (p: string) => readFileSync(p, "utf8")
 const semComentarios = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:\\])\/\/[^\n]*/g, "$1")
 const ARQUIVOS = [
-  "lib/operacional/precisa-de-voce-decisoes.ts", "src/components/torre/TorreHoje.tsx", "src/components/torre/ProcessoDecisoes.tsx",
-  "src/components/torre/acoes-do-item.tsx", "src/components/torre/tipos-precisa.ts", "src/services/precisa-de-voce-acoes.ts",
+  "lib/operacional/precisa-de-voce-decisoes.ts", "src/components/torre/TorrePrecisaDeVoce.tsx", "src/components/torre/TorreRevisao.tsx",
+  "src/components/torre/TorreBriefing.tsx", "src/components/torre/acoes-do-item.tsx", "src/components/torre/tipos-precisa.ts", "src/services/precisa-de-voce-acoes.ts",
 ]
 const proibidos = /ningu[ée]m|com o cart[óo]rio|sem dono"|'Sem dono'/i
 const achados = ARQUIVOS.filter((f) => proibidos.test(semComentarios(ler(f))))
 ok("nenhum 'ninguém', 'Com o cartório' ou 'Sem dono' visível nos arquivos da frente", achados.length === 0, achados.join(", "))
-ok("os componentes removidos não existem mais (TorrePrecisaDeVoce, TorreRevisao, TorreBriefing)", ["TorrePrecisaDeVoce", "TorreRevisao", "TorreBriefing"].every((n) => !existsSync(`src/components/torre/${n}.tsx`)))
-const hoje = ler("src/components/torre/TorreHoje.tsx")
-ok("Hoje: as decisões do dia são LINHAS (tipo · família · texto · link para onde se resolve) — sem botão de ação", hoje.includes("Decisões do dia") && hoje.includes("tor-hoje-linha") && hoje.includes("destinoDaDecisao(it)") && /<Link className="onde"/.test(hoje) && !/<button|onClick=\{\(\) => (void )?(executar|rodar)/.test(semComentarios(hoje)))
-ok("Hoje mostra o tipo pelo rótulo oficial e a tarefa/complemento das colunas estruturadas (cada informação uma vez)", hoje.includes("ROTULO_TIPO[it.tipo]") && hoje.includes("it.colunas?.tarefa") && hoje.includes("it.colunas?.complemento") && !hoje.includes("it.sugestao"))
-ok("a fonte das decisões é a MESMA rota (GET /api/torre/precisa-de-voce) — Hoje e a página do processo leem o mesmo conjunto", ler("src/components/torre/Torre.tsx").includes("/api/torre/precisa-de-voce") && ler("src/components/torre/ProcessoDecisoes.tsx").includes("/api/torre/precisa-de-voce"))
-const pdec = ler("src/components/torre/ProcessoDecisoes.tsx")
-ok("página do processo: 'Decisões deste processo' (âncora #decisoes), filtradas pelo processo, com as mesmas ações (useAcoesDoItem)", pdec.includes("Decisões deste processo") && pdec.includes('id="decisoes"') && pdec.includes("i.processoId === processoId") && pdec.includes("useAcoesDoItem") && ler("src/components/torre/TorreProcessoPagina.tsx").includes("<ProcessoDecisoes"))
-ok("L4: ação de atribuição NÃO vira botão fora de Tarefas — vira o link 'Atribuir na Torre' (ATRIBUIR_SUGERIDO · ATRIBUIR_ESCOLHIDO · REDISTRIBUIR_CARGA)", pdec.includes('"ATRIBUIR_SUGERIDO", "ATRIBUIR_ESCOLHIDO", "REDISTRIBUIR_CARGA"') && pdec.includes("Atribuir na Torre") && /href="\/torre\?aba=tarefas&visao=semdono"/.test(pdec))
-const acoes = ler("src/components/torre/acoes-do-item.tsx")
-ok("acoes-do-item não atribui mais: as ações de atribuição só levam à aba Tarefas", /case "ATRIBUIR_SUGERIDO":\s*case "ATRIBUIR_ESCOLHIDO":\s*window\.location\.assign\("\/torre\?aba=tarefas&visao=semdono"\)/.test(acoes))
-ok("o que NÃO é atribuição continua com a ação real: avançar fase, encerrar, desbloquear, cobrar, ligação, canal, reconciliar", ["AVANCAR_FASE", "ENCERRAR_NAO_DEVIDA", "ENCERRAR_FASE_NAO_DEVIDA", "DESBLOQUEAR", "COBRAR_CLIENTE", "REGISTRAR_LIGACAO", "TROCAR_CANAL", "RECONCILIAR"].every((a) => acoes.includes(a)))
+const tela = ler("src/components/torre/TorrePrecisaDeVoce.tsx")
+ok("os textos exatos da seção: título, apoio e botão", /Precisa de você · \{todos\.length\}/.test(tela) && tela.includes("Itens que só o Marco pode decidir ou destravar.") && tela.includes("▶ Revisar uma por uma"))
+ok("as colunas: Família · Tipo · Fase · Tarefa · Quantidade · Ação (sem 'Sugestão do sistema' e sem 'O que está acontecendo')", tela.includes("<div>Família</div><div>Tipo</div><div>Fase</div><div>Tarefa</div><div>Quantidade</div><div>Ação</div>") && !tela.includes("Sugestão do sistema") && !tela.includes("O que está acontecendo") && !tela.includes("it.sugestao") && !tela.includes("it.detalhe"))
+ok("o rodapé com filtro e sem filtro", tela.includes('Mostrando só "${ROTULO_TIPO[tipo]}" · ordenadas do maior risco para o menor') && tela.includes("ordenadas do maior risco para o menor"))
+ok("a assinatura estável: embutido? e onRevisar? opcionais; itens/carregando/erro/irParaAba obrigatórios", /embutido\?: boolean/.test(tela) && /onRevisar\?: \(\) => void/.test(tela) && /itens: ItemPrecisa\[\] \| null\n\s+carregando: boolean\n\s+erro: string \| null\n\s+irParaAba/.test(tela))
+const brief = ler("src/components/torre/TorreBriefing.tsx")
+ok("Briefing: 'Ver a Torre' e '▶ Revisar o dia (N decisões)'; nada abre sozinho (sem sessionStorage nem abertura automática)", brief.includes("Ver a Torre") && brief.includes("▶ Revisar o dia (") && !/sessionStorage|localStorage/.test(brief))
+const rev = ler("src/components/torre/TorreRevisao.tsx")
+ok("Revisão: 'Revisar o dia · N de T', 'N decididas · N puladas', Sair · Abrir o processo · Pular · Fechar", rev.includes("Revisar o dia · {posicao} de {total}") && rev.includes("{decididas} decididas · {puladas} puladas") && ["Sair", "Abrir o processo", "Pular", "Fechar", "Revisão concluída. Decisões tomadas:"].every((t) => rev.includes(t)))
 
 secao("ACESSO — as rotas usam a guarda da Torre (admin ou gerência operacional) + a permissão da porta")
 const rotaLista = ler("src/app/api/torre/precisa-de-voce/route.ts")
@@ -145,6 +143,8 @@ ok("o avanço passa pela PORTA CANÔNICA (advance/forceAdvance do PhaseAdvanceSe
 ok("POST …/desfazer usa exigirTorre('tarefas.editar')", /exigirTorre\(request, 'tarefas\.editar'\)/.test(rotaDesfazer) && !/verificarPermissao/.test(semComentarios(rotaDesfazer)))
 ok("o toast de 'Reconciliar' mostra os status em português, nunca o enum cru (NAO_INICIADA → CONCLUIDO_RECEBIDO)", /humanizarEstadosNoTexto\(`Reconciliada: \$\{de\} → \$\{resultado\.para\}\.`\)/.test(ler("src/services/precisa-de-voce-acoes.ts")) && humanizarEstadosNoTexto("Reconciliada: NAO_INICIADA → CONCLUIDO_RECEBIDO.") === "Reconciliada: a iniciar → concluída." && !/[A-Z]+_[A-Z_]+/.test(humanizarEstadosNoTexto("Reconciliada: NAO_INICIADA → CONCLUIDO_RECEBIDO.")))
 
+console.log(`\n${falhou === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${passou} ok, ${falhou} falhas`)
+if (falhou > 0) { 
 // ── Ajuste 05/10: colunas estruturadas — cada informação uma vez ──────────────────────────────────────────────
 {
   const sd = textosDoSemDono({ familia: "Salvarani", pais: "Itália", faseLabel: "Genealogia", entrouNaFase: null, agora: new Date("2026-10-05T12:00:00Z"), total: 12, plano: { atribuicoes: [], semAptidao: [] } })
@@ -162,6 +162,4 @@ ok("o toast de 'Reconciliar' mostra os status em português, nunca o enum cru (N
   ok("nenhum texto das colunas abrevia tempo ('5d', '5 d')", !/\b\d+ ?d\b/.test(todosOsTextos), todosOsTextos)
 }
 
-
-console.log(`\n${falhou === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${passou} ok, ${falhou} falhas`)
-if (falhou > 0) { console.log(falhas.join("\n")); process.exit(1) }
+console.log(falhas.join("\n")); process.exit(1) }

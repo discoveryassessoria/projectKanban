@@ -208,7 +208,7 @@ secao("'Mostrando N de M' e contadores — a MESMA função da tabela")
   const t = ler("src/components/torre/TorreTarefas.tsx"), f = ler("src/components/torre/TorreFiltros.tsx")
   ok("estático: a tabela (trabalhoVisivel) e o texto leem `resumo` — o resultado de UM aplicarFiltros", /const resumo = useMemo\(\(\) => aplicarFiltros\(listaBase, filtros, ctxFiltro\)/.test(t) && /const l = resumo\.linhas/.test(t) && /mostrando=\{resumo\.mostrando\}/.test(t) && /Mostrando \{mostrando\} de \{total\}/.test(f))
   const torre = ler("src/components/torre/Torre.tsx")
-  ok("estático: o SELO da aba Tarefas é o total FIXO das abertas (não muda com visão/filtro — o contador da visão e o \"Mostrando N de M\" é que mudam)", /const nTarefas = numeroDoKpi\("abertas", linhasPais, agora\)/.test(torre))
+  ok("estático: o número da aba Tarefas também passa por aplicarFiltros", /const nTarefas = aplicarFiltros\(/.test(torre))
 }
 
 // ═══ URL ═══
@@ -230,7 +230,7 @@ secao("URL ↔ estado — parse/serialize idempotente, compartilhável")
   ok("valor fora da lista é descartado, o válido fica", lixo.prazo.join() === "hoje" && lixo.risco.length === 0 && lixo.status.length === 0 && lixo.certidao.join() === "NASCIMENTO" && lixo.prazoDe === null && lixo.prazoAte === null
     && lixo.quando === null && lixo.quandoDe === null && lixo.responsavel.join() === "eu,12" && lixo.ordenar === null && lixo.orgao.join() === "sem,7" && lixo.linhaReta === false && lixo.prioridade.join() === "ALTA", JSON.stringify(lixo))
   ok("limites: lista longa é cortada e texto enorme também", normalizarFiltros({ responsavel: Array.from({ length: 100 }, (_, i) => String(i + 1)) }).responsavel.length === 30 && (normalizarFiltros({ familia: "x".repeat(500) }).familia ?? "").length === 80)
-  ok("o estado inicial da tela vem da URL e a URL acompanha o estado (estático)", /lerUrl\(params\)/.test(ler("src/components/torre/Torre.tsx")) && /useState<FiltrosTorre>\(urlInicial\.filtros\)/.test(ler("src/components/torre/Torre.tsx")) && /filtrosNaQueryDaAba\(q, aba, filtros\)/.test(ler("src/components/torre/Torre.tsx")) && /aplicarFiltrosNaQuery\(query, aba === 'familias'/.test(ler("lib/operacional/torre-casca.ts")) && /history\.replaceState/.test(ler("src/components/torre/Torre.tsx")))
+  ok("o estado inicial da tela vem da URL e a URL acompanha o estado (estático)", /lerUrl\(params\)/.test(ler("src/components/torre/Torre.tsx")) && /useState<FiltrosTorre>\(urlInicial\.filtros\)/.test(ler("src/components/torre/Torre.tsx")) && /filtrosNaQueryDaAba\(q, aba, filtros\)/.test(ler("src/components/torre/Torre.tsx")) && /aplicarFiltrosNaQuery\(query, aba === 'processos'/.test(ler("lib/operacional/torre-casca.ts")) && /history\.replaceState/.test(ler("src/components/torre/Torre.tsx")))
   ok("as chaves antigas da URL continuam lidas (aba, kpi, visao, processo, tarefa)", ["aba", "kpi", "visao", "processo", "tarefa"].every((k) => new RegExp(`params\\.get\\("${k}"\\)`).test(ler("src/components/torre/Torre.tsx"))))
 }
 

@@ -9,7 +9,8 @@
 // nova, só a interface que faltava.
 //
 // SÓ QUEM GERE (`tarefas.editar`) — mudar o prazo oficial é decisão de
-// gestão, não do executor.
+// gestão, não do executor (mesma régua que já separa "Delegar" no cabeçalho
+// deste drawer).
 // ============================================================================
 
 import { useState } from "react"

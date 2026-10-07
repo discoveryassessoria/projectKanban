@@ -5,14 +5,14 @@
 //   npx tsx scripts/torre-vocabulario-oficial.test.ts   (sem banco)
 //
 // 'Aguardando terceiros' (nunca 'Com o cartório') · 'Sem responsável' (nunca 'Sem ninguém'/'ninguém') · aba 'Tarefas' (nunca 'Certidões') ·
-// sem 'Equipe e Terceiros' · 'Aguardando a equipe'/'Aguardando terceiro' · as 5 abas Hoje·Tarefas·Famílias·Equipe·Terceiros (consolidação 06/10/2026).
+// sem 'Equipe e Terceiros' · 'Aguardando a equipe'/'Aguardando terceiro' · 'Precisa de você' · 'Revisar o dia'.
 // As CHAVES internas (kpi=aguard, `cartorio`, `ninguem`…) e as URLs NÃO mudam — a varredura olha só o que a pessoa lê (comentários não contam).
 // ============================================================================
 import { readFileSync, readdirSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { KPIS, KPI_POR_CHAVE, CARTOES_DA_SITUACAO, PREDICADO_DO_KPI } from "../lib/operacional/torre-kpis"
 import { fraseDoDia, textoDaFrase, TIPOS_NA_FRASE } from "../lib/operacional/torre-topo"
-import { ABAS_DA_TORRE, PERGUNTA_DA_ABA } from "../lib/operacional/torre-abas"
+import { ABAS_DA_TORRE } from "../lib/operacional/torre-abas"
 import { ROTULO_STATUS } from "../src/lib/home/rotulo-status-tarefa"
 import { rotuloDoLado } from "../lib/operacional/torre-bola"
 import { escolherResponsavel, textoDaSugestao, type ContextoDeSugestao } from "../lib/operacional/precisa-de-voce"
@@ -75,7 +75,7 @@ ok("a frase-resumo diz 'sem dono' e 'escalada de cartório' (vocabulário do pro
 ok("os tipos da frase têm o vocabulário oficial", TIPOS_NA_FRASE.map((x) => x.varios).join(" · ") === "sem dono · fases deixadas · escaladas de cartório · divergências · bloqueadas · de carga da equipe")
 ok("as abas: a aba é 'Tarefas' (nunca 'Certidões') e não há 'Equipe e Terceiros'", ABAS_DA_TORRE.some(([, r]) => r === "Tarefas") && ABAS_DA_TORRE.every(([, r]) => !/certid|Equipe e Terceiros/i.test(r)))
 ok("'Aguardando a equipe' / 'Aguardando terceiros'", rotuloDoLado("Equipe") === "Aguardando a equipe" && rotuloDoLado("Cartório") === "Aguardando terceiros" && rotuloDoLado("Cliente") === "Aguardando terceiros")
-ok("os nomes oficiais das 5 abas e suas perguntas (06/10/2026): Hoje · Tarefas · Famílias · Equipe · Terceiros; 'Precisa de você' e 'Revisar o dia' saíram do vocabulário da Torre ('Briefing do dia' virou a frase de Hoje)", ABAS_DA_TORRE.map(([, r]) => r).join(" · ") === "Hoje · Tarefas · Famílias · Equipe · Terceiros" && ABAS_DA_TORRE.every(([k]) => !!PERGUNTA_DA_ABA[k]) && ABAS_DA_TORRE.every(([, r]) => !/Precisa de voc|Revisar o dia|Briefing do dia|Vis[aã]o geral|Radar|Minha opera/.test(r)) && !/Revisar o dia|Briefing do dia|Precisa de você/.test(semComentarios(ler("src/components/torre/TorreCabecalho.tsx"))) && /frase-do-dia/.test(ler("src/components/torre/TorreHoje.tsx")))
+ok("os nomes oficiais seguem no cabeçalho: 'Precisa de você', 'Revisar o dia', 'Briefing do dia'", ABAS_DA_TORRE.some(([, r]) => r === "Precisa de você") && /Revisar o dia/.test(ler("src/components/torre/TorreCabecalho.tsx")) && /Briefing do dia/.test(ler("src/components/torre/TorreCabecalho.tsx")))
 ok("a visão de Tarefas se chama 'Aguardando terceiros' e 'Sem responsável'", /\['aguard', 'Aguardando terceiros'\]/.test(ler("lib/operacional/torre-tarefas-tela.ts")) && /\['semdono', 'Sem responsável'\]/.test(ler("lib/operacional/torre-tarefas-tela.ts")))
 // Torre nova: a aba Processos (por fase) não repete os 4 números por linha; o vocabulário vale nela e no Radar do mesmo jeito.
 ok("os 4 números do Foco (página do processo) dizem 'Aguardando terceiros'; Processos e Radar usam 'Sem responsável' e nunca 'Com o cartório'/'Sem ninguém'", /"Aguardando terceiros", d\.numeros\.comCartorio/.test(ler("src/components/torre/ProcessoCabecalho.tsx")) && [ "src/components/torre/TorreProcessos.tsx", "src/components/torre/TorreRadar.tsx", "lib/operacional/torre-fase.ts", "lib/operacional/torre-radar.ts" ].every((a) => !/Com o cart[oó]rio|Sem ningu[eé]m|Ninguém/.test(ler(a))) && /SEM_RESPONSAVEL = 'Sem responsável'/.test(ler("lib/operacional/torre-fase.ts")))

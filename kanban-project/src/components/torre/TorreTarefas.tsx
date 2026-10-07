@@ -37,7 +37,6 @@ import {
   type Agrupar, type AcaoDaLinha, type VisaoTarefas,
 } from "@/lib/operacional/torre-tarefas-tela"
 import { useConfirmarAtribuicao } from "./ConfirmarAtribuicao"
-import { PerguntaDaAba } from "./PerguntaDaAba"
 import "./tarefas.css"
 
 export type { VisaoTarefas }
@@ -56,7 +55,7 @@ const sufixoDasFalhas = (itens: Array<{ ok: boolean; mensagem?: string }> | unde
   return falhas.length ? ` · ${falhas.length} não passou(aram): ${falhas[0].mensagem ?? "recusada"}` : ""
 }
 
-export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, paisRotulo, visaoPedida, tarefaPedida, onTarefaAtendida, processos, processoFoco, versao, onAplicarSpec, agora, filtros, onFiltros, onLimparPais, onLimparBusca, agruparPedido, dentroPedido, onEstadoUrl, semCanceladas }: {
+export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, paisRotulo, visaoPedida, tarefaPedida, onTarefaAtendida, processos, processoFoco, versao, onAplicarSpec, agora, filtros, onFiltros, onLimparPais, onLimparBusca, agruparPedido, dentroPedido, onEstadoUrl }: {
   linhas: LinhaTorre[]; carregando: boolean; erro: boolean
   /** Filtro do KPI clicado no cabeçalho (o MESMO predicado que dá o número do cartão). */
   kpi: ChaveKpi | null
@@ -92,8 +91,6 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
   dentroPedido?: string | null
   /** O que a aba escolheu e a URL deve guardar (só visões FIXAS — visão salva não é endereço). */
   onEstadoUrl?: (e: { visao: string | null; agrupar: string | null; dentro: string | null }) => void
-  /** Na PÁGINA DO PROCESSO as canceladas / não exigidas moram no card próprio (L1: uma vez só): a lista não as busca nem mostra. */
-  semCanceladas?: boolean
 }) {
   const router = useRouter()
   const { permissoes, avisar, recarregar } = useTorre()
@@ -155,11 +152,10 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
   }, [versao, paisChave])
   // CANCELADAS: só exibição (riscadas, no fim do grupo, com "Ver motivo") — nunca contador, seleção ou lote.
   useEffect(() => {
-    if (semCanceladas) return
     let vivo = true
     void api<{ linhas: LinhaDaTela[] }>(`/api/torre/tarefas/canceladas${paisChave ? `?pais=${encodeURIComponent(paisChave)}` : ""}`).then((r) => { if (vivo && r.ok) setCanceladas(r.data.linhas ?? []) })
     return () => { vivo = false }
-  }, [versao, paisChave, semCanceladas])
+  }, [versao, paisChave])
 
   // A visão em vigor: uma das fixas, ou a `visao` guardada dentro da visão salva escolhida.
   const visao: VisaoTarefas = (CHAVES_DE_VISAO_DA_TELA.includes(visaoSel) ? visaoSel : visaoSalva) as VisaoTarefas
@@ -241,8 +237,8 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
   const lote = async (acao: "ATRIBUIR" | "REMOVER_RESPONSAVEL" | "PRIORIDADE_ALTA" | "PRIORIDADE" | "REPACTUAR" | "COBRAR", extra: Record<string, unknown> = {}, opcoes: { limpar?: boolean; ddmm?: string } = {}) => {
     const { limpar = true, ddmm = "" } = opcoes
     setOcupado(true)
-    // ATRIBUIR e REMOVER RESPONSÁVEL passam pelo modal de confirmação (a lista de quem recebe/perde o quê); as demais ações seguem direto.
-    const r = acao === "REMOVER_RESPONSAVEL" || acao === "ATRIBUIR"
+    // REMOVER RESPONSÁVEL passa pelo modal de confirmação (lista de quem sai de quê); as demais ações seguem direto.
+    const r = acao === "REMOVER_RESPONSAVEL"
       ? await postarComConfirmacao<RespLote>("/api/torre/tarefas/lote", { acao, tarefaIds: selIds, ...extra })
       : await api<RespLote>("/api/torre/tarefas/lote", "POST", { acao, tarefaIds: selIds, ...extra })
     setOcupado(false)
@@ -283,8 +279,7 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
   const atribuirRapido = (l: LinhaTorre) => { setErroEscolha(null); setEscolhaLinha(l) }
   const atribuirA = async (l: LinhaTorre, responsavelId: number) => {
     setAtribuindo(true); setErroEscolha(null)
-    // L4: a escolha da pessoa passa pela CONFIRMAÇÃO EXPLÍCITA ("Atribuir X a Y?"), no servidor e na tela.
-    const r = await postarComConfirmacao<{ ok?: boolean; erro?: string }>(`/api/torre/tarefas/${l.taskId}/atribuir`, { responsavelId })
+    const r = await api<{ ok?: boolean; erro?: string }>(`/api/tarefas/${l.taskId}/comando`, "POST", { acao: l.responsavelId == null ? "atribuir" : "transferir", responsavelId })
     setAtribuindo(false)
     if (!r.ok) { setErroEscolha(erroDe(r.data)); return }
     setEscolhaLinha(null)
@@ -360,7 +355,6 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
 
   return (
     <div className="tf">
-      <PerguntaDaAba aba="tarefas" />
       <div className="tf-head">
         <div className="tf-bread"><Link href="/torre">Torre de Controle</Link> › Tarefas</div>
         <div className="tf-titulo">

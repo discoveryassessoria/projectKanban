@@ -6,8 +6,8 @@ import "./torre-processos.css"
 
 export function TorrePassosDaFase({ p }: { p: PassosDaFase }) {
   return (
-    <section className="tor-pf-cartao" aria-label="Onde estão as certidões dos processos desta fase, por passo">
-      <div className="tor-pf-rotulo">Onde estão as {milhar(p.total)} {p.substantivo} dos processos desta fase — por passo</div>
+    <section className="tor-pf-cartao" aria-label="Onde estão as certidões desta fase, por passo">
+      <div className="tor-pf-rotulo">Onde estão as {milhar(p.total)} {p.substantivo} desta fase — por passo</div>
       <div className="tor-pf-caixas">
         {p.caixas.map((c) => (
           <div key={c.chave} className={`tor-pf-caixa ${c.classe}`}>

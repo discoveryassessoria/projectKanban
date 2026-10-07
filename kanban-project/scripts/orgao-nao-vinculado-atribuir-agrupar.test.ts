@@ -55,12 +55,12 @@ async function main() {
   await prisma.logAuditoria.deleteMany({ where: { acao: "ORGAO_CRIADO_PAINEL_DOCUMENTO", descricao: { contains: "OBVAG" } } })
   await prisma.orgaoProtocolo.deleteMany({ where: { name: { startsWith: "OBVAG" } } })
 
-  secao("B5) «Atribuir» da fila leva à Torre (Lei da Torre, L4 — sem botão morto)")
+  secao("B5) «Atribuir» da fila ligado (sem botão morto)")
   const v3 = src("src/components/operacao/operacao-v3.tsx")
   ok("não há mais «ação ainda não ligada»", !/ainda não ligada/.test(v3) && !/onNaoLigado/.test(v3))
-  ok("não atribui mais pela fila: sem porta de comando atribuir|transferir", !/"atribuir" : "transferir"/.test(v3) && !/atribuirSelecionadas/.test(v3))
-  ok("o botão é um link «Atribuir na Torre» para /torre?aba=tarefas", /href="\/torre\?aba=tarefas"[^>]*>Atribuir na Torre/.test(v3))
-  ok("não abre mais o seletor de responsável", !/<SeletorResponsavel/.test(v3))
+  ok("usa a porta canônica de comando (atribuir|transferir)", /\/api\/tarefas\/\$\{l\.taskId\}\/comando/.test(v3) && /"atribuir" : "transferir"/.test(v3))
+  ok("mesma permissão da Torre/Visão global: tarefas.editar", /podePermissao\("tarefas\.editar"\)/.test(v3) && /podeAtribuir && <button[^>]*onClick=\{onAtribuir\}>Atribuir/.test(v3))
+  ok("abre o seletor de responsável do kit", /<SeletorResponsavel/.test(v3))
 
   secao("B6) Aguardando e Acompanhamento agrupam por pessoa")
   ok("helper por pessoa dentro da família usado nas duas abas", /const porPessoaSeAtivo/.test(abas) && /porPessoaSeAtivo\(grupo\.linhas, !!onVerFamilia\)/.test(abas) && /porPessoaSeAtivo\(g\.linhas, true\)/.test(abas))

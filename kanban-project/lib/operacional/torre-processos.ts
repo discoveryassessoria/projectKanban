@@ -285,9 +285,7 @@ const rotuloDoPassoDaLinha = (l: Pick<LinhaDaTorre, 'passoCorrente' | 'etapaAtua
 /** `todasAbertas` (opcional): as abertas do PROCESSO inteiro — `abertas` e `semResponsavel` passam a contar o MESMO conjunto da lista da página do processo. */
 export function tarefasDaFaseDoProcesso(linhasDaFase: LinhaDaTorre[], concluidas: number, metaDias: number | null, todasAbertas?: LinhaDaTorre[]): TarefasDaFase {
   const semResp = linhasDaFase.filter((l) => l.responsavelId == null)
-  // Os PASSOS somam TODAS as tarefas abertas COM responsável do processo (de qualquer fase — ex.: Localizar registro da Genealogia reaberta), para que
-  // passos + sem responsável = o total que o cartão anuncia (L3). Antes só entravam as da fase atual (14 + 1 + 31 ≠ 48).
-  const comResp = (todasAbertas ?? linhasDaFase).filter((l) => l.responsavelId != null)
+  const comResp = linhasDaFase.filter((l) => l.responsavelId != null)
   const porPasso = new Map<string, PassoDoProcesso>()
   for (const l of comResp) {
     const label = rotuloDoPassoDaLinha(l)

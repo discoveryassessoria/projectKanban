@@ -3,8 +3,7 @@
 // Os números vêm das MESMAS linhas da Operação (/api/torre/equipe → `cargaPorPessoa`, a conta única — Ativas, Atrasadas e
 // Aguard. terceiros fecham com a aba Tarefas e a Visão geral). Ausência é só REGISTRO (com sucessor sugerido); mover a carteira é
 // ação MANUAL; "Simular saída" mostra o impacto antes de aplicar e NUNCA grava; "Distribuir por aptidão e carga" só atribui a quem
-// tem aptidão comprovada (sem apto, a tarefa fica para você atribuir em Tarefas). Toda ação com efeito grava no histórico e tem Desfazer.
-import { PerguntaDaAba } from "./PerguntaDaAba"
+// tem aptidão comprovada (sem apto, a tarefa fica para o Precisa de você). Toda ação com efeito grava no histórico e tem Desfazer.
 import { useConfirmarAtribuicao } from "./ConfirmarAtribuicao"
 import { useEffect, useState } from "react"
 import { api, erroDe, useTorre, type Desfazer } from "./torre-base"
@@ -67,7 +66,7 @@ export function TorreEquipe({ versao, pais = "" }: { versao: number; pais?: stri
   const aplicar = async () => {
     if (!sim) return
     setOcupado(true)
-    const r = await postarComConfirmacao<{ ok?: boolean; desfazer?: Desfazer | null }>("/api/torre/equipe/aplicar-saida", { usuarioId: sim.usuarioId, dias: sim.dias })
+    const r = await api<{ ok?: boolean; desfazer?: Desfazer | null }>("/api/torre/equipe/aplicar-saida", "POST", { usuarioId: sim.usuarioId, dias: sim.dias })
     setOcupado(false)
     if (r.ok) { avisar(toastSimulacaoAplicada(sim.nome), r.data.desfazer ?? null); setSim(null); atualizar() } else avisar(erroDe(r.data))
   }
@@ -79,7 +78,7 @@ export function TorreEquipe({ versao, pais = "" }: { versao: number; pais?: stri
   }
   const redistribuir = async () => {
     setOcupado(true)
-    const r = await postarComConfirmacao<RespostaRedistribuicao>("/api/torre/equipe/redistribuir", {})
+    const r = await api<RespostaRedistribuicao>("/api/torre/equipe/redistribuir", "POST", {})
     setOcupado(false)
     if (r.data?.distribuicao) {
       avisar(toastRedistribuicao({ movimentos: r.data.movimentos, atribuidas: r.data.distribuicao.atribuidas, semApto: r.data.distribuicao.semApto, seguradas: r.data.distribuicao.seguradas }, nomes), r.data.desfazer ?? null)
@@ -90,9 +89,8 @@ export function TorreEquipe({ versao, pais = "" }: { versao: number; pais?: stri
   return (
     <div className="eqp">
       {modalConfirmacao}
-      <PerguntaDaAba aba="equipe" />
       <div className="eqp-cab">
-        <div className="eqp-mig"><a href="/torre?aba=hoje">Torre de Controle</a> › Equipe</div>
+        <div className="eqp-mig"><a href="/torre?aba=visao">Torre de Controle</a> › Equipe</div>
         <h1 className="eqp-titulo">{TITULO_EQUIPE}</h1>
       </div>
       <div className="eqp-nota">{TEXTO_EXPLICATIVO}</div>

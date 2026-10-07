@@ -49,14 +49,6 @@ const EXEC = { "tarefas.iniciar_concluir": true, "tarefas.ver": true, "tarefas.e
 const req = (url: string, token: string, body?: unknown) =>
   new NextRequest(`http://localhost${url}`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(body ?? {}) })
 
-/** PROPOSTA (06/10/2026): a rota devolve a prévia (428, nada gravado) e só grava com `confirmado` + a assinatura da prévia. Prova as duas viagens. */
-async function comConfirmacao(chamar: (extra: Record<string, unknown>) => Promise<Response>): Promise<{ resposta: Response; previa: Record<string, unknown> | null }> {
-  const r1 = await chamar({})
-  if (r1.status !== 428) return { resposta: r1, previa: null }
-  const previa = (await r1.json()).confirmacao as { assinatura: string } & Record<string, unknown>
-  return { resposta: await chamar({ confirmado: true, assinatura: previa.assinatura }), previa }
-}
-
 async function main() {
   const c = await montarCenario(MARCA)
   const paisesCriados: number[] = []
@@ -173,7 +165,7 @@ async function main() {
     ok("pré-condição: Dora com 4 executáveis e limite 2 (barra vermelha)", dora4.carga.executaveis >= 4 && dora4.carga.limite === 2)
     const mDora = q4.sugestao.movimentos.find((m) => m.deUsuarioId === dora.id)
     ok("a sugestão manda o EXCESSO (executáveis − limite) da Dora para quem é apto e tem menor custo", !!mDora && mDora.quantidade === Math.min(dora4.carga.executaveis - 2, mDora.quantidade) && [ana.id, beto.id].includes(mDora.paraUsuarioId) && mDora.quantidade >= 1, JSON.stringify(mDora))
-    const { resposta: rRed } = await comConfirmacao((x) => postRedistribuir(req("/api/torre/equipe/redistribuir", tAdmin, x)))
+    const rRed = await postRedistribuir(req("/api/torre/equipe/redistribuir", tAdmin))
     const jRed = await rRed.json()
     const feitoDora = jRed.movimentos.find((m: { deUsuarioId: number }) => m.deUsuarioId === dora.id)
     ok("a execução move EXATAMENTE o que a sugestão previu", rRed.status === 200 && feitoDora?.movidas === mDora!.quantidade && feitoDora.paraUsuarioId === mDora!.paraUsuarioId, JSON.stringify(feitoDora))
@@ -211,7 +203,7 @@ async function main() {
     ok("o período usa os dias pedidos (3 dias muda os prazos contados)", (await simularSaida(dora.id, 3))!.texto.includes("nesses 3 dias") && (await simularSaida(dora.id, 60))!.vencemNoPeriodo >= sim!.vencemNoPeriodo)
 
     // aplicar: a ausência recebe o motivo 'saída simulada · N dias' (o texto que a tela mostra)
-    const { resposta: rApl } = await comConfirmacao((x) => postAplicar(req("/api/torre/equipe/aplicar-saida", tAdmin, { usuarioId: dora.id, dias: 10, ...x })))
+    const rApl = await postAplicar(req("/api/torre/equipe/aplicar-saida", tAdmin, { usuarioId: dora.id, dias: 10 }))
     const jApl = await rApl.json()
     const ausDora = (await quadroDaEquipe()).pessoas.find((p) => p.usuarioId === dora.id)!.ausencia
     ok("'Aplicar': a pessoa passa a 'ausente (saída simulada · 10 dias)'", rApl.status === 200 && ausDora?.motivo === "saída simulada · 10 dias", JSON.stringify(ausDora))

@@ -6,7 +6,7 @@
 // "Dentro do sistema" = mesma origem e não é a tela de login.
 // ============================================================================
 
-export const DESTINO_SEM_ANTERIOR = "/torre?aba=familias"
+export const DESTINO_SEM_ANTERIOR = "/torre?aba=processos"
 
 export interface EntradaDoHistorico {
   /** A entrada ANTERIOR do histórico (Navigation API), quando o navegador a expõe; `null` = não há; `undefined` = o navegador não expõe. */

@@ -91,27 +91,6 @@ export async function atribuirEmLote(args: { tarefaIds: number[]; responsavelId:
   }
 }
 
-// ─── ATRIBUIR MANUAL — a PRÉVIA da confirmação ("Atribuir X a Y?") ─────────────────────────────────────────────────────────────────────────
-
-/** A prévia da atribuição escolhida pela pessoa (manual): nomeia quem recebe, o que e de quem sai; nada é gravado. `null` = nenhuma tarefa válida. */
-export async function previaDeAtribuir(tarefaIds: number[], responsavelId: number): Promise<import('@/src/lib/torre-confirmacao').PreviaDeConfirmacao | null> {
-  const destino = await prisma.usuario.findUnique({ where: { id: responsavelId }, select: { id: true, nome: true } })
-  if (!destino) return null
-  const ts = await prisma.tarefa.findMany({
-    where: { id: { in: tarefaIds }, statusTarefa: { notIn: ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI', 'CANCELADA', 'SUPERSEDIDA'] } },
-    select: { id: true, titulo: true, responsavelId: true, responsavel: { select: { nome: true } }, processo: { select: { nome: true, arvore: { select: { nome: true } } } } },
-    orderBy: { id: 'asc' },
-  })
-  if (ts.length === 0) return null
-  const linhas = ts.map((t) => `${t.titulo}${t.processo ? ` · ${t.processo.arvore?.nome ?? t.processo.nome}` : ''}`)
-  const deQuem = [...new Set(ts.filter((t) => t.responsavelId != null && t.responsavelId !== responsavelId).map((t) => t.responsavel?.nome ?? `usuário ${t.responsavelId}`))]
-  return {
-    pergunta: `${deQuem.length > 0 ? 'Transferir' : 'Atribuir'} ${ts.length === 1 ? linhas[0] : `${ts.length} tarefas (${linhas.join('; ')})`} a ${destino.nome}${deQuem.length > 0 ? ` (hoje de ${deQuem.join(', ')})` : ''}?`,
-    itens: [{ pessoa: destino.nome, quantidade: ts.length, tarefas: linhas }],
-    assinatura: ts.map((t) => `${t.id}:${responsavelId}`).join(','),
-  }
-}
-
 // ─── REMOVER RESPONSÁVEL (devolver à fila de distribuição) ───────────────────
 
 /** A PRÉVIA da remoção — nomeia pessoa por pessoa e tarefa por tarefa; nada é gravado. `null` = nenhuma das tarefas tem responsável. */

@@ -30,6 +30,7 @@ import { encerrarSessao } from "@/src/lib/sessao/cliente"
 import { useIsClient, useJsonLocalStorage } from "@/src/lib/cliente"
 import { OperacaoV3 } from "@/src/components/operacao/operacao-v3"
 import { ehGestorDaOperacao } from "@/src/components/operacao/operacao-v3-derivacoes"
+import { destinoDaOperacaoParaAdmin, temAcessoATorre } from "@/src/lib/torre-absorcao"
 
 const CARREGANDO = (
   <div className="relative min-h-screen [overflow-x:clip] text-[var(--text-primary)]">
@@ -68,14 +69,18 @@ function OperacaoPageConteudo() {
   // de obrigação administrativa acima — nunca uma aba misturada aqui dentro.
   const autorizado = pode("tarefas.ver")
 
-  // 06/10/2026: "Minha operação" SAIU da Torre — esta é a tela de quem EXECUTA e fica só aqui (sem redirecionar ninguém para a Torre).
-  // A gestão (atribuir, distribuir, acompanhar a equipe) é da Torre; aqui não se atribui.
+  // TUDO DO ADMIN MORA NA TORRE (30/09/2026; 06/10/2026: vale para quem tem acesso à Torre e cai na aba "Minha operação"): quem acessa a Torre é levado a ela, com o que o link carregava
+  // (família → Foco, aba → visão equivalente, tarefa → drawer) traduzido — os avisos já gravados continuam
+  // funcionando. Sem acesso à Torre: esta tela, exatamente como hoje. A rota NÃO é apagada.
+  const parametros = useSearchParams()
+  const paraTorre = temAcessoATorre(user.tipo, pode) ? destinoDaOperacaoParaAdmin(parametros) : null
 
   useEffect(() => {
+    if (mounted && !carregando && paraTorre) { router.replace(paraTorre); return }
     if (mounted && !carregando && !autorizado) router.push("/")
-  }, [mounted, carregando, autorizado, router])
+  }, [mounted, carregando, autorizado, paraTorre, router])
 
-  if (!mounted || carregando || !autorizado) return CARREGANDO
+  if (!mounted || carregando || !autorizado || paraTorre) return CARREGANDO
 
   return (
     <div className="relative min-h-screen [overflow-x:clip] overscroll-none text-[var(--text-primary)]">

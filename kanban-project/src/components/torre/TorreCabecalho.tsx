@@ -1,7 +1,7 @@
 "use client"
 // src/components/torre/TorreCabecalho.tsx — a barra do topo da Torre (Bloco J2; Torre nova, Etapa A): a NACIONALIDADE como botões
-// ("Todos · Itália 280 · Espanha 140…", a contagem é de processos ativos) e a busca. (O "Briefing do dia" virou a frase de HOJE e o
-// "Revisar o dia" saiu — consolidação 06/10/2026.) O SINO é o do cabeçalho global da página (`HeaderBarApp`), o mesmo de todo o sistema.
+// ("Todos · Itália 280 · Espanha 140…", a contagem é de processos ativos), a busca, o "Briefing do dia" (SÓ manual — nunca abre
+// sozinho) e o "Revisar o dia (N)". O SINO é o do cabeçalho global da página (`HeaderBarApp`), o mesmo de todo o sistema.
 // A data, o usuário e o perfil ficam no subtítulo do cabeçalho da página. O país escolhido filtra TODAS as abas (Torre.tsx).
 export interface PaisDaTorre { chave: string; rotulo: string; bandeira: string | null; /** Processos ativos do país (`null` = ainda carregando). */ n?: number | null }
 
@@ -9,8 +9,9 @@ export interface PaisDaTorre { chave: string; rotulo: string; bandeira: string |
 export const paisesPorTamanho = (paises: PaisDaTorre[]): PaisDaTorre[] =>
   paises.map((p, i) => ({ p, i })).sort((a, b) => (b.p.n ?? -1) - (a.p.n ?? -1) || a.i - b.i).map((x) => x.p)
 
-export function TorreCabecalho({ paises, pais, onPais, nTodos, busca, onBusca }: {
+export function TorreCabecalho({ paises, pais, onPais, nTodos, busca, onBusca, nPrecisa, onBriefing, onRevisar }: {
   paises: PaisDaTorre[]; pais: string; onPais: (chave: string) => void; nTodos?: number | null; busca: string; onBusca: (t: string) => void
+  nPrecisa: number | null; onBriefing: () => void; onRevisar: () => void
 }) {
   return (
     <div className="tor-cab">
@@ -25,6 +26,10 @@ export function TorreCabecalho({ paises, pais, onPais, nTodos, busca, onBusca }:
         ))}
       </div>
       <input className="tor-in tor-cab-busca" aria-label="Buscar" placeholder="Buscar família, pessoa, cartório…" value={busca} onChange={(e) => onBusca(e.target.value)} />
+      <div className="tor-cab-btns">
+        <button className="tor-btn" onClick={onBriefing}>☀ Briefing do dia</button>
+        <button className="tor-btn pri" onClick={onRevisar} disabled={!nPrecisa}>▶ Revisar o dia ({nPrecisa ?? "…"})</button>
+      </div>
     </div>
   )
 }

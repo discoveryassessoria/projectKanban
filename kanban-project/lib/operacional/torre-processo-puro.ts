@@ -140,8 +140,6 @@ export interface LinhaDaTabela {
   podeAtribuir: boolean
   /** A FASE da tarefa (a lista do processo mostra as abertas de TODAS as fases, agrupadas da mais antiga para a mais nova). */
   fase: { key: string | null; label: string | null; ordem: number }
-  /** `true` = certidão inativa que NÃO tem tarefa cancelada (a árvore deixou de exigir): fora da conta das "canceladas" da aba Tarefas. */
-  semTarefa?: boolean
 }
 
 /** A chave da regra fixa de ordem das certidões para uma linha desta tabela. */
@@ -382,14 +380,16 @@ export function cartoesDaFase<L extends LinhaParaDerivar>(a: {
           tom: 'normal',
         }
 
-  // CANCELADA / NÃO EXIGIDA — `canceladas` = as tarefas canceladas do processo (a MESMA consulta e o MESMO número da aba Tarefas, L3);
-  // `naoExigidas` = certidões inativas SEM tarefa (a árvore deixou de exigir), mostradas à parte e nunca somadas às canceladas.
+  // CANCELADA / NÃO EXIGIDA
   const totalFora = a.encerradas.canceladas + a.encerradas.naoExigidas
-  const semTarefa = a.encerradas.naoExigidas > 0 ? `${a.encerradas.naoExigidas} ${plural(a.encerradas.naoExigidas, 'não exigida', 'não exigidas')} pela árvore (sem tarefa)` : null
+  const partes = [
+    a.encerradas.canceladas > 0 ? `${a.encerradas.canceladas} ${plural(a.encerradas.canceladas, 'cancelada', 'canceladas')}` : null,
+    a.encerradas.naoExigidas > 0 ? `${a.encerradas.naoExigidas} ${plural(a.encerradas.naoExigidas, 'não exigida', 'não exigidas')}` : null,
+  ].filter(Boolean)
   const fora: CartaoSimples = {
     rotulo: ROTULO_ENCERRADAS,
-    titulo: totalFora === 0 ? 'Nenhuma' : a.encerradas.canceladas > 0 ? `${a.encerradas.canceladas} ${plural(a.encerradas.canceladas, 'cancelada', 'canceladas')}` : `${a.encerradas.naoExigidas} ${plural(a.encerradas.naoExigidas, 'não exigida', 'não exigidas')}`,
-    sub: totalFora === 0 ? 'nada cancelado nem dispensado pela árvore' : a.encerradas.canceladas > 0 ? (semTarefa ?? 'todas com tarefa — as mesmas da aba Tarefas') : 'pela árvore (sem tarefa)',
+    titulo: totalFora === 0 ? 'Nenhuma' : `${totalFora} ${plural(totalFora, 'certidão', 'certidões')}`,
+    sub: partes.length ? partes.join(' · ') : 'nada cancelado nem dispensado pela árvore',
     tom: 'normal',
   }
   return [passo, comQuem, prazo, cartorios, fora]

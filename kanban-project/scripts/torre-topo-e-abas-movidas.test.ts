@@ -1,13 +1,11 @@
 // scripts/torre-topo-e-abas-movidas.test.ts
 // ============================================================================
-// TORRE — SEÇÕES 1 e 2 (01/10/2026): o que NÃO é gestão de processo saiu da Torre, e as regras puras do topo (frase + SITUAÇÃO + AGENDA).
-// CONSOLIDAÇÃO 06/10/2026: o topo (TorreKpis/TorreVisaoGeral/TorreFunil) virou a aba HOJE (só alarmes); as contas (lib/operacional/torre-kpis.ts)
-// seguem as MESMAS e alimentam os alarmes e a aba Tarefas. A Torre tem 5 abas.
+// TORRE — SEÇÕES 1 e 2 (01/10/2026): o que NÃO é gestão de processo saiu da Torre, e o topo novo (frase + SITUAÇÃO + AGENDA).
 //
 //   npx tsx scripts/torre-topo-e-abas-movidas.test.ts   (banco de teste)
 //
 // PROVA:
-//   1.1/1.5/1.6  abas antigas → destino no Gerenciamento; a Torre fica com 5 abas (Hoje na frente); Regras/Integridade/Auditoria são sub-abas da Saúde;
+//   1.1/1.5/1.6  abas antigas → destino no Gerenciamento; a Torre fica com 7 abas (Visão geral na frente); Regras/Integridade/Auditoria são sub-abas da Saúde;
 //   1.2          Auditoria: mapa único SISTEMA × PROCESSO/TAREFA, padrão Sistema, filtros e CSV na mesma consulta;
 //   1.3          o "Precisa de você" não produz mais achado de cadastro (PAREDE_A_FRENTE);
 //   1.1          as portas de Regras/Integridade valem para quem tem usuarios.gerenciar (sem exigir ser gestor da Torre);
@@ -92,7 +90,6 @@ async function main() {
   ]
   ok("sem responsável E aguardando → 'Sem responsável' (precedência: sem responsável > aguardando terceiros > equipe)", situacaoDaTarefa(part[1]) === "ninguem")
   ok("Sem responsável=2 · Aguardando terceiros=1 · Com a equipe=2", numeroDoKpi("ninguem", part, AGORA) === 2 && numeroDoKpi("cartorio", part, AGORA) === 1 && numeroDoKpi("equipe", part, AGORA) === 2)
-  ok("'Aguardando terceiros' (visão/KPI 'aguard') = TODO pedido com a bola com terceiro, COM ou SEM responsável (2); o KPI 'cartorio' da partição segue só com responsável (1)", numeroDoKpi("aguard", part, AGORA) === 2 && numeroDoKpi("cartorio", part, AGORA) === 1 && PREDICADO_DO_KPI.aguard!(part[1], AGORA) === true && PREDICADO_DO_KPI.cartorio!(part[1], AGORA) === false)
   ok("os TRÊS somam 'Tarefas abertas' (partição exata)", numeroDoKpi("ninguem", part, AGORA) + numeroDoKpi("cartorio", part, AGORA) + numeroDoKpi("equipe", part, AGORA) === numeroDoKpi("abertas", part, AGORA))
   ok("cada tarefa cai em UM e só um dos três", part.every((l) => ["ninguem", "cartorio", "equipe"].filter((k) => PREDICADO_DO_KPI[k as "ninguem"]!(l, AGORA)).length === 1))
   ok("'Sem responsável' (cartão) é a MESMA conta do antigo `semdono` (foto E10 comparável)", part.every((l) => PREDICADO_DO_KPI.ninguem!(l, AGORA) === PREDICADO_DO_KPI.semdono!(l, AGORA)))
@@ -101,8 +98,10 @@ async function main() {
   ok("todo cartão do topo tem rótulo e REGRA escrita", [...CARTOES_DA_SITUACAO, ...CARTOES_DA_AGENDA, "risco" as const].every((k) => KPI_POR_CHAVE[k].rotulo.length > 0 && KPI_POR_CHAVE[k].regra.length > 20))
   ok("toda chave de KPI tem predicado (exceto risco/back, que são por processo/agregado)", KPIS.filter((k) => k.chave !== "risco" && k.chave !== "back").every((k) => typeof PREDICADO_DO_KPI[k.chave] === "function"))
   ok("tendência: venc, ninguem, cob e risco (definição igual à da foto antiga) + abertas, equipe e cartorio (colunas novas da M4, MESMA definição do cartão); a agenda nova (hoje/prox7…) NÃO", CAMPO_DA_FOTO.venc === "vencidas" && CAMPO_DA_FOTO.ninguem === "semDono" && CAMPO_DA_FOTO.cob === "cobrancasPendentes" && CAMPO_DA_FOTO.risco === "emRisco" && CAMPO_DA_FOTO.cartorio === "comCartorio" && CAMPO_DA_FOTO.equipe === "comEquipe" && CAMPO_DA_FOTO.abertas === "tarefasAbertas" && !CAMPO_DA_FOTO.hoje && !CAMPO_DA_FOTO.prox7)
-  ok("o antigo painel de KPIs (TorreKpis) e a Visão geral saíram da Torre; o clique num número de HOJE filtra a aba Tarefas com o MESMO predicado (linhasDoKpi no casco, em Tarefas e nos alarmes)", !existsSync("src/components/torre/TorreKpis.tsx") && !existsSync("src/components/torre/TorreVisaoGeral.tsx") && /linhasDoKpi\(kpi, linhasPais, agora\)/.test(ler("src/components/torre/Torre.tsx")) && /linhasDoKpi\(kpi, linhas, agora\)/.test(ler("src/components/torre/TorreTarefas.tsx")) && /linhasDoKpi\(a\.abre\.kpi, linhas, agora\)/.test(ler("lib/operacional/torre-hoje.ts")))
-  ok("as visões 'Vencidas', 'Sem responsável' e 'Aguardando terceiros' (todo pedido com a bola com terceiro) da aba Tarefas usam os predicados dos cartões", /PREDICADO_DO_KPI\.venc!/.test(ler("lib/operacional/torre-tarefas-tela.ts")) && /PREDICADO_DO_KPI\.ninguem!/.test(ler("lib/operacional/torre-tarefas-tela.ts")) && /PREDICADO_DO_KPI\.aguard!/.test(ler("lib/operacional/torre-tarefas-tela.ts")) && /predicadoDaVisao\(visao/.test(ler("src/components/torre/TorreTarefas.tsx")))
+  const kp = ler("src/components/torre/TorreKpis.tsx")
+  ok("nenhum cartão escreve 'sem histórico' nem 'tendência só no total'", !/sem histórico|tendência só no total/i.test(kp))
+  ok("cada cartão clica e filtra com o mesmo predicado (Torre.tsx usa linhasDoKpi; a aba Tarefas usa linhasDoKpi)", /linhasDoKpi\(kpi, linhasPais, agora\)/.test(ler("src/components/torre/Torre.tsx")) && /linhasDoKpi\(kpi, linhas, agora\)/.test(ler("src/components/torre/TorreTarefas.tsx")) && /numeroDoKpi\(k, linhas, agora\)/.test(kp))
+  ok("as visões 'Vencidas', 'Sem responsável' e 'Aguardando terceiros' da aba Tarefas usam os predicados dos cartões", /PREDICADO_DO_KPI\.venc!/.test(ler("lib/operacional/torre-tarefas-tela.ts")) && /PREDICADO_DO_KPI\.ninguem!/.test(ler("lib/operacional/torre-tarefas-tela.ts")) && /PREDICADO_DO_KPI\.cartorio!/.test(ler("lib/operacional/torre-tarefas-tela.ts")) && /predicadoDaVisao\(visao/.test(ler("src/components/torre/TorreTarefas.tsx")))
 
   secao("2.1 — a FRASE do dia (Torre nova: processos ativos, no ritmo, decisões por tipo, gargalo)")
   const dec = (tipo: string, n: number) => Array.from({ length: n }, () => ({ tipo }))
@@ -113,9 +112,9 @@ async function main() {
   ok("Processos ativos: total, distribuição por PAÍS e 'N em risco' (crítico)", t.processosAtivos.total === 2 && t.processosAtivos.distribuicao === "Espanha 1 · Itália 1" && t.processosAtivos.emRisco === 1, t.processosAtivos.distribuicao)
   ok("distribuição sem país", distribuicaoPorPais([{ pais: null }]) === "Sem país 1")
 
-  secao("2.5 — backlog vai para a aba Famílias; 'Escaladas pra mim' e Backlog saem do topo")
-  // Consolidação 06/10/2026: o funil e a linha da semana saíram junto com a Visão geral; a aba Famílias, por fase, não os repete.
-  ok("o funil (TorreFunil) saiu e a linha 'Semana: …' não existe mais nem em Famílias", !existsSync("src/components/torre/TorreFunil.tsx") && !/Semana:/.test(ler("src/components/torre/TorreProcessos.tsx")) && !/Semana:/.test(ler("src/components/torre/TorreFamilias.tsx")))
+  secao("2.5 — backlog vai para a aba Processos; 'Escaladas pra mim' e Backlog saem do topo")
+  // Torre nova: o protótipo mostra a linha da semana na Visão geral (TorreFunil), não na aba Processos (que agora é por fase).
+  ok("a linha 'Semana: …' mora na Visão geral (funil) e a aba Processos, por fase, não a repete", /Semana:/.test(ler("src/components/torre/TorreFunil.tsx")) && !/Semana:/.test(ler("src/components/torre/TorreProcessos.tsx")))
   ok("o topo não tem mais 'Escaladas pra mim' nem 'Backlog'", !CARTOES_DA_SITUACAO.concat(CARTOES_DA_AGENDA).some((k) => k === "esc" || k === "back"))
 
   // ═══════════ SEÇÃO 1 — abas movidas ═══════════
@@ -124,13 +123,13 @@ async function main() {
   const abas = /export const ABAS: Array<\[Aba, string\]> = \[([\s\S]*?)\n\]/.exec(torre)?.[1].match(/\["(\w+)", "([^"]+)"\]/g) ?? []
   const abasDoCasco = /export const ABAS: Array<\[Aba, string\]> = ABAS_DA_TORRE/.test(torre)
   ok("o casco usa a lista única de abas (lib/operacional/torre-abas.ts)", abasDoCasco)
-  ok("exatamente 5 abas, na ordem: Hoje · Tarefas · Famílias · Equipe · Terceiros (ids hoje,tarefas,familias,equipe,terceiros)", ABAS_DA_TORRE.length === 5 && ABAS_DA_TORRE.map(([, r]) => r).join(" · ") === "Hoje · Tarefas · Famílias · Equipe · Terceiros" && ABAS_DA_TORRE.map(([k]) => k).join() === "hoje,tarefas,familias,equipe,terceiros", ABAS_DA_TORRE.map(([, r]) => r).join(","))
+  ok("exatamente 8 abas, na ordem: Visão geral · Precisa de você · Radar · Processos · Tarefas · Minha operação · Equipe · Terceiros", ABAS_DA_TORRE.length === 8 && ABAS_DA_TORRE.map(([, r]) => r).join(" · ") === "Visão geral · Precisa de você · Radar · Processos · Tarefas · Minha operação · Equipe · Terceiros", ABAS_DA_TORRE.map(([, r]) => r).join(","))
   ok("a Torre não importa mais Regras/Integridade/Auditoria", !/TorreRegras|TorreIntegridade|TorreAuditoria|SaudeRegras/.test(torre) && !existsSync("src/components/torre/TorreRegras.tsx") && !existsSync("src/components/torre/TorreIntegridade.tsx") && !existsSync("src/components/torre/TorreAuditoria.tsx"))
-  ok("a Torre redireciona a aba antiga (Gerenciamento) e a que saiu (minha → /operacao) com router.replace", /destinoDaAbaAntigaDaTorre\(params\.get\("aba"\)\)/.test(torre) && /destinoDeAbaQueSaiu\(params\.get\("aba"\)\)/.test(torre) && /router\.replace\(destinoAntigo\)/.test(torre))
+  ok("a Torre redireciona a aba antiga com router.replace", /destinoDaAbaAntigaDaTorre\(params\.get\("aba"\)\)/.test(torre) && /router\.replace\(destinoAntigo\)/.test(torre))
   ok("?aba=regras → Gerenciamento › Saúde › Regras", destinoDaAbaAntigaDaTorre("regras") === "/administrator?screen=syshealth&sub=regras")
   ok("?aba=integridade → …&sub=integridade", destinoDaAbaAntigaDaTorre("integridade") === "/administrator?screen=syshealth&sub=integridade")
   ok("?aba=auditoria → …&sub=auditoria", destinoDaAbaAntigaDaTorre("auditoria") === "/administrator?screen=syshealth&sub=auditoria")
-  ok("as abas da Torre (e seus ids antigos, traduzidos pela própria Torre) NÃO redirecionam ao Gerenciamento", ["hoje", "visao", "precisa", "radar", "tarefas", "equipe", "familias", "processos", "terceiros", "minha", null, undefined, ""].every((x) => destinoDaAbaAntigaDaTorre(x) === null))
+  ok("as abas que continuam da Torre NÃO redirecionam", ["visao", "precisa", "radar", "tarefas", "equipe", "processos", "terceiros", null, undefined, ""].every((x) => destinoDaAbaAntigaDaTorre(x) === null))
   ok("a Saúde tem as cinco sub-abas (a quinta, 'metas', é nova) e a URL 'saude' é a tela de sempre", SUB_ABAS_DA_SAUDE.join() === "saude,regras,integridade,auditoria,metas" && urlDaSaudeDoSistema() === "/administrator?screen=syshealth")
   const saude = ler("src/components/gerenciamentoComponents/SaudeSistemaTab.tsx")
   ok("Saúde do sistema monta Regras, Integridade e Auditoria (Auditoria só admin) com o deep-link ?sub=", /<SaudeRegras/.test(saude) && /<SaudeIntegridade/.test(saude) && /isAdmin \? <SaudeAuditoria/.test(saude) && /get\("sub"\)/.test(saude))

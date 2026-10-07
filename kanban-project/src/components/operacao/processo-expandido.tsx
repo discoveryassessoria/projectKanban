@@ -11,8 +11,8 @@
 //   Histórico de Atividades   → GET /api/processos/{id}/atividades (LogAuditoria + PhaseAdvanceLog + observações/anexos)
 //   Observações                → o mesmo /atividades, filtrado por tipo
 //
-// Nenhuma escrita de responsável aqui: atribuir/transferir só na aba Tarefas da
-// Torre (Lei da Torre, L4) — a tela oferece o link "Atribuir na Torre".
+// A ÚNICA escrita possível daqui é reatribuir a fase atual — e sai pela MESMA
+// porta de sempre (`redistribuirTarefas`, `/api/tarefas/redistribuir`).
 // ============================================================================
 "use client"
 
@@ -26,7 +26,7 @@ import { Progress } from "@/components/ui/progress"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
-import { auth, dataCurta, Estado, Etiqueta, rotularFase, useRotulosDeFaseProntos, ROTULO_STATUS, ROTULO_COLUNA, type LinhaDeFila } from "./kit-operacional"
+import { auth, dataCurta, Estado, Etiqueta, rotularFase, useRotulosDeFaseProntos, ROTULO_STATUS, ROTULO_COLUNA, SeletorResponsavel, type LinhaDeFila } from "./kit-operacional"
 import type { ProcessoAgrupado, LinhaGerencial } from "@/lib/operacional/tarefa-projecoes"
 
 type Aba = "visao" | "tarefas" | "documentos" | "historico" | "observacoes" | "dados"
@@ -109,6 +109,40 @@ export function ProcessoExpandido({
   const [documentos, setDocumentos] = useState<{ chave: number; d: DocumentosDoProcesso | null } | null>(null)
   const [atividades, setAtividades] = useState<{ chave: number; d: Atividade[] | null } | null>(null)
   const [recarga, setRecarga] = useState(0)
+  const [atribuindo, setAtribuindo] = useState(false)
+  const [ocupado, setOcupado] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
+  // ATRIBUIÇÃO INDIVIDUAL — a MESMA porta de sempre (`/api/tarefas/{id}/
+  // comando`), a mesma que Lista e Kanban chamam. Nunca um endpoint exclusivo
+  // desta aba: atribuir uma tarefa aqui precisa ser IDÊNTICO a atribuir na
+  // Lista — mesmo ownership canônico, mesmo histórico, mesma notificação.
+  const [alvoIndividual, setAlvoIndividual] = useState<LinhaGerencial | null>(null)
+  const comandarTarefaIndividual = async (tarefaId: number, corpo: Record<string, unknown>, sucesso: string) => {
+    setOcupado(true); setErro(null)
+    try {
+      const r = await fetch(`/api/tarefas/${tarefaId}/comando`, { method: "POST", headers: auth(), body: JSON.stringify(corpo) })
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}))
+        setErro(
+          r.status === 409 ? "Outra pessoa mexeu nesta tarefa agora. Recarregamos a lista."
+          : r.status === 403 ? "Você não tem permissão para esta ação."
+          : d?.error ?? `Falha (HTTP ${r.status}).`,
+        )
+        setOcupado(false)
+        if (r.status === 409) setRecarga((n) => n + 1)
+        return
+      }
+      setAviso(sucesso)
+      setAlvoIndividual(null)
+      setOcupado(false)
+      setRecarga((n) => n + 1)
+    } catch {
+      setErro("Não foi possível falar com o servidor.")
+      setOcupado(false)
+    }
+  }
+
   // TUDO CARREGA UMA VEZ, na hora em que a linha abre — não uma vez por aba
   // clicada. É a MESMA leitura que a Central Operacional já faz para este
   // processo; a expansão só lê de novo, nunca outra coisa.
@@ -144,6 +178,30 @@ export function ProcessoExpandido({
   // não reordena certidões dentro da família.
   const proximasTarefas = ordenarLinhasDeCertidao((listaTarefas ?? []).filter((t) => t.statusTarefa === "NAO_INICIADA")).slice(0, 5)
 
+  const atribuirFaseAtual = async (novoResponsavelId: number) => {
+    if (!processo.faseAtualKey) return
+    setOcupado(true); setErro(null)
+    try {
+      const idsSemDono = (listaTarefas ?? [])
+        .filter((t) => t.faseMacroKey === processo.faseAtualKey && t.responsavelId == null && t.statusTarefa !== "CANCELADA" && t.statusTarefa !== "SUPERSEDIDA")
+        .map((t) => t.taskId)
+      if (idsSemDono.length === 0) { setErro("Nenhuma tarefa sem responsável nesta fase."); return }
+      const r = await fetch("/api/tarefas/redistribuir", {
+        method: "POST", headers: auth(),
+        body: JSON.stringify({ tarefaIds: idsSemDono, novoResponsavelId }),
+      })
+      if (!r.ok && r.status !== 207) { setErro(`Falha ao atribuir (HTTP ${r.status}).`); return }
+      const d = await r.json().catch(() => ({}))
+      setAviso(`${d.ok ?? idsSemDono.length} tarefa${idsSemDono.length === 1 ? "" : "s"} atribuída${idsSemDono.length === 1 ? "" : "s"}.`)
+      setAtribuindo(false)
+      setRecarga((n) => n + 1)
+    } catch {
+      setErro("Não foi possível falar com o servidor.")
+    } finally {
+      setOcupado(false)
+    }
+  }
+
   return (
     <div className="border-b border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-5 py-4">
       {/* ── ABAS + AÇÕES ── */}
@@ -158,16 +216,20 @@ export function ProcessoExpandido({
           </TabsList>
         </Tabs>
         <div className="flex items-center gap-2">
-          {podeAtribuir && (
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/torre?aba=tarefas&processo=${processo.processoId}`}>Atribuir na Torre</Link>
-            </Button>
+          {podeAtribuir && processo.faseAtualKey && (
+            <Button variant="outline" size="sm" onClick={() => setAtribuindo(true)}>Atribuir fase atual</Button>
           )}
           <Button variant="outline" size="sm" asChild>
             <Link href={`/processos/${processo.processoId}`}>Abrir processo <ExternalLink size={13} /></Link>
           </Button>
         </div>
       </div>
+
+      {(erro || aviso) && (
+        <div className={`mt-3 rounded-lg border px-3 py-2 text-[12px] ${erro ? "border-[var(--danger-tile)] bg-[var(--danger-tile)] text-[var(--danger-text)]" : "border-[var(--success-tile)] bg-[var(--success-tile)] text-[var(--success-text)]"}`}>
+          {erro ?? aviso}
+        </div>
+      )}
 
       {/* ── CONTEÚDO + PAINÉIS ── */}
       <div className="mt-4 flex flex-col gap-4 lg:flex-row">
@@ -178,7 +240,9 @@ export function ProcessoExpandido({
               linhas={listaTarefas}
               usuarioAtualId={usuarioAtualId}
               podeIniciar={podeIniciar}
+              podeAtribuir={podeAtribuir}
               aoAbrir={(id) => aoAbrirTarefa(id, processo.processoId)}
+              aoAtribuir={setAlvoIndividual}
             />
           )}
           {aba === "documentos" && <AbaDocumentos dados={documentosDoProcesso} />}
@@ -195,6 +259,33 @@ export function ProcessoExpandido({
         </div>
       </div>
 
+      {atribuindo && (
+        <SeletorResponsavel
+          titulo={`Atribuir ${rotularFase(processo.faseAtualKey) ?? "fase atual"}`}
+          atual={null}
+          ocupado={ocupado}
+          erro={erro}
+          aoFechar={() => { setAtribuindo(false); setErro(null) }}
+          aoEscolher={atribuirFaseAtual}
+        />
+      )}
+
+      {alvoIndividual && (
+        <SeletorResponsavel
+          titulo={alvoIndividual.responsavelId == null ? "Atribuir tarefa" : `Transferir de ${alvoIndividual.responsavelNome ?? "—"}`}
+          atual={alvoIndividual.responsavelId}
+          ocupado={ocupado}
+          erro={erro}
+          aoFechar={() => { setAlvoIndividual(null); setErro(null) }}
+          aoEscolher={(id) =>
+            comandarTarefaIndividual(
+              alvoIndividual.taskId,
+              { acao: alvoIndividual.responsavelId == null ? "atribuir" : "transferir", responsavelId: id },
+              alvoIndividual.responsavelId == null ? "Tarefa atribuída." : "Tarefa transferida.",
+            )
+          }
+        />
+      )}
     </div>
   )
 }
@@ -301,13 +392,17 @@ function AbaVisaoGeral({ processo, faseProjecao }: { processo: ProcessoAgrupado;
 /**
  * A COLUNA DE AÇÃO — separação de responsabilidades entre Tarefas e Projetos
  * (consulta/gestão) e o Processo/Workflow Interno (execução), MAIS a
- * (sem atribuição: Lei da Torre, L4).
+ * atribuição individual — que é gestão, não execução, e por isso convive com
+ * as duas colunas acima sem se confundir com elas.
  *
  * "Iniciar"/"Continuar" só aparecem quando a tarefa é do usuário logado, está
  * executável e ele tem `tarefas.iniciar_concluir` — e mesmo assim só
  * NAVEGAM (deep-link canônico via `urlOperacionalDaTarefa`, a MESMA rota que
  * Minha Fila e Central usam); a execução em si acontece lá, nunca aqui.
  *
+ * "Atribuir"/"Transferir" é a MESMA ação da Lista/Kanban global — mesmo
+ * `POST /api/tarefas/{id}/comando`, mesmo `SeletorResponsavel` — só que sem
+ * precisar sair do processo expandido pra achar a tarefa de novo.
  */
 const ESTADOS_TERMINAIS: string[] = ["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI", "CANCELADA", "SUPERSEDIDA"]
 
@@ -341,12 +436,14 @@ function AcaoExecucao({
 }
 
 function AbaTarefas({
-  linhas, usuarioAtualId, podeIniciar, aoAbrir,
+  linhas, usuarioAtualId, podeIniciar, podeAtribuir, aoAbrir, aoAtribuir,
 }: {
   linhas: LinhaGerencial[] | null
   usuarioAtualId: number | null
   podeIniciar: boolean
+  podeAtribuir: boolean
   aoAbrir: (id: number) => void
+  aoAtribuir: (t: LinhaGerencial) => void
 }) {
   if (linhas == null) return <Estado tipo="carregando" mensagem="Carregando tarefas…" />
   if (linhas.length === 0) return <Estado tipo="vazio" mensagem="Nenhuma tarefa neste processo." />
@@ -356,10 +453,12 @@ function AbaTarefas({
         <thead className="sticky top-0 bg-[var(--surface-secondary)]">
           <tr className="[&>th]:px-3.5 [&>th]:py-2.5 [&>th]:text-[10.5px] [&>th]:font-semibold [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-[var(--text-secondary)]">
             <th>Tarefa</th><th>Fase</th><th>Status</th><th>Responsável</th><th>Prazo</th><th>Conclusão</th><th className="text-right">Execução</th>
+            {podeAtribuir && <th className="text-right">Atribuição</th>}
           </tr>
         </thead>
         <tbody>
           {linhas.map((t) => {
+            const permiteReatribuir = podeAtribuir && !ESTADOS_TERMINAIS.includes(t.statusTarefa)
             return (
               <tr key={t.taskId} className="border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-hover)] [&>td]:px-3.5 [&>td]:py-2.5">
                 <td className="max-w-0 truncate text-[12.5px] font-medium text-[var(--text-primary)]">
@@ -375,6 +474,15 @@ function AbaTarefas({
                 <td className="text-right">
                   <AcaoExecucao t={t} usuarioAtualId={usuarioAtualId} podeIniciar={podeIniciar} aoAbrir={() => aoAbrir(t.taskId)} />
                 </td>
+                {podeAtribuir && (
+                  <td className="text-right">
+                    {permiteReatribuir && (
+                      <Button variant="outline" size="sm" onClick={() => aoAtribuir(t)}>
+                        {t.responsavelId == null ? "Atribuir" : "Transferir"}
+                      </Button>
+                    )}
+                  </td>
+                )}
               </tr>
             )
           })}
