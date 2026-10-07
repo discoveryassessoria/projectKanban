@@ -7,6 +7,54 @@ import { api, erroDe, useTorre } from "@/src/components/torre/torre-base"
 interface Regra { chave: "r1" | "r2" | "r3"; nome: string; ativa: boolean; padrao: boolean; descricao: string }
 interface Simulacao { chave: string; titulo: string; ativaAgora: boolean; texto: string; itens: Array<{ tarefaId: number | null; texto: string }> }
 
+interface Cobranca { padraoDias: number; vigenteDesde: string; porOrgao: Array<{ orgaoId: number; nome: string; dias: number }>; orgaos: Array<{ id: number; name: string }> }
+
+/** «Cobrar a partir de»: dias ÚTEIS, padrão e ajuste por cartório. Só um lembrete — não trava nada. */
+function PrazoDeCobranca({ versao }: { versao: number }) {
+  const { avisar } = useTorre()
+  const [c, setC] = useState<Cobranca | null>(null)
+  const [padrao, setPadrao] = useState("")
+  const [orgaoId, setOrgaoId] = useState("")
+  const [diasOrgao, setDiasOrgao] = useState("")
+  const [salvando, setSalvando] = useState(false)
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    let vivo = true
+    void api<Cobranca>("/api/torre/cobranca").then((r) => { if (vivo && r.ok) { setC(r.data); setPadrao(String(r.data.padraoDias)) } })
+    return () => { vivo = false }
+  }, [tick, versao])
+  if (!c) return null
+  const gravar = async (corpo: Record<string, unknown>, ok: string) => {
+    setSalvando(true)
+    const res = await api<{ ok?: boolean }>("/api/torre/cobranca", "PUT", corpo)
+    setSalvando(false)
+    if (res.ok) { avisar(ok); setTick((n) => n + 1) } else avisar(erroDe(res.data, "Não foi possível salvar."))
+  }
+  const desde = new Date(c.vigenteDesde).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })
+  return (
+    <div className="tor-card pad" data-testid="prazo-de-cobranca">
+      <b>Prazo de cobrança — «cobrar a partir de»</b>
+      <div className="small">Contado em dias <b>úteis</b> (sem sábado, domingo e feriado nacional) a partir do envio do requerimento. É só um lembrete: não trava nada. Vale para pedidos enviados a partir de {desde}; os anteriores mantêm a data que já tinham.</div>
+      <div className="flex flex-wrap items-center gap-2 mt-2">
+        <label className="small" htmlFor="cobr-padrao">Padrão (dias úteis)</label>
+        <input id="cobr-padrao" type="number" min={1} max={90} value={padrao} onChange={(e) => setPadrao(e.target.value)} style={{ width: 70 }} />
+        <button className="tor-btn pri" disabled={salvando || Number(padrao) === c.padraoDias} onClick={() => void gravar({ padraoDias: Number(padrao) }, "Prazo de cobrança padrão salvo (auditado).")}>Salvar padrão</button>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 mt-2">
+        <label className="small" htmlFor="cobr-orgao">Ajuste por cartório</label>
+        <select id="cobr-orgao" value={orgaoId} onChange={(e) => { setOrgaoId(e.target.value); const j = c.porOrgao.find((o) => String(o.orgaoId) === e.target.value); setDiasOrgao(j ? String(j.dias) : "") }}>
+          <option value="">— escolher cartório —</option>
+          {c.orgaos.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+        </select>
+        <input type="number" min={1} max={90} placeholder="dias" value={diasOrgao} onChange={(e) => setDiasOrgao(e.target.value)} style={{ width: 70 }} aria-label="Dias úteis do cartório" />
+        <button className="tor-btn pri" disabled={salvando || !orgaoId || !diasOrgao} onClick={() => void gravar({ orgaoId: Number(orgaoId), dias: Number(diasOrgao) }, "Prazo do cartório salvo (auditado).")}>Salvar ajuste</button>
+        <button className="tor-btn" disabled={salvando || !orgaoId || !c.porOrgao.some((o) => String(o.orgaoId) === orgaoId)} onClick={() => void gravar({ orgaoId: Number(orgaoId), dias: null }, "Cartório voltou ao prazo padrão.")}>Voltar ao padrão</button>
+      </div>
+      {c.porOrgao.length > 0 && <div className="small mt-2">Ajustes: {c.porOrgao.map((o) => `${o.nome} ${o.dias}d`).join(" · ")}</div>}
+    </div>
+  )
+}
+
 export function SaudeRegras({ versao }: { versao: number }) {
   const { avisar } = useTorre()
   const [regras, setRegras] = useState<Regra[] | null>(null)
@@ -51,6 +99,7 @@ export function SaudeRegras({ versao }: { versao: number }) {
   return (
     <div>
       <div className="small mb-2">Tudo aqui é gravado no Gerenciamento e vale para a Torre. Dá para <b>simular</b> antes de ativar. Regra desligada não executa nada.</div>
+      <PrazoDeCobranca versao={versao} />
       {regras.map((r) => (
         <div key={r.chave} className="tor-card pad flex flex-wrap items-center gap-3">
           <div style={{ flex: 1, minWidth: 260 }}><b>{r.chave} · {r.nome}</b><div className="small">{r.descricao}</div></div>

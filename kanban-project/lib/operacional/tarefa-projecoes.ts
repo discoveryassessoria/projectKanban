@@ -26,6 +26,7 @@ import { estadosTemporaisDasOperacoes, ehEsperaExterna, type EstadoTemporalDaOpe
 import { escolherSubtarefaCorrente, criarCacheDeLeitura, type CacheDeLeitura } from './subtarefa-corrente'
 import { aguardandoOCartorio, SUBTAREFA_PEDIDO_ENVIADO } from './emissao-recebimento'
 import { prazoOperacional } from './tempo-operacional'
+import { lembreteDeCobranca, lerConfigDeCobranca, type ConfigDeCobranca } from './cobranca-uteis'
 import { ehFaseFutura, semFaseFutura } from './fase-futura'
 import type { AdvanceResultado, Prisma, PrioridadeTarefa, PrismaClient, StatusTarefa, TipoDocumento, TipoTarefa } from '@prisma/client'
 
@@ -459,7 +460,7 @@ const SELECT = {
   // `whereGerencial`).
   // `tipo`: só pra classificar nascimento/casamento/óbito na ordenação da
   // sequência genealógica (`categoriaDoc`) — nunca usado como identidade.
-  documento: { select: { tipo: true, cartorio: true, orgao: { select: { name: true, email: true, telefone: true } } } },
+  documento: { select: { tipo: true, cartorio: true, orgaoId: true, orgao: { select: { name: true, email: true, telefone: true } } } },
 } satisfies Prisma.TarefaSelect
 
 /** NASCIMENTO/CASAMENTO/OBITO a partir do enum legado — só as variantes "Inteiro Teor" contam junto, o resto (RG, CPF, apostila…) fica `null` e vai para o fim da sequência. */
@@ -690,7 +691,7 @@ function projetar(
     lembreteDeCobrancaEm: (() => {
       const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
       if (!aguardandoOCartorio(porSubtarefa?.statusPorSubtarefa) || !porSubtarefa?.pedidoEnviadoEm) return null
-      return prazoOperacional(porSubtarefa.slaDiasDoPasso, porSubtarefa.pedidoEnviadoEm)
+      return lembreteDeCobranca({ pedidoEnviadoEm: porSubtarefa.pedidoEnviadoEm, slaDiasDoPasso: porSubtarefa.slaDiasDoPasso, orgaoId: t.documento?.orgaoId, cfg: porSubtarefa.cobranca })
     })(),
     aIniciar: (() => {
       const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
@@ -862,8 +863,10 @@ export interface ResumoSubtarefasDoPasso {
   /** Quando e por quem a subtarefa "Enviar requerimento ao cartório" foi concluída. */
   pedidoEnviadoEm: Date | null
   pedidoPorId: number | null
-  /** O prazo do passo no cadastro (dias úteis) — o "10 dias" do lembrete de cobrança. */
+  /** O prazo do passo no cadastro — usado só no cálculo ANTIGO do lembrete (pedidos anteriores à vigência dos dias úteis). */
   slaDiasDoPasso: number | null
+  /** Padrão e ajustes por cartório do «cobrar a partir de» (dias úteis). */
+  cobranca: ConfigDeCobranca
   /** A subtarefa CORRENTE (não encerrada), pela ordem da definição — nunca por `sequencia` (retry count por subtarefa, não ordem entre subtarefas). */
   atual: {
     subtaskKey: string; status: string; criadoEm: Date; startedAt: Date | null
@@ -966,6 +969,7 @@ async function progressoPorSubtarefa(
     [...resultadosPorExecucaoId.entries()].map(([id, resultados]) => [id, contarCobrancasSemResposta(resultados)]),
   )
 
+  const configCobranca = await lerConfigDeCobranca()
   const resultado = new Map<number, ResumoSubtarefasDoPasso>()
   for (const [stepInstanceId, execs] of execucoesPorStepInstance) {
     const total = totalPorStepInstance.get(stepInstanceId) ?? execs.length
@@ -993,7 +997,7 @@ async function progressoPorSubtarefa(
       concluidas, total,
       statusPorSubtarefa: Object.fromEntries(execs.map((e) => [e.subtaskKey, e.status])),
       pedidoEnviadoEm: pedido?.completedAt ?? null, pedidoPorId: pedido?.executadoPorId ?? null,
-      slaDiasDoPasso: slaDoPassoPorStepInstance.get(stepInstanceId) ?? null,
+      slaDiasDoPasso: slaDoPassoPorStepInstance.get(stepInstanceId) ?? null, cobranca: configCobranca,
       atual: atual ? {
         subtaskKey: atual.subtaskKey, status: atual.status, criadoEm: atual.criadoEm, startedAt: atual.startedAt,
         escalada: atual.escalada, totalCobrancas: totalCobrancasPorExecucaoId.get(atual.id) ?? 0,
@@ -1027,7 +1031,7 @@ async function progressoPorSubtarefa(
     const [subtaskKey, def] = entrada
     resultado.set(stepInstanceId, {
       concluidas: 0, total,
-      statusPorSubtarefa: {}, pedidoEnviadoEm: null, pedidoPorId: null, slaDiasDoPasso: slaDoPassoPorStepInstance.get(stepInstanceId) ?? null,
+      statusPorSubtarefa: {}, pedidoEnviadoEm: null, pedidoPorId: null, slaDiasDoPasso: slaDoPassoPorStepInstance.get(stepInstanceId) ?? null, cobranca: configCobranca,
       atual: {
         subtaskKey, status: 'DISPONIVEL',
         criadoEm: createdAtPorStepInstance.get(stepInstanceId) ?? new Date(),
@@ -2668,7 +2672,7 @@ async function carregarBrutas(
         ordem: passo.ordem, createdAt: passo.createdAt,
       } : null,
       dependeDe: dependenciasPorTarefa.get(e.id) ?? [],
-      documento: doc ? { tipo: doc.tipo, cartorio: doc.cartorio, orgao: doc.orgao } : null,
+      documento: doc ? { tipo: doc.tipo, cartorio: doc.cartorio, orgaoId: doc.orgaoId, orgao: doc.orgao } : null,
     }
   })
   return { brutas, ordensPorTipo: doProcesso.ordensPorTipo, extras, proximaFasePorProcesso }
