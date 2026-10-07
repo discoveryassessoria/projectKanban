@@ -13,6 +13,7 @@
 //   g  A certidão só entra em Feito com os 4 passos concluídos.
 //   i  Contadores batem: sem responsável + com cada pessoa = abertas (cabeçalho × tabela × Caminho).
 //   l  Certidão recebida/validada SÓ com o passo da Emissão correspondente concluído (Localizar registro na Genealogia nunca recebe nem valida).
+//   m  Local do óbito: a cidade/estado da certidão de óbito LOCALIZADA e a árvore (Pessoa.local_obito/estado_obito) dizem o mesmo lugar.
 //   j  Fluxo do recebimento: nenhuma subtarefa da Emissão concluída fora de ordem, e nenhuma gravada «Disponível» enquanto depende de outra.
 //
 // (b) seletores sem pessoa, (d) atribuição só na página do processo e (h) contador repetido são regras de TELA/CÓDIGO: vigiadas pelo teste
@@ -21,10 +22,11 @@
 import { prisma } from '@/lib/prisma'
 import { STEP_KEY_LOCALIZAR_REGISTRO, STEP_KEY_SOLICITAR_CERTIDAO } from '@/src/lib/process-stage/situacao-solicitacao-certidao'
 import { MOTIVO_AGUARDANDO_GENEALOGIA } from '@/src/services/genealogia/trava-emissao-por-genealogia'
+import { mesmoLugar } from '@/src/lib/genealogia/sincronizacao-registral'
 import { compararCertidoesDaFamilia } from '@/lib/operacional/ordem-certidoes'
 import { SUBTAREFA_PEDIDO_ENVIADO, SUBTAREFA_CONFIRMACAO, SUBTAREFA_CERTIDAO_RECEBIDA, SUBTAREFA_CONFERENCIA } from '@/lib/operacional/emissao-recebimento'
 
-export type RegraDoMarco = 'a' | 'c' | 'e' | 'f' | 'g' | 'i' | 'j' | 'l'
+export type RegraDoMarco = 'a' | 'c' | 'e' | 'f' | 'g' | 'i' | 'j' | 'l' | 'm'
 
 /** O detalhe do processo lido UMA vez por rodada (as regras e, i e o script leem o mesmo). */
 type Detalhe = Awaited<ReturnType<typeof import('@/lib/operacional/torre-foco')['detalheDoProcesso']>>
@@ -55,6 +57,7 @@ export const TITULO_DA_REGRA: Record<RegraDoMarco, string> = {
   g: 'Certidão concluída sem os 4 passos concluídos',
   i: 'Contadores que não batem',
   j: 'Subtarefa da Emissão fora de ordem ou com selo «Disponível» sendo que depende de outra',
+  m: 'Local do óbito da certidão diferente (ou ausente) na árvore',
   l: 'Certidão recebida/validada sem o passo de recebimento/validação da Emissão concluído',
 }
 
@@ -351,13 +354,47 @@ export async function detectarRegraL(): Promise<ViolacaoDoMarco[]> {
   return out
 }
 
+// ── m ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/** Cidade/estado da certidão de óbito × o que a árvore guarda do óbito. PURA. `null` = tudo certo. */
+export function problemaDoLocalDoObito(a: { cidadeCertidao: string | null; estadoCertidao: string | null; cidadeArvore: string | null; estadoArvore: string | null }): string | null {
+  const cert = (a.cidadeCertidao ?? '').trim(), arv = (a.cidadeArvore ?? '').trim()
+  if (cert && !arv) return `a certidão diz «${cert}» mas a árvore não tem a cidade do óbito`
+  if (cert && arv && !mesmoLugar({ origem: 'cidade_registro' }, arv, cert)) return `cidade do óbito: certidão «${cert}» × árvore «${arv}»`
+  const ec = (a.estadoCertidao ?? '').trim(), ea = (a.estadoArvore ?? '').trim()
+  if (ec && ea && !mesmoLugar({ origem: 'estado_registro' }, ea, ec)) return `estado do óbito: certidão «${ec}» × árvore «${ea}»`
+  return null
+}
+export async function detectarRegraM(): Promise<ViolacaoDoMarco[]> {
+  const ctx = await processosAtivos()
+  try {
+    const docs = await prisma.documento.findMany({
+      where: {
+        OR: [{ tipo: { in: ['CERTIDAO_OBITO', 'CERTIDAO_OBITO_INTEIRO_TEOR'] as never[] } }, { documentType: { legacyEnumKey: { in: ['CERTIDAO_OBITO', 'CERTIDAO_OBITO_INTEIRO_TEOR'] } } }],
+        status: { notIn: ['CANCELADO', 'NAO_EXIGIDO'] as never }, cidade_registro: { not: null },
+        stepInstances: { some: { stepKey: STEP_KEY_LOCALIZAR_REGISTRO, status: 'CONCLUIDO' } },
+        pessoa: { arvore: { processos: { some: { id: { in: ctx.ids } } } } },
+      },
+      select: { id: true, tipo: true, cidade_registro: true, estado_registro: true, pessoa: { select: { nome: true, sobrenome: true, local_obito: true, estado_obito: true, arvore: { select: { processos: { select: { id: true }, take: 1 } } } } } },
+    })
+    const out: ViolacaoDoMarco[] = []
+    for (const d of docs) {
+      const p = problemaDoLocalDoObito({ cidadeCertidao: d.cidade_registro, estadoCertidao: d.estado_registro, cidadeArvore: d.pessoa.local_obito, estadoArvore: d.pessoa.estado_obito })
+      if (p) { const processoId = d.pessoa.arvore?.processos[0]?.id ?? null; out.push({ regra: 'm', processoId, familia: ctx.nome(processoId), certidao: d.tipo ? String(d.tipo) : null, pessoa: nomeDe(d.pessoa), detalhe: p, entidade: 'Documento', registroId: d.id }) }
+    }
+    return out
+  } catch (e) {
+    console.error('[regra m] coluna do local do óbito ainda não existe neste banco:', e instanceof Error ? e.message : e)
+    return []
+  }
+}
+
 export async function detectarRegrasDoMarco(opts: { profundo?: boolean } = {}): Promise<{ violacoes: ViolacaoDoMarco[]; porRegra: Record<RegraDoMarco, number> }> {
   limparMemoDeDetalhes()
   const todas = [
     ...(await detectarRegraA()), ...(await detectarRegraC()), ...(await detectarRegraE(opts)),
-    ...(await detectarRegraF()), ...(await detectarRegraG()), ...(opts.profundo ? await detectarRegraI() : []), ...(await detectarRegraJ()), ...(await detectarRegraL()),
+    ...(await detectarRegraF()), ...(await detectarRegraG()), ...(opts.profundo ? await detectarRegraI() : []), ...(await detectarRegraJ()), ...(await detectarRegraL()), ...(await detectarRegraM()),
   ]
-  const porRegra = { a: 0, c: 0, e: 0, f: 0, g: 0, i: 0, j: 0, l: 0 } as Record<RegraDoMarco, number>
+  const porRegra = { a: 0, c: 0, e: 0, f: 0, g: 0, i: 0, j: 0, l: 0, m: 0 } as Record<RegraDoMarco, number>
   for (const v of todas) porRegra[v.regra]++
   return { violacoes: todas, porRegra }
 }

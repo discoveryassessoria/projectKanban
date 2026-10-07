@@ -107,6 +107,10 @@ model Pessoa {
   sexo               String?       @db.VarChar(10)
   data_nasc          DateTime?
   data_obito         DateTime?
+  /// LOCAL DO ÓBITO em colunas próprias (07/10/2026): cidade / estado / país. Antes ia no texto único `local_emigracao`, que também serve para emigração.
+  local_obito        String?       @db.VarChar(100)
+  estado_obito       String?       @db.VarChar(50)
+  pais_obito         String?       @db.VarChar(50)
   local_nasc         String?       @db.VarChar(100)
   estado_nasc        String?       @db.VarChar(50)
   pais_nasc          String?       @db.VarChar(50)

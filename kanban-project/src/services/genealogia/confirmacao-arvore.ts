@@ -108,7 +108,7 @@ async function alvoDoDocumento(documentoId: number | null, criacao?: { pessoaId:
   } else return null
   const evento = eventoDoTipoDeDocumento(tipo) ?? eventoDoTipoDeDocumento(legacy)
   if (!evento) return null
-  const pessoa = await prisma.pessoa.findUnique({ where: { id: pessoaId }, select: { id: true, nome: true, sobrenome: true, arvoreId: true, data_nasc: true, local_nasc: true, estado_nasc: true, pais_nasc: true, data_obito: true } })
+  const pessoa = await prisma.pessoa.findUnique({ where: { id: pessoaId }, select: { id: true, nome: true, sobrenome: true, arvoreId: true, data_nasc: true, local_nasc: true, estado_nasc: true, pais_nasc: true, data_obito: true, local_obito: true, estado_obito: true, pais_obito: true } })
   if (!pessoa || pessoa.arvoreId == null) return null
   const pessoaNome = `${pessoa.nome}${pessoa.sobrenome ? ` ${pessoa.sobrenome}` : ""}`
   if (evento === "CASAMENTO") {

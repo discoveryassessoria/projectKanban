@@ -8,7 +8,7 @@
 // FONTE POR CAMPO (uma certidão NUNCA altera campo de outro evento):
 //   Certidão de NASCIMENTO → Pessoa.data_nasc · local_nasc (cidade) · estado_nasc · pais_nasc
 //   Certidão de CASAMENTO  → União.data_inicio · local (cidade) · estado · pais
-//   Certidão de ÓBITO      → Pessoa.data_obito   (a Pessoa NÃO tem coluna de local do óbito: nada a sincronizar no local)
+//   Certidão de ÓBITO      → Pessoa.data_obito · local_obito (cidade) · estado_obito · pais_obito   (colunas próprias desde 07/10/2026; `local_emigracao` é só emigração)
 //   Origem no registro: data_evento · cidade_registro · estado_registro · pais_registro  (a "Data do registro" NUNCA é a data do evento).
 // Valor vazio no registro nunca apaga a árvore.
 // ============================================================================
@@ -40,6 +40,9 @@ export const CAMPOS_SINCRONIZAVEIS: readonly CampoSincronizavel[] = [
   { chave: "UNIAO.estado", alvo: "UNIAO", coluna: "estado", evento: "CASAMENTO", origem: "estado_registro", tipo: "texto", rotulo: "estado do casamento" },
   { chave: "UNIAO.pais", alvo: "UNIAO", coluna: "pais", evento: "CASAMENTO", origem: "pais_registro", tipo: "texto", rotulo: "país do casamento" },
   { chave: "PESSOA.data_obito", alvo: "PESSOA", coluna: "data_obito", evento: "OBITO", origem: "data_evento", tipo: "data", rotulo: "data do óbito" },
+  { chave: "PESSOA.local_obito", alvo: "PESSOA", coluna: "local_obito", evento: "OBITO", origem: "cidade_registro", tipo: "texto", rotulo: "cidade do óbito" },
+  { chave: "PESSOA.estado_obito", alvo: "PESSOA", coluna: "estado_obito", evento: "OBITO", origem: "estado_registro", tipo: "texto", rotulo: "estado do óbito" },
+  { chave: "PESSOA.pais_obito", alvo: "PESSOA", coluna: "pais_obito", evento: "OBITO", origem: "pais_registro", tipo: "texto", rotulo: "país do óbito" },
   // Só o CASAMENTO tem onde guardar a referência do registro na árvore (a União). Nascimento e óbito: Pessoa não tem data de registro, cartório, livro, folha nem termo
   // — sem equivalente, sem comparação e sem modal. Cada campo só contra o seu: cartório é CARTÓRIO (nunca cidade); livro, folha e termo, cada um com o seu.
   { chave: "UNIAO.data_registro", alvo: "UNIAO", coluna: "data_registro", evento: "CASAMENTO", origem: "data_registro", tipo: "data", rotulo: "data do registro do casamento" },

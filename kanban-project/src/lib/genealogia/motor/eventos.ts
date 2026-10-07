@@ -194,14 +194,14 @@ export function eventosDaPessoa(g: GrafoGenealogico, pessoaId: number): EventoPr
   }
 
   // ---- óbito ----
-  // GOTCHA do modelo atual: o formulário grava o LOCAL do falecimento em
-  // `local_emigracao` (o schema não tem `local_obito`). Lemos os dois para não
-  // perder o dado, sem "corrigir" nada em disco.
+  // O LOCAL do falecimento tem colunas próprias (`local_obito`, `estado_obito`) desde 07/10/2026. Antes ia em `local_emigracao`: enquanto a pessoa não tem o
+  // dado novo, o texto antigo ainda vale (sem "corrigir" nada em disco).
   const falecida = p.vivo === false || !!p.data_obito
   if (falecida) {
+    const cidadeObito = p.local_obito ?? null
     const localObito = juntar(
-      (p as { local_obito?: string | null }).local_obito ?? null,
-      p.data_emigracao ? null : p.local_emigracao,
+      cidadeObito ?? (p.data_emigracao ? null : p.local_emigracao),
+      cidadeObito ? p.estado_obito ?? null : null,
     )
     eventos.push(
       montar({
