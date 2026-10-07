@@ -10,7 +10,7 @@ console.log("às 22h de São Paulo (01h UTC do dia seguinte) o 'hoje' ainda é o
 ok("diaOperacional(2026-10-06T01:00Z) = 2026-10-05", diaOperacional(new Date("2026-10-06T01:00:00Z")) === "2026-10-05")
 
 console.log("ninguém calcula 'hoje' por data UTC")
-for (const p of ["lib/operacional/tarefa-projecoes.ts", "src/components/operacao/central-operacional.tsx", "src/lib/home/coleta.ts"]) {
+for (const p of ["lib/operacional/tarefa-projecoes.ts", "src/components/operacao/central-operacional.tsx", "src/components/operacao/visao-global.tsx", "src/lib/home/coleta.ts"]) {
   const src = f(p).split("\n").filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*")).join("\n")
   ok(`${p}: sem new Date().toISOString().slice(0, 10) / agora.toISOString().slice(0, 10)`, !/(new Date\(\)|agora)\.toISOString\(\)\.slice\(0, 10\)/.test(src))
 }

@@ -1,9 +1,9 @@
 // scripts/torre-casca-integracao.test.ts — Torre nova, INTEGRAÇÃO DO CASCO (01/10/2026): selos das abas (T004–T008), clique em
-// as abas (T009/T010 viraram: Hoje sem selo e sem âncora), rolar ao topo (T011), `?fase=` com dois donos, toast FIXO (T013–T015),
-// inicioDaSemana única, cabeçalho (T034/T042). CONSOLIDAÇÃO 06/10/2026: 5 abas (Hoje · Tarefas · Famílias · Equipe · Terceiros).
+// "Precisa de você" (T009/T010), rolar ao topo (T011), `?fase=` com dois donos, toast FIXO (T013–T015), Visão geral → onRevisar,
+// inicioDaSemana única, cabeçalho (T034/T042).
 //   npx tsx scripts/torre-casca-integracao.test.ts   (sem banco)
-import { existsSync, readFileSync } from "node:fs"
-import { ABAS_DA_TORRE, abaDaUrl, type Aba } from "../lib/operacional/torre-abas"
+import { readFileSync } from "node:fs"
+import { ABAS_DA_TORRE, type Aba } from "../lib/operacional/torre-abas"
 import { seloVisivel, separarFaseDaUrl, preservarFaseDeTarefas, filtrosNaQueryDaAba } from "../lib/operacional/torre-casca"
 import { filtrosDaQuery, filtrosVazios, aplicarFiltros, type FiltrosTorre } from "../lib/operacional/torre-filtros"
 import { hrefDaFase } from "../lib/operacional/torre-funil-puro"
@@ -16,35 +16,42 @@ const sem = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\
 const ABAS = ABAS_DA_TORRE.map(([a]) => a)
 const ondeAparece = (selo: Aba) => ABAS.filter((a) => seloVisivel(selo, a)).join(",")
 
-console.log("T004–T008 — onde cada selo aparece (5 abas)")
-ok("Tarefas: Hoje e dentro de Tarefas", ondeAparece("tarefas") === "hoje,tarefas")
-ok("Famílias: Hoje e dentro de Famílias", ondeAparece("familias") === "hoje,familias")
-ok("Equipe e Terceiros ('N a cobrar'): só em Hoje", ondeAparece("equipe") === "hoje" && ondeAparece("terceiros") === "hoje")
-ok("Hoje não tem selo em tela nenhuma", ondeAparece("hoje") === "")
+console.log("T004–T008 — onde cada selo aparece")
+ok("Precisa de você: Visão geral, Processos, Tarefas (nunca Radar, Equipe, Terceiros)", ondeAparece("precisa") === "visao,processos,tarefas")
+ok("Processos: Visão geral e Processos", ondeAparece("processos") === "visao,processos")
+ok("Tarefas: Visão geral e dentro de Tarefas", ondeAparece("tarefas") === "visao,tarefas")
+ok("Equipe: só a Visão geral · Terceiros ('N a cobrar'): só a Visão geral", ondeAparece("equipe") === "visao" && ondeAparece("terceiros") === "visao")
+ok("Visão geral e Radar não têm selo em tela nenhuma", ondeAparece("visao") === "" && ondeAparece("radar") === "")
 
 const torre = ler("src/components/torre/Torre.tsx")
 const cod = sem(torre)
-console.log("\nT011 — selos e rolar ao topo (Hoje não tem 'Precisa de você' nem âncora #pdv)")
+console.log("\nT009–T011 — clique em 'Precisa de você' e rolar ao topo")
 ok("o casco decide o selo por seloVisivel(aba, abaAtual)", /seloVisivel\(k, aba\)/.test(cod))
-ok("clicar numa aba só troca de aba (sem caso especial de 'precisa', sem âncora #pdv)", /const clicarNaAba = \(k: Aba\) => setAba\(k\)/.test(cod) && !/"pdv"|scrollIntoView|k !== "precisa"/.test(cod) && /onClick=\{\(\) => clicarNaAba\(k\)\}/.test(cod))
+ok("clique em 'Precisa de você' na Visão geral rola suave até #pdv e NÃO troca de aba", /if \(aba === "visao"\) \{ document\.getElementById\("pdv"\)\?\.scrollIntoView\(\{ behavior: "smooth" \}\); return \}/.test(cod))
+ok("clique em 'Precisa de você' nas outras abas vai à Visão geral", /setAba\("visao"\)\s*\n\s*\}/.test(cod) && /onClick=\{\(\) => clicarNaAba\(k\)\}/.test(cod))
+ok("as demais abas só trocam de aba", /if \(k !== "precisa"\) \{ setAba\(k\); return \}/.test(cod))
 ok("toda troca de aba (clique, link, 'ver equipe') rola a página ao topo; não rola na montagem", /abaAnterior\.current === aba\) return/.test(cod) && /rolarAoTopo\(\)/.test(cod) && /window\.scrollTo\(\{ top: 0 \}\)/.test(cod))
-ok("as telas antigas saíram do casco: nada de TorrePrecisaDeVoce, TorreVisaoGeral, TorreRevisao, TorreBriefing, onRevisar", !/TorrePrecisaDeVoce|TorreVisaoGeral|TorreRevisao|TorreBriefing|onRevisar|setRevisao/.test(cod) && ["TorrePrecisaDeVoce", "TorreVisaoGeral", "TorreKpis", "TorreFunil", "TorreBriefing", "TorreRevisao"].every((f) => !existsSync(`src/components/torre/${f}.tsx`)))
-ok("a aba 'hoje' é a tela de alarmes (TorreHoje)", /aba === "hoje" && \(/.test(cod) && /<TorreHoje/.test(cod))
+ok("a aba 'precisa' segue existindo (links antigos ?aba=precisa) — leitura: o protótipo a trata como âncora, o casco a mantém como tela de compatibilidade", /aba === "precisa" && <TorrePrecisaDeVoce/.test(cod))
 
-console.log("\n?fase= — filtro de TAREFAS na aba Tarefas, seleção de fase na aba Famílias")
+console.log("\nVisão geral → onRevisar (sem contingência de DOM)")
+const vg = ler("src/components/torre/TorreVisaoGeral.tsx")
+ok("o casco passa onRevisar à Visão geral", /irParaAba=\{setAba\} onRevisar=\{\(\) => itensPrecisaPais && setRevisao\(\[\.\.\.itensPrecisaPais\]\)\}/.test(cod))
+ok("a contingência ABRIR_REVISAO_DO_CABECALHO e o querySelector do botão do cabeçalho saíram", !/ABRIR_REVISAO_DO_CABECALHO|tor-cab-btns/.test(vg) && /onRevisar: \(\) => void/.test(vg))
+
+console.log("\n?fase= — filtro de TAREFAS na aba Tarefas, seleção de fase na aba Processos")
 const href = hrefDaFase("emissao_documental", { pais: null, q: null })
 const q = new URL(`http://x${href}`).searchParams
-ok("o link por fase navega para ?aba=familias&fase=<phaseKey> (e o id ANTIGO ?aba=processos continua traduzido para Famílias)", q.get("aba") === "familias" && abaDaUrl("processos") === "familias" && q.get("fase") === "emissao_documental")
+ok("o funil navega para ?aba=processos&fase=<phaseKey>", q.get("aba") === "processos" && q.get("fase") === "emissao_documental")
 const lidos = filtrosDaQuery(q)
 ok("(a leitura crua da URL põe a fase em filtros.fase — por isso o casco separa)", lidos.fase.join() === "emissao_documental")
-const emProc = separarFaseDaUrl("familias", lidos)
-ok("em Famílias: a fase vira SELEÇÃO e filtros.fase fica vazio (o selo da aba Tarefas não encolhe)", emProc.faseProcessos === "emissao_documental" && emProc.filtros.fase.length === 0)
+const emProc = separarFaseDaUrl("processos", lidos)
+ok("em Processos: a fase vira SELEÇÃO e filtros.fase fica vazio (o selo da aba Tarefas não encolhe)", emProc.faseProcessos === "emissao_documental" && emProc.filtros.fase.length === 0)
 const emTar = separarFaseDaUrl("tarefas", lidos)
 ok("em Tarefas: segue filtro de tarefas e nada é seleção de Processos", emTar.faseProcessos === null && emTar.filtros.fase.join() === "emissao_documental")
 const f0: FiltrosTorre = { ...filtrosVazios(), fase: ["genealogia"] }
-ok("reler a URL em Famílias preserva o filtro 'Fase' que as Tarefas já tinham", preservarFaseDeTarefas("familias", emProc.filtros, f0).fase.join() === "genealogia" && preservarFaseDeTarefas("tarefas", lidos, f0).fase.join() === "emissao_documental")
-ok("o casco NÃO grava filtros.fase na URL quando a aba é Famílias; grava nas Tarefas", !new URLSearchParams(filtrosNaQueryDaAba(new URLSearchParams("aba=familias"), "familias", f0)).has("fase") && new URLSearchParams(filtrosNaQueryDaAba(new URLSearchParams("aba=tarefas"), "tarefas", f0)).get("fase") === "genealogia")
-ok("fase com formato inválido nunca vira seleção", separarFaseDaUrl("familias", { ...filtrosVazios(), fase: ["a b;c"] }).faseProcessos === null)
+ok("reler a URL em Processos preserva o filtro 'Fase' que as Tarefas já tinham", preservarFaseDeTarefas("processos", emProc.filtros, f0).fase.join() === "genealogia" && preservarFaseDeTarefas("tarefas", lidos, f0).fase.join() === "emissao_documental")
+ok("o casco NÃO grava filtros.fase na URL quando a aba é Processos; grava nas Tarefas", !new URLSearchParams(filtrosNaQueryDaAba(new URLSearchParams("aba=processos"), "processos", f0)).has("fase") && new URLSearchParams(filtrosNaQueryDaAba(new URLSearchParams("aba=tarefas"), "tarefas", f0)).get("fase") === "genealogia")
+ok("fase com formato inválido nunca vira seleção", separarFaseDaUrl("processos", { ...filtrosVazios(), fase: ["a b;c"] }).faseProcessos === null)
 // O selo da aba Tarefas (a MESMA aplicarFiltros) não encolhe ao abrir Processos pelo funil.
 const linhaBase = (id: number, fase: string) => ({
   id, responsavelId: 1, dataPrazo: null, criadaEm: null, atribuidaEm: null, iniciouEm: null, familiaNome: "Fam", processoNome: null, statusTarefa: "A_FAZER", categoriaDoc: null,
@@ -53,8 +60,8 @@ const linhaBase = (id: number, fase: string) => ({
 const linhas = [linhaBase(1, "genealogia"), linhaBase(2, "emissao_documental"), linhaBase(3, "emissao_documental")]
 const contexto = { usuarioId: 1, agora: new Date("2026-10-01T15:00:00Z") }
 const nSelo = (f: FiltrosTorre) => aplicarFiltros(linhas, f, contexto).mostrando
-ok("selo de Tarefas: sem filtro = 3; ao chegar pelo funil em Famílias continua 3 (antes encolhia para 2)", nSelo(emProc.filtros) === 3 && nSelo(lidos) === 2)
-ok("a aba Famílias recebe o pedido: memória de Processos + remontagem por pedido (key)", /pedirFaseDeProcessos\(u\.faseProcessos\)/.test(cod) && /<TorreFamilias\s+key=\{pedidoFase\.n\}/.test(cod))
+ok("selo de Tarefas: sem filtro = 3; ao chegar pelo funil em Processos continua 3 (antes encolhia para 2)", nSelo(emProc.filtros) === 3 && nSelo(lidos) === 2)
+ok("a aba Processos recebe o pedido: memória de Processos + remontagem por pedido (key)", /pedirFaseDeProcessos\(u\.faseProcessos\)/.test(cod) && /<TorreProcessos key=\{pedidoFase\.n\}/.test(cod))
 
 console.log("\nT013–T015 — toast FIXO")
 const base = ler("src/components/torre/torre-base.tsx")
@@ -84,7 +91,6 @@ console.log("\nCabeçalho (T034/T042)")
 const cab = ler("src/components/torre/TorreCabecalho.tsx")
 ok("busca: 'Buscar família, pessoa, cartório…' (igual ao protótipo)", /placeholder="Buscar família, pessoa, cartório…"/.test(cab))
 ok("seletor de país: ordenado por tamanho, sem bandeira no rótulo ('Itália 280')", /paisesPorTamanho\(paises\)\.map/.test(cab) && !/bandeira \?/.test(sem(cab)))
-ok("o cabeçalho NÃO tem mais 'Briefing do dia' nem 'Revisar o dia' (a frase é de Hoje; a revisão saiu)", !/Briefing do dia|Revisar o dia|onBriefing|onRevisar/.test(sem(cab)))
 
 console.log(`\n${falhou === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${passou} ok, ${falhou} falhas`)
 process.exit(falhou === 0 ? 0 : 1)

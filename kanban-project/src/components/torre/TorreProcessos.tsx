@@ -126,7 +126,7 @@ export function TorreProcessos({ processos, carregando, erro }: { processos: Pro
       <div className="tor-pg-cab">
         <div>
           <div className="tor-pg-trilha">
-            <Link href="/torre?aba=hoje">Torre de Controle</Link> › <Link href="/torre?aba=familias">Processos</Link>{botaoAtivo ? <> › <b>{botaoAtivo.label}</b></> : null}
+            <Link href="/torre?aba=visao">Torre de Controle</Link> › <Link href="/torre?aba=processos">Processos</Link>{botaoAtivo ? <> › <b>{botaoAtivo.label}</b></> : null}
           </div>
           <h2 className="tor-pg-titulo">{titulo}</h2>
         </div>

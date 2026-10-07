@@ -85,17 +85,69 @@ async function main() {
     colunaDaTarefa({ statusTarefa: 'BLOQUEADA', motivoCodigo: 'OUTRO_MOTIVO', responsavelId: 1 }) === 'BLOQUEADA')
 
   // ══════════════════════════════════════════════════════════════════════════
-  secao('§30) A rota de leitura é só leitura (a tela Visão global saiu — Lei da Torre, L4: só a Torre atribui)')
+  secao('§5) KANBAN GLOBAL ≠ WORKFLOW INTERNO')
   // ══════════════════════════════════════════════════════════════════════════
-  ok('§5) a tela antiga (visao-global.tsx) não existe mais', !require('node:fs').existsSync('src/components/operacao/visao-global.tsx'))
+  const tela = ler('src/components/operacao/visao-global.tsx')
+  const ETAPAS_INTERNAS = ['Solicitar', 'Aguardar retorno', 'Receber', 'Conferir', 'Validar']
+  const arrayDeColunas = tela.slice(tela.indexOf('const COLUNAS:'), tela.indexOf(']', tela.indexOf('const COLUNAS:')))
+  const colunasDeclaradas = [...arrayDeColunas.matchAll(/rotulo:\s*"([^"]+)"/g)].map((m) => m[1])
+  ok('§4) o quadro declara exatamente as seis colunas de ESTADO', colunasDeclaradas.length === 6,
+    colunasDeclaradas.join(' | '))
+  for (const etapa of ETAPAS_INTERNAS) {
+    ok(`§5) nenhuma coluna se chama "${etapa}"`,
+      !colunasDeclaradas.some((c) => c.toLowerCase().includes(etapa.toLowerCase())))
+  }
+  ok('§5) a tela mostra a ETAPA dentro do card, sem confundi-la com a coluna',
+    /etapaAtual/.test(tela) && /Etapa:/.test(tela))
+
+  // ══════════════════════════════════════════════════════════════════════════
+  secao('§30) Zero writer operacional direto — inclusive no arrasto')
+  // ══════════════════════════════════════════════════════════════════════════
+  const codigoTela = semComentarios(tela)
+  ok('§30) a tela não escreve na Tarefa', !/prisma\s*\.\s*tarefa\s*\.\s*(update|create|delete)/.test(codigoTela))
+  ok('§30) a tela não escreve em passo', !/phaseWorkflowStepInstance/.test(codigoTela))
+  ok('§30) toda mudança sai pela porta de comando',
+    /\/api\/tarefas\/\$\{[^}]+\}\/comando/.test(codigoTela))
   // A rota de leitura precisa ser LEITURA: um POST aqui seria uma segunda porta.
   const rota = semComentarios(ler('src/app/api/operacao/visao-global/route.ts'))
   ok('§30) a rota da visão global só tem GET', /export async function GET/.test(rota) && !/export async function (POST|PATCH|PUT|DELETE)/.test(rota))
   ok('§19) e exige permissão de GESTÃO no backend', /verificarPermissao\(request, 'tarefas\.editar'\)/.test(rota))
+
+  // ══════════════════════════════════════════════════════════════════════════
+  secao('§11) Arrastar só onde existe comando canônico')
+  // ══════════════════════════════════════════════════════════════════════════
+  const arrastos = [...codigoTela.matchAll(/"([A-Z_]+)→([A-Z_]+)":\s*\{\s*acao:\s*"([a-z_]+)"/g)]
+    .map((m) => ({ de: m[1], para: m[2], acao: m[3] }))
+  ok('§11) existe um mapa explícito de arrastos permitidos', arrastos.length > 0, `${arrastos.length} transições`)
+  const ACOES_DA_PORTA = [
+    'iniciar', 'aguardar_terceiro', 'retomar_espera', 'bloquear', 'desbloquear',
+    'devolver_a_fila', 'atribuir', 'transferir', 'concluir_etapa', 'reabrir', 'cancelar',
+    'alterar_prazo', 'alterar_prioridade', 'adicionar_dependencia', 'remover_dependencia',
+  ]
+  for (const a of arrastos) {
+    ok(`§11) ${a.de}→${a.para} usa comando existente (${a.acao})`, ACOES_DA_PORTA.includes(a.acao))
+  }
+  ok('§11) NADA arrasta para Concluída — tarefa conclui pelo último PASSO',
+    !arrastos.some((a) => a.para === 'CONCLUIDA'))
+  ok('§11) nada sai de Sem responsável arrastando — antes de andar, precisa de dono',
+    !arrastos.some((a) => a.de === 'SEM_RESPONSAVEL'))
+  ok('§11) colunas sem transição válida não aceitam o solto',
+    /alvoValido/.test(codigoTela) && /arrastoDe\(/.test(codigoTela))
+
+  // ══════════════════════════════════════════════════════════════════════════
+  secao('§10/§9) Reúso, não reimplementação')
+  // ══════════════════════════════════════════════════════════════════════════
+  ok('§10) usa o MESMO seletor de responsável da Central', /SeletorResponsavel/.test(tela) && /from "\.\/kit-operacional"/.test(tela))
+  // Clicar leva ao lugar canônico do trabalho — a Central Operacional do
+  // processo. O painel local saiu: supervisionar não é executar.
+  ok('§9) clicar leva à Central Operacional do processo', /urlOperacionalDaTarefa/.test(tela))
+  ok('§9) e a visão global não monta executor', !/StepEditorRouter/.test(tela))
+  ok('§9) e não existe um segundo modal de tarefa aqui',
+    !/function\s+\w*Modal(Tarefa|Detalhe)/.test(codigoTela))
   // `minha-operacao.tsx` foi extraído/fundido em `tabela-familia.tsx` (fusão
   // Central Operacional + Minha Operação, 25/09/2026).
   const central = ler('src/components/operacao/tabela-familia.tsx')
-  ok('§10) a Central importa o kit em vez de ter cópia própria',
+  ok('§10) a Central passou a IMPORTAR o kit em vez de ter cópia própria',
     /from "\.\/kit-operacional"/.test(central) && !/function SeletorResponsavel\(/.test(central))
 
   // ══════════════════════════════════════════════════════════════════════════

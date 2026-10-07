@@ -135,9 +135,6 @@
 .tor-pais[aria-pressed="true"] { background: var(--action-primary); color: var(--action-primary-ink); border-color: transparent; }
 .tor-pais .n { margin-left: 6px; font-size: 11px; font-weight: 600; opacity: .8; }
 
-/* L2 da Lei da Torre: a pergunta que a aba responde, no cabeçalho dela. */
-.tor-aba-pergunta { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin: 2px 0 10px; }
-
 /* ===== toast (início) ===== */
 /* O TOAST DA TORRE é escuro nas TRÊS superfícies que o usam (.tor-toast: torre-base + Precisa de você; .tpr-toast: Detalhe do Processo) —
    fundo marinho do protótipo (#17223b), texto claro, botões "Desfazer" e "✕" com contorno claro. O hex mora SÓ nestes tokens. Contraste

@@ -50,14 +50,6 @@ const req = (method: string, url: string, token: string | null, body?: unknown) 
   })
 const tokenDe = (u: { id: number; email: string; tipo: string }) => signAuthToken({ userId: u.id, email: u.email, tipo: u.tipo, sessaoInicio: Date.now() })
 
-/** PROPOSTA (06/10/2026): a rota devolve a prévia (428, nada gravado) e só grava com `confirmado` + a assinatura da prévia. Prova as duas viagens. */
-async function comConfirmacao(chamar: (extra: Record<string, unknown>) => Promise<Response>): Promise<{ resposta: Response; previa: Record<string, unknown> | null }> {
-  const r1 = await chamar({})
-  if (r1.status !== 428) return { resposta: r1, previa: null }
-  const previa = (await r1.json()).confirmacao as { assinatura: string } & Record<string, unknown>
-  return { resposta: await chamar({ confirmado: true, assinatura: previa.assinatura }), previa }
-}
-
 async function main() {
   const c = await montarCenario(MARCA)
   try {
@@ -183,10 +175,7 @@ async function main() {
     ok("mover carteira exige também tarefas.editar", (await postMover(req("POST", "/api/torre/equipe/mover-carteira", tGestor, { deUsuarioId: ana.id, paraUsuarioId: beto.id }))).status === 403)
     ok("origem = destino: recusa", (await moverCarteira({ deUsuarioId: ana.id, paraUsuarioId: ana.id, autorId: admin.id })).ok === false)
     ok("pessoa sem tarefa: nada a mover", (await moverCarteira({ deUsuarioId: cris.id, paraUsuarioId: beto.id, autorId: admin.id })).ok === false)
-    const antesMov = await prisma.tarefa.count({ where: { responsavelId: beto.id, id: { in: [a1, a2, a3, a4].map((a) => a.tarefaId) } } })
-    const prevMov = await postMover(req("POST", "/api/torre/equipe/mover-carteira", tAdmin, { deUsuarioId: ana.id, paraUsuarioId: beto.id }))
-    ok("mover carteira é PROPOSTA: sem confirmação devolve a prévia (428) e não move nada", prevMov.status === 428 && /Mover 4 tarefas de .* para /.test((await prevMov.json()).confirmacao?.pergunta ?? "") && (await prisma.tarefa.count({ where: { responsavelId: beto.id, id: { in: [a1, a2, a3, a4].map((a) => a.tarefaId) } } })) === antesMov)
-    const { resposta: rMov } = await comConfirmacao((x) => postMover(req("POST", "/api/torre/equipe/mover-carteira", tAdmin, { deUsuarioId: ana.id, paraUsuarioId: beto.id, ...x })))
+    const rMov = await postMover(req("POST", "/api/torre/equipe/mover-carteira", tAdmin, { deUsuarioId: ana.id, paraUsuarioId: beto.id }))
     const jMov = await rMov.json()
     ok("as 4 tarefas da Ana vão para o Beto", rMov.status === 200 && jMov.movidas === 4 && jMov.para.usuarioId === beto.id, JSON.stringify(jMov).slice(0, 200))
     ok("de fato mudaram de dono no banco", (await prisma.tarefa.count({ where: { responsavelId: beto.id, id: { in: [a1, a2, a3, a4].map((a) => a.tarefaId) } } })) === 4)
@@ -194,13 +183,13 @@ async function main() {
       && (await prisma.logAuditoria.count({ where: { acao: "TAREFAS_REDISTRIBUIDAS", descricao: { contains: "4 de 4" } } })) >= 1)
     const dMov = await desfazerLote({ tipo: jMov.desfazer.tipo, tarefaIds: jMov.desfazer.tarefaIds, autorId: admin.id })
     ok("o Desfazer devolve a carteira à Ana", dMov.desfeitas === 4 && (await prisma.tarefa.count({ where: { responsavelId: ana.id, id: { in: [a1, a2, a3, a4].map((a) => a.tarefaId) } } })) === 4)
-    const { resposta: rSem } = await comConfirmacao((x) => postMover(req("POST", "/api/torre/equipe/mover-carteira", tAdmin, { deUsuarioId: ana.id, ...x })))
+    const rSem = await postMover(req("POST", "/api/torre/equipe/mover-carteira", tAdmin, { deUsuarioId: ana.id }))
     const jSem = await rSem.json()
     ok("sem destino, usa o sucessor SUGERIDO (E2)", rSem.status === 200 && jSem.para.usuarioId !== ana.id && jSem.movidas === 4)
     await desfazerLote({ tipo: "ATRIBUICAO", tarefaIds: jSem.desfazer.tarefaIds, autorId: admin.id })
 
     secao("H1 — APLICAR a simulação: registra a ausência (com sucessor) e move o que o sucessor pode executar")
-    const { resposta: rApl } = await comConfirmacao((x) => postAplicar(req("POST", "/api/torre/equipe/aplicar-saida", tAdmin, { usuarioId: ana.id, dias: 10, ...x })))
+    const rApl = await postAplicar(req("POST", "/api/torre/equipe/aplicar-saida", tAdmin, { usuarioId: ana.id, dias: 10 }))
     const jApl = await rApl.json()
     ok("ausência registrada e carteira movida ao sucessor sugerido", rApl.status === 200 && jApl.ok === true && jApl.sucessor?.usuarioId != null && jApl.carteira.movidas === 4, JSON.stringify(jApl).slice(0, 240))
     ok("a pessoa aparece ausente na aba", (await quadroDaEquipe()).pessoas.find((p) => p.usuarioId === ana.id)!.ausencia?.rotulo === "ausência")

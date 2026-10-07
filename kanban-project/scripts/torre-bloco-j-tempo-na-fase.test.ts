@@ -117,9 +117,9 @@ async function main() {
     const fase = readFileSync("lib/operacional/torre-fase.ts", "utf8")
     ok("as três telas formatam pelo MESMO textoTempoNaFase (nenhuma monta '{n} d' à mão)", /textoTempoNaFase/.test(fase) && /textoDuracao|textoNaFase|textoDaCelulaAtual/.test(ui[0] + readFileSync("lib/operacional/torre-radar.ts", "utf8")) && /textoNaFase/.test(ui[1]) && ui[2].includes("textoTempoNaFase") && !/\{c\.dias \?\? "—"\} d/.test(ui[0]) && !/diasNaFase\} d/.test(ui[1]))
 
-    secao("Distribuição: Lei da Torre (L4) — a rota só redireciona para a aba Tarefas da Torre")
+    secao("Distribuição: o portão de permissão que já existia continua igual (o J não o alterou)")
     const dist = readFileSync("src/app/operacao/distribuicao/page.tsx", "utf8")
-    ok("redireciona para /torre?aba=tarefas (a Torre confere a permissão)", /redirect\("\/torre\?aba=tarefas"\)/.test(dist))
+    ok("continua exigindo tarefas.editar e mandando quem não tem para /operacao", /const autorizado = pode\("tarefas\.editar"\)/.test(dist) && /if \(mounted && !carregando && !autorizado\) router\.push\("\/operacao"\)/.test(dist))
   } finally {
     await prisma.phaseAdvanceLog.deleteMany({ where: { correlationId: { startsWith: MARCA } } })
     await c.limpar()

@@ -60,8 +60,8 @@ check("3c) `pode` vem de usePermissoes() — permissão efetiva do usuário loga
 secao("4) 'Delegar' (transferir responsável) — achado real 11/09/2026: Assistente não distribui trabalho")
 const atribuirRoute = read("src/app/api/tarefas/[tarefaId]/atribuir/route.ts")
 check("4a) o servidor exige tarefas.editar em POST /api/tarefas/[id]/atribuir (a porta que 'Delegar' chama)", /verificarPermissao\(request, 'tarefas\.editar'\)/.test(atribuirRoute))
-check("4b) o drawer não tem mais 'Delegar' (Lei da Torre, L4: só a Torre atribui) — mostra o link 'Atribuir na Torre'", !/Delegar/.test(drawer) && /Atribuir na Torre/.test(drawer))
-check("4c) o drawer não escreve responsável: sem /atribuir, sem seletor de responsável", !/\/atribuir/.test(drawer) && !/delegandoResp/.test(drawer) && !/delegarTarefa/.test(drawer))
+check("4b) o link 'Delegar' no drawer só renderiza com pode('tarefas.editar')", /pode\('tarefas\.editar'\)[\s\S]{0,1200}Delegar/.test(drawer))
+check("4c) o seletor de responsável (aberto) também exige a permissão, não só o link que o abre", /delegandoResp && pode\('tarefas\.editar'\)/.test(drawer))
 
 console.log(`\n${ok} passaram, ${falhas.length} falharam`)
 if (falhas.length) console.log("Falhas:", falhas.join(", "))

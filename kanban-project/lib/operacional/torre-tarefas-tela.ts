@@ -56,8 +56,7 @@ export function predicadoDaVisao(v: VisaoTarefas, usuarioId: number | null, agor
   switch (v) {
     case 'vencidas': return (l) => PREDICADO_DO_KPI.venc!(l, agora)
     case 'semdono': return (l) => PREDICADO_DO_KPI.ninguem!(l, agora)
-    // "Aguardando terceiros" = TODA tarefa aberta com a bola com terceiro (com OU sem responsável): é o mesmo conjunto da aba Terceiros (consolidação 06/10/2026 — antes só contava quem tinha responsável: 9 × 10).
-    case 'aguard': return (l) => PREDICADO_DO_KPI.aguard!(l, agora)
+    case 'aguard': return (l) => PREDICADO_DO_KPI.cartorio!(l, agora)
     case 'cobranca': return (l) => l.cobravelVencida === true
     case 'acompvenc': return (l) => l.acompanhamentoVencido === true
     case 'minhas': return (l) => usuarioId != null && l.responsavelId === usuarioId

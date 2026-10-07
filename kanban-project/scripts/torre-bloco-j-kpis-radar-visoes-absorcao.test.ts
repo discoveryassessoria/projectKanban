@@ -187,13 +187,13 @@ async function main() {
     const fonte = (p: string) => readFileSync(p, "utf8")
     for (const [arq, rota] of [["src/app/tarefas/page.tsx", "/tarefas"], ["src/app/operacao/distribuicao/page.tsx", "/operacao/distribuicao"]] as const) {
       const s = fonte(arq)
-      void rota
-      ok(`${arq}: Lei da Torre (L4) — só redireciona para a aba Tarefas da Torre`, /redirect\("\/torre\?aba=tarefas"\)/.test(s) && !/<VisaoGlobal|<DistribuicaoTarefas/.test(s))
+      ok(`${arq}: consulta a função de absorção e só redireciona quando ela devolve destino`, s.includes(`destinoDaAbsorcao("${rota}", user.tipo)`) && /if \(mounted && !carregando && paraTorre\) \{ router\.replace\(paraTorre\)/.test(s))
+      ok(`${arq}: continua com o código da tela de hoje (nada apagado)`, /<VisaoGlobal|<DistribuicaoTarefas/.test(s))
     }
     const menu = fonte("src/components/bitrix-sidebar.tsx")
     const iOp = menu.indexOf('title: "Operação"'), iTorre = menu.indexOf('title: "Torre de Controle"'), iCal = menu.indexOf('title: "Calendário"')
     ok("menu: 'Torre de Controle' entre Operação e Calendário, e SÓ para administrador", iOp > 0 && iOp < iTorre && iTorre < iCal && /title: "Torre de Controle",[\s\S]{0,260}soAdmin: true/.test(menu))
-    ok("'Tarefas e Projetos' e 'Distribuição' SAÍRAM do menu (06/10/2026, Lei da Torre L4); as rotas só redirecionam", !menu.includes('title: "Tarefas e Projetos"') && !menu.includes('title: "Distribuição"') && !menu.includes('url: "/tarefas"') && !menu.includes('url: "/operacao/distribuicao"'))
+    ok("'Tarefas e Projetos' e 'Distribuição' continuam no menu (nada apagado)", menu.includes('title: "Tarefas e Projetos"') && menu.includes('title: "Distribuição"'))
     void outro
     await prisma.familia.deleteMany({ where: { nome: { startsWith: MARCA } } })
     await prisma.catalogoPais.delete({ where: { id: semOferta.id } }).catch(() => {})
