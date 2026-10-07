@@ -195,7 +195,7 @@ export function agruparPorOrgao(pedidos: PedidoDeTerceiro[]): GrupoDeOrgao[] {
 // ─── OS SEIS CARTÕES ─────────────────────────────────────────────────────────────────────────────────────────────
 
 export interface ResumoDeTerceiros {
-  /** = `numeroDoKpi('cartorio')`: o "Aguardando terceiros" da Visão geral e da aba Tarefas. */
+  /** = `numeroDoKpi('aguard')`: TODO pedido com a bola com terceiro (com ou sem responsável) — o mesmo da visão "Aguardando terceiros" da aba Tarefas (L3; antes 9 × 10). */
   aguardando: number
   comCartorios: number
   comOCliente: number
@@ -210,11 +210,11 @@ export interface ResumoDeTerceiros {
 
 /** Os cartões da tela. Os cartões 2–4 repartem EXATAMENTE o cartão 1 (`comCartorios + comOCliente + tradutora + juizo + consulado = aguardando`). */
 export function resumoDeTerceiros(linhas: LinhaParaTerceiros[], agora: Date): ResumoDeTerceiros {
-  const doCartao = linhas.filter((l) => PREDICADO_DO_KPI.cartorio!(l, agora))
+  const doCartao = linhas.filter((l) => PREDICADO_DO_KPI.aguard!(l, agora))
   const n = (b: BolaCom) => doCartao.filter((l) => l.bolaCom === b).length
   const pedidos = linhas.filter(ehPedidoDeTerceiro)
   return {
-    aguardando: numeroDoKpi('cartorio', linhas, agora),
+    aguardando: numeroDoKpi('aguard', linhas, agora),
     comCartorios: n('Cartório'), comOCliente: n('Cliente'), tradutora: n('Tradutor'), juizo: n('Juízo'), consulado: n('Consulado'),
     paraCobrar: pedidos.filter((l) => precisaCobrar(l, agora)).length,
     escaladas: pedidos.filter((l) => l.escalada).length,

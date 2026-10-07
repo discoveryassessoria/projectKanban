@@ -90,7 +90,7 @@ export function TorreEquipe({ versao, pais = "" }: { versao: number; pais?: stri
     <div className="eqp">
       {modalConfirmacao}
       <div className="eqp-cab">
-        <div className="eqp-mig"><a href="/torre?aba=visao">Torre de Controle</a> › Equipe</div>
+        <div className="eqp-mig"><a href="/torre?aba=hoje">Torre de Controle</a> › Equipe</div>
         <h1 className="eqp-titulo">{TITULO_EQUIPE}</h1>
       </div>
       <div className="eqp-nota">{TEXTO_EXPLICATIVO}</div>

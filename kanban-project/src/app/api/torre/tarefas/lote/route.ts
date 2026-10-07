@@ -18,7 +18,7 @@ import { exigirTorre } from '@/src/lib/torre-acesso'
 import type { PermissaoChave } from '@/src/lib/permissoes'
 import { confirmacaoDoCorpo, pedirConfirmacao } from '@/src/lib/torre-confirmacao'
 import {
-  validarIds, atribuirEmLote, removerResponsavelEmLote, previaDeRemoverResponsavel, prioridadeAltaEmLote, prioridadeEmLote, repactuarEmLote, cobrarCartorioEmLote,
+  validarIds, atribuirEmLote, removerResponsavelEmLote, previaDeRemoverResponsavel, previaDeAtribuir, prioridadeAltaEmLote, prioridadeEmLote, repactuarEmLote, cobrarCartorioEmLote,
 } from '@/src/services/torre-acoes-lote'
 
 const PERMISSAO: Record<string, PermissaoChave> = {
@@ -43,6 +43,12 @@ export async function POST(request: NextRequest) {
       case 'ATRIBUIR': {
         const responsavelId = Number(b?.responsavelId)
         if (!Number.isInteger(responsavelId) || responsavelId <= 0) return NextResponse.json({ error: 'responsavelId é obrigatório' }, { status: 400 })
+        // CONFIRMAÇÃO EXPLÍCITA (L4): a lista de quem recebe o quê — 428 sem nada gravado; depois `confirmado` + a assinatura da prévia.
+        const previa = await previaDeAtribuir(ids.ids, responsavelId)
+        if (!previa) return NextResponse.json({ error: 'Nenhuma tarefa válida para atribuir (ou pessoa não encontrada).' }, { status: 422 })
+        const { confirmado, assinatura } = confirmacaoDoCorpo(b)
+        if (!confirmado || assinatura == null) return pedirConfirmacao(previa)
+        if (assinatura !== previa.assinatura) return NextResponse.json({ error: 'As tarefas mudaram desde que você confirmou. Revise e confirme de novo.', code: 'SUGESTAO_MUDOU', confirmacao: previa }, { status: 409 })
         r = await atribuirEmLote({ tarefaIds: ids.ids, responsavelId, autorId: usuario.userId })
         break
       }

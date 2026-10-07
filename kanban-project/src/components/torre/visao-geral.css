@@ -85,3 +85,17 @@
 /* ===== Visão geral — Torre nova, frente B1 (fim) ===== */
 
 .tvg-card-proc .tvg-card-n { padding-right: 84px; }
+
+/* HOJE (consolidação 06/10/2026): pergunta da aba, seis números clicáveis e as decisões como linhas com link. */
+.tor-aba-pergunta { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin: 2px 0 10px; }
+.tor-hoje-frase { font-size: 14px; margin: 0 0 12px; }
+.tor-hoje-numeros { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 18px; }
+.tor-hoje-num { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 10px; background: var(--surface-tertiary); text-decoration: none; color: inherit; border: 1px solid var(--border-default); }
+.tor-hoje-num b { font-size: 26px; line-height: 1; }
+.tor-hoje-num span { font-size: 12px; color: var(--text-secondary); }
+.tor-hoje-num.red b { color: var(--danger-text, #c0392b); }
+.tor-hoje-num.amb b { color: var(--warning-text); }
+.tor-hoje-titulo { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); margin-bottom: 8px; }
+.tor-hoje-linha { display: grid; grid-template-columns: 150px 180px 1fr auto; gap: 12px; align-items: center; padding: 8px 10px; border-top: 1px solid var(--border-default); font-size: 13px; }
+.tor-hoje-linha .fam { font-weight: 600; }
+.tor-hoje-linha .onde { white-space: nowrap; }

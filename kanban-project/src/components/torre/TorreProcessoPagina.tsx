@@ -13,12 +13,15 @@ import type { CertidaoDoFiltro } from "@/lib/operacional/historico-linha-do-temp
 import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 import type { DetalheDoProcesso } from "@/lib/operacional/torre-foco"
 import type { LinhaDaTabela } from "@/lib/operacional/torre-processo-puro"
-import { api, erroDe, Modal, ModalTexto, useEscFecha } from "./torre-base"
-import { SeletorResponsavel } from "@/src/components/operacao/kit-operacional"
+import { api, erroDe, Modal, ModalTexto, TorreProvider, useEscFecha, type PermissoesTorre } from "./torre-base"
 import { ProcessoRelatorio } from "./ProcessoRelatorio"
 import { ProcessoCabecalho } from "./ProcessoCabecalho"
 import { ProcessoCaminho } from "./ProcessoCaminho"
-import { ProcessoCertidoes } from "./ProcessoCertidoes"
+import { ProcessoEncerradas } from "./ProcessoEncerradas"
+import { ProcessoDecisoes } from "./ProcessoDecisoes"
+import { TorreTarefas } from "./TorreTarefas"
+import type { LinhaTorre } from "./tipos"
+import { filtrosVazios, type FiltrosTorre } from "@/lib/operacional/torre-filtros"
 import { VoltarDaTorre } from "./VoltarDaTorre"
 import { escreverRelatorioNaUrl, lerRelatorioDaUrl, type FiltrosDoRelatorio } from "@/lib/operacional/torre-relatorio-filtros"
 import type { FiltroDeStatusDaTabela } from "@/lib/operacional/torre-processo-puro"
@@ -33,6 +36,10 @@ type DesfazerDeAtribuicao = { tipo: "ATRIBUICAO"; tarefaIds: number[] }
 export function TorreProcessoPagina({ processoId }: { processoId: number }) {
   const { pode, isAdmin, carregando: carregandoPerm } = usePermissoes()
   const [d, setD] = useState<DetalheDoProcesso | null>(null)
+  // A TABELA DE TAREFAS desta página É o componente da aba Tarefas (`TorreTarefas`), alimentado pela MESMA consulta (`/api/torre/tarefas`) filtrada pelo processo.
+  const [tarefas, setTarefas] = useState<{ linhas: LinhaTorre[]; permissoes: PermissoesTorre } | null>(null)
+  const [erroTarefas, setErroTarefas] = useState<string | null>(null)
+  const [filtrosTarefas, setFiltrosTarefas] = useState<FiltrosTorre>(filtrosVazios())
   const [erro, setErro] = useState<string | null>(null)
   const [versao, setVersao] = useState(0)
   // O RELATÓRIO VIVE NA URL (`?relatorio=1&rel_fase=…`): um link copiado abre a janela já filtrada; sem parâmetros, os padrões. `replace` (não empilha
@@ -46,7 +53,7 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
     router.replace(q ? `${caminhoAtual}?${q}` : caminhoAtual, { scroll: false })
   }, [router, caminhoAtual])
   // O estado da lista de certidões: o padrão é só as ATIVAS; o bloco "Cancelada / não exigida" e o select de Status mexem neste mesmo estado.
-  const [statusDaLista, setStatusDaLista] = useState<FiltroDeStatusDaTabela>("ATIVAS")
+  const [verEncerradas, setVerEncerradas] = useState(false)
   const [ocupado, setOcupado] = useState(false)
   const [toast, setToast] = useState<ToastDaPagina | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -70,6 +77,10 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
       if (!vivo) return
       if (r.ok) { setD(r.data); setErro(null) }
       else setErro(r.status === 404 ? "Processo não encontrado." : erroDe(r.data, "Não foi possível abrir o processo."))
+    })
+    void api<{ linhas: LinhaTorre[]; permissoes: PermissoesTorre }>(`/api/torre/tarefas?processoId=${processoId}`).then((r) => {
+      if (!vivo) return
+      if (r.ok) { setTarefas({ linhas: r.data.linhas, permissoes: r.data.permissoes }); setErroTarefas(null) } else setErroTarefas(erroDe(r.data, "Não foi possível carregar as tarefas."))
     })
     return () => { vivo = false }
   }, [processoId, versao])
@@ -99,29 +110,6 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
     setOcupado(false)
     if (r.data?.mensagem) avisar(r.data.mensagem, r.data.desfazer ? { rotulo: "Desfazer", fazer: desfazerAtribuicao(r.data.desfazer) } : undefined)
     else avisar(erroDe(r.data))
-    recarregar()
-  }
-
-  // ATRIBUIR abre a ESCOLHA do funcionário (a mesma lista da Operação) — nunca atribui sozinho à sugestão. Atribuir automaticamente é o botão «Distribuir».
-  const [escolha, setEscolha] = useState<number[] | null>(null)
-  const [erroEscolha, setErroEscolha] = useState<string | null>(null)
-  const atribuir = (tarefaId: number) => { setErroEscolha(null); setEscolha([tarefaId]) }
-  const atribuirVarias = (ids: number[]) => { setErroEscolha(null); setEscolha(ids) }
-  const atribuirA = async (ids: number[], responsavelId: number) => {
-    setOcupado(true); setErroEscolha(null)
-    const feitas: number[] = []
-    let primeiraFalha: string | null = null
-    for (const id of ids) {
-      const r = await api<{ ok?: boolean; erro?: string }>(`/api/tarefas/${id}/comando`, "POST", { acao: "atribuir", responsavelId })
-      if (r.ok) feitas.push(id); else primeiraFalha = primeiraFalha ?? erroDe(r.data)
-    }
-    setOcupado(false)
-    if (feitas.length === 0) { setErroEscolha(primeiraFalha ?? "Não foi possível atribuir."); return } // a escolha continua aberta
-    setEscolha(null)
-    avisar(
-      ids.length === 1 ? "Responsável atribuído · fica no histórico" : `${feitas.length} de ${ids.length} atribuídas · fica no histórico${primeiraFalha ? ` · ${ids.length - feitas.length} não passou(aram): ${primeiraFalha}` : ""}`,
-      { rotulo: "Desfazer", fazer: desfazerAtribuicao({ tipo: "ATRIBUICAO", tarefaIds: feitas }) },
-    )
     recarregar()
   }
 
@@ -166,7 +154,7 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
   const agora = new Date(d.geradoEm)
 
   return (
-    <>
+    <TorreProvider permissoes={tarefas?.permissoes ?? null} recarregar={recarregar} fixo>
       {modalConfirmacao}
       <div className="tor">
         <div className="tpr">
@@ -176,21 +164,20 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
             onDistribuir={() => void distribuir()} onRelatorio={() => gravarRelatorio(true, relatorioDaUrl.filtros)} onHistorico={() => setModal({ tipo: "historico", certidao: null })}
             onPausar={() => setModal({ tipo: "pausar" })} onReativar={() => void reativar(false)} onForcar={() => setModal({ tipo: "forcar" })}
           />
-          <ProcessoCaminho d={d} agora={agora} encerradasNaLista={statusDaLista === "TODOS" || statusDaLista === "ENCERRADAS"} onAlternarEncerradas={() => setStatusDaLista((s) => (s === "TODOS" || s === "ENCERRADAS" ? "ATIVAS" : "TODOS"))} />
-          <ProcessoCertidoes
-            status={statusDaLista} onStatus={setStatusDaLista}
-            d={d} agora={agora} podeAtribuir={perm.editar} ocupado={ocupado}
-            onHistorico={(l) => setModal({ tipo: "historico", certidao: { documentoId: l.documentoId, tarefaId: l.tarefaId, rotulo: [l.titulo, l.pessoa].filter(Boolean).join(" · ") } })}
-            onAtribuir={atribuir} onAtribuirVarias={atribuirVarias}
-            onMotivo={(l) => setModal({ tipo: "motivo", linha: l })} onReabrir={(l) => setModal({ tipo: "reabrir", linha: l })}
-            onVerHistorico={() => setModal({ tipo: "historico", certidao: null })}
-          />
-          {escolha && (
-            <SeletorResponsavel
-              titulo={escolha.length === 1 ? "Atribuir tarefa" : `Atribuir ${escolha.length} tarefas`}
-              atual={null} ocupado={ocupado} erro={erroEscolha}
-              aoFechar={() => { setEscolha(null); setErroEscolha(null) }}
-              aoEscolher={(id) => void atribuirA(escolha, id)}
+          <ProcessoCaminho d={d} agora={agora} encerradasNaLista={verEncerradas} onAlternarEncerradas={() => setVerEncerradas((v) => !v)} />
+          <ProcessoDecisoes processoId={processoId} versao={versao} onFeito={recarregar} />
+          {tarefas ? (
+            <TorreTarefas
+              linhas={tarefas.linhas} carregando={false} erro={false} kpi={null} busca="" paisChave="" paisRotulo={null}
+              visaoPedida={null} processoFoco={processoId} versao={versao} agora={agora} onAplicarSpec={() => {}}
+              filtros={filtrosTarefas} onFiltros={setFiltrosTarefas} onLimparPais={() => {}} onLimparBusca={() => {}} semCanceladas
+            />
+          ) : <div className="tor-card pad small">{erroTarefas ?? "Carregando as tarefas…"}</div>}
+          {verEncerradas && (
+            <ProcessoEncerradas
+              d={d} podeEditar={perm.editar} ocupado={ocupado}
+              onHistorico={(l) => setModal({ tipo: "historico", certidao: { documentoId: l.documentoId, tarefaId: l.tarefaId, rotulo: [l.titulo, l.pessoa].filter(Boolean).join(" · ") } })}
+              onMotivo={(l) => setModal({ tipo: "motivo", linha: l })} onReabrir={(l) => setModal({ tipo: "reabrir", linha: l })}
             />
           )}
           <ProcessoFatos processoId={processoId} agora={agora} versao={versao} onVerTudo={() => setModal({ tipo: "historico", certidao: null })} />
@@ -242,7 +229,7 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
           </div>
         )}
       </div>
-    </>
+    </TorreProvider>
   )
 }
 

@@ -56,7 +56,7 @@ export function TorreRadar({ colunas, processos, carregando, erro }: { colunas: 
     <div className="tor-pg">
       <div className="tor-pg-cab">
         <div>
-          <div className="tor-pg-trilha"><Link href="/torre?aba=visao">Torre de Controle</Link> › <b>Radar</b></div>
+          <div className="tor-pg-trilha"><Link href="/torre?aba=hoje">Torre de Controle</Link> › <b>Radar</b></div>
           <h2 className="tor-pg-titulo">Radar · cada família em cada fase</h2>
         </div>
       </div>

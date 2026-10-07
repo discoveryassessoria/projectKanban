@@ -30,8 +30,8 @@ export function ProcessoCabecalho({ d, agora, perm, ocupado, onDistribuir, onRel
   return (
     <>
       <nav className="tpr-crumb" aria-label="Trilha">
-        <Link href="/torre?aba=visao">Torre de Controle</Link><span>›</span>
-        {d.faseAtual.key ? <Link href={`/torre?aba=processos&fase=${encodeURIComponent(d.faseAtual.key)}`}>{faseLabel ?? "Processos"}</Link> : <Link href="/torre?aba=processos">Processos</Link>}
+        <Link href="/torre?aba=hoje">Torre de Controle</Link><span>›</span>
+        {d.faseAtual.key ? <Link href={`/torre?aba=familias&fase=${encodeURIComponent(d.faseAtual.key)}`}>{faseLabel ?? "Processos"}</Link> : <Link href="/torre?aba=familias">Processos</Link>}
         <span>›</span><b>{d.familiaNome}</b>
       </nav>
 

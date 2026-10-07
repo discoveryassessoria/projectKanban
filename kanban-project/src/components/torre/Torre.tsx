@@ -11,29 +11,24 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { KPIS, KPI_POR_CHAVE, emRiscoCritico, linhasDoKpi, numeroDoKpi, processosEmRisco, type ChaveKpi } from "@/lib/operacional/torre-kpis"
 import { briefingDoDia } from "@/lib/operacional/precisa-de-voce-decisoes"
+import { ALARMES_DE_HOJE } from "@/lib/operacional/torre-hoje"
 import { classeDoFunil } from "@/lib/operacional/torre-funil-puro"
 import type { OntemPorPais } from "@/lib/operacional/precisa-de-voce"
-import { ABAS_DA_TORRE, ABA_INICIAL, ehAbaDaTorre, type Aba } from "@/lib/operacional/torre-abas"
+import { ABAS_DA_TORRE, ABA_INICIAL, ABA_ANTIGA_PARA_NOVA, abaDaUrl, destinoDeAbaQueSaiu, ehAbaDaTorre, type Aba } from "@/lib/operacional/torre-abas"
 import { seloVisivel, separarFaseDaUrl, preservarFaseDeTarefas, filtrosNaQueryDaAba } from "@/lib/operacional/torre-casca"
 import { itensDoPais, mapaDePaisPorProcesso, contagemDeProcessosPorPais } from "@/lib/operacional/torre-pais"
 import { destinoDaAbaAntigaDaTorre } from "@/lib/operacional/navegacao"
 import { aplicarFiltros, filtrosDaQuery, filtrosIguais, type FiltrosTorre } from "@/lib/operacional/torre-filtros"
 import { AGRUPAR_TORRE, DENTRO_TORRE } from "@/lib/operacional/torre-visoes"
 import { aplicarBusca } from "@/src/components/operacao/operacao-v3-derivacoes"
-import { OperacaoV3 } from "@/src/components/operacao/operacao-v3"
-import { contagemDaVisao } from "@/lib/operacional/torre-tarefas-tela"
 import { api, erroDe, TorreProvider, type PermissoesTorre, type AlvoDoRelatorio } from "./torre-base"
 import type { LinhaTorre } from "./tipos"
 import type { ColunaDoRadar, ProcessoDaTorre } from "./tipos-processos"
 import type { ItemPrecisa } from "./tipos-precisa"
 import { TorreCabecalho, type PaisDaTorre } from "./TorreCabecalho"
 import type { Tendencias } from "./TorreKpis"
-import { TorreVisaoGeral } from "./TorreVisaoGeral"
-import { TorrePrecisaDeVoce } from "./TorrePrecisaDeVoce"
-import { TorreBriefing } from "./TorreBriefing"
-import { TorreRevisao } from "./TorreRevisao"
-import { TorreRadar } from "./TorreRadar"
-import { TorreProcessos } from "./TorreProcessos"
+import { TorreHoje } from "./TorreHoje"
+import { TorreFamilias } from "./TorreFamilias"
 import { pedirFaseDeProcessos } from "./torre-fase-memoria"
 import { TorreTarefas, CHAVES_DE_VISAO } from "./TorreTarefas"
 import { TorreTerceiros } from "./TorreTerceiros"
@@ -68,7 +63,10 @@ function lerUrl(params: URLSearchParams) {
   const visao = visaoUrl && CHAVES_DE_VISAO.includes(visaoUrl) ? visaoUrl : null
   const processo = numeroDaUrl(params.get("processo"))
   const tarefa = numeroDaUrl(params.get("tarefa"))
-  const abaValida = ehAbaDaTorre(abaUrl) ? abaUrl : null
+  // `?aba=` NOVO ou ANTIGO (visao/precisa → hoje · processos → familias · radar → familias com a matriz). `minha` saiu da Torre (vai para /operacao).
+  const antiga = abaUrl ? ABA_ANTIGA_PARA_NOVA[abaUrl] : undefined
+  const abaValida = ehAbaDaTorre(abaUrl) ? abaUrl : antiga && "aba" in antiga ? antiga.aba : null
+  const vista = params.get("vista") === "matriz" || (antiga && "vista" in antiga && antiga.vista === "matriz") ? "matriz" : "lista"
   const kpiUrl = params.get("kpi") as ChaveKpi | null
   const agrupar = params.get("agrupar"); const dentro = params.get("dentro")
   // `?tarefa=` sempre vai para Tarefas; `?visao=`/`?processo=` sem `?aba=` também; com `?aba=` a aba é respeitada.
@@ -76,7 +74,7 @@ function lerUrl(params: URLSearchParams) {
   // `?fase=` tem dois donos: filtro de TAREFAS (aba Tarefas) ou seleção de fase (aba Processos) — `torre-casca.ts`.
   const { filtros, faseProcessos } = separarFaseDaUrl(aba ?? ABA_INICIAL, filtrosDaQuery(params))
   return {
-    aba, visao, processo, tarefa, faseProcessos,
+    aba, vista: vista as "lista" | "matriz", visao, processo, tarefa, faseProcessos,
     kpi: kpiUrl && KPIS_QUE_FILTRAM.includes(kpiUrl) ? kpiUrl : null,
     pais: params.get("pais") ?? "",
     busca: params.get("q") ?? "",
@@ -103,8 +101,8 @@ export function Torre() {
   const urlInicial = lerUrl(params)
 
   const [aba, setAba] = useState<Aba>(urlInicial.aba ?? ABA_INICIAL)
-  // `?op=` — qual aba interna da Operação abrir dentro de "Minha operação" (links antigos de /operacao?aba=…). Lido uma vez, na montagem.
-  const [opInicial] = useState<string | null>(() => params.get("op"))
+  // FAMÍLIAS tem duas vistas do MESMO conjunto: lista e matriz (o antigo Radar). `?vista=matriz`.
+  const [vista, setVista] = useState<"lista" | "matriz">(urlInicial.vista)
   // A fase que o link pediu para a aba PROCESSOS (`?aba=processos&fase=…`). A seleção em si mora na memória de Processos; `n` muda a cada
   // pedido novo para a aba remontar e aplicá-lo (mesmo já estando em Processos).
   const [pedidoFase, setPedidoFase] = useState<{ n: number }>(() => { if (urlInicial.faseProcessos) pedirFaseDeProcessos(urlInicial.faseProcessos); return { n: 0 } })
@@ -139,11 +137,9 @@ export function Torre() {
   const [nEquipe, setNEquipe] = useState<number | null>(null)
 
   const [relatorio, setRelatorio] = useState<AlvoDoRelatorio | null>(null)
-  const [briefingAberto, setBriefingAberto] = useState(false)
-  const [revisao, setRevisao] = useState<ItemPrecisa[] | null>(null)
 
   // Endereço antigo de aba que saiu da Torre (`?aba=regras|integridade|auditoria`): leva ao Gerenciamento equivalente.
-  const destinoAntigo = destinoDaAbaAntigaDaTorre(params.get("aba"))
+  const destinoAntigo = destinoDaAbaAntigaDaTorre(params.get("aba")) ?? destinoDeAbaQueSaiu(params.get("aba"))
   useEffect(() => { if (destinoAntigo) router.replace(destinoAntigo) }, [destinoAntigo, router])
 
   // Endereço antigo da janela "Foco da família" (`/torre?processo=N`, `?aba=tarefas&processo=N`): leva à PÁGINA do processo. Com `?tarefa=` o pedido é
@@ -160,6 +156,7 @@ export function Torre() {
     if (!escritas.includes(paramsChave)) {
       const u = lerUrl(params)
       if (u.aba) setAba(u.aba)
+      setVista(u.vista)
       if (u.faseProcessos) { pedirFaseDeProcessos(u.faseProcessos); setPedidoFase((p) => ({ n: p.n + 1 })) }
       setEstadoTarefas((e) => (e.visao === u.visao && e.agrupar === u.agrupar && e.dentro === u.dentro ? e : { visao: u.visao, agrupar: u.agrupar, dentro: u.dentro }))
       setTarefaPedida(u.tarefa); setProcessoDaUrl(u.processo)
@@ -179,7 +176,8 @@ export function Torre() {
       const q = new URLSearchParams(atual.toString())
       for (const k of ["aba", "kpi", "visao", "pais", "q", "agrupar", "dentro"]) q.delete(k)
       if (aba !== ABA_INICIAL) q.set("aba", aba)
-      if (aba !== "minha") q.delete("op") // `?op=` (aba inicial da Minha operação) só vale nela
+      q.delete("op"); q.delete("vista")
+      if (aba === "familias" && vista === "matriz") q.set("vista", "matriz")
       if (kpi) q.set("kpi", kpi)
       if (pais) q.set("pais", pais)
       if (busca.trim()) q.set("q", busca.trim())
@@ -194,7 +192,7 @@ export function Torre() {
       window.history.replaceState(window.history.state, "", novo.toString() ? `${window.location.pathname}?${novo.toString()}` : window.location.pathname)
     }, 250)
     return () => window.clearTimeout(t)
-  }, [aba, kpi, pais, busca, filtros, estadoTarefas, destinoAntigo])
+  }, [aba, vista, kpi, pais, busca, filtros, estadoTarefas, destinoAntigo])
 
   // 1) As tarefas (a projeção da Operação) e as decisões do dia — o que a tela precisa para abrir.
   useEffect(() => {
@@ -268,7 +266,8 @@ export function Torre() {
   // O número da aba = a lista que os filtros da barra deixam passar (a MESMA `aplicarFiltros` da tabela).
   const nTarefas = aplicarFiltros(aplicarBusca(base, busca) as LinhaTorre[], filtros, { usuarioId: permissoes?.usuarioId ?? null, agora }).mostrando
   const filtrandoBacklogPais = filtrandoPais
-  const nCobrar = numeroDoKpi("cob", linhasPais, agora)
+  // Terceiros: "N aguardando" = a visão "Aguardando terceiros" da aba Tarefas (todo pedido com a bola com terceiro) — a MESMA lista (L3).
+  const nTerceiros = numeroDoKpi("aguard", linhasPais, agora)
   // O TEXTO DO BRIEFING sai dos MESMOS conjuntos que os cartões mostram (país escolhido, "no ritmo" = a classe do funil, "vencem hoje" =
   // o cartão da Agenda). Ele não vem mais pronto do servidor: era global e com outra régua de "no ritmo".
   const textoDoBriefing = useMemo(() => {
@@ -289,6 +288,14 @@ export function Torre() {
     if (k === "abertas") { setKpi(null); setAba("tarefas"); return } // "Tarefas abertas" = a lista inteira da aba Tarefas
     setKpi((atual) => (atual === k ? null : k)); setAba("tarefas")
   }
+  // O clique num número de HOJE abre a aba Tarefas já filtrada pelo MESMO predicado que deu o número (KPI ou visão) — L3.
+  const abrirAlarme = (chave: string) => {
+    const a = ALARMES_DE_HOJE.find((x) => x.chave === chave)
+    if (!a) return
+    if (a.abre.tipo === "kpi") { setKpi(a.abre.kpi); setEstadoTarefas((e) => ({ ...e, visao: null })) }
+    else { setKpi(null); setEstadoTarefas((e) => ({ ...e, visao: a.abre.tipo === "visao" ? a.abre.visao : null })) }
+    setAba("tarefas")
+  }
   const irParaAba = (a: "equipe") => setAba(a)
 
   // T011: trocar de aba (clique, link interno, "ver equipe"…) rola a página para o topo. Não roda na montagem.
@@ -298,22 +305,15 @@ export function Torre() {
     abaAnterior.current = aba
     rolarAoTopo()
   }, [aba])
-  // T009/T010: "Precisa de você" é um LINK no protótipo, não uma tela — na Visão geral rola suave até a seção #pdv; nas outras vai à Visão geral.
-  const clicarNaAba = (k: Aba) => {
-    if (k !== "precisa") { setAba(k); return }
-    if (aba === "visao") { document.getElementById("pdv")?.scrollIntoView({ behavior: "smooth" }); return }
-    setAba("visao")
-  }
+  const clicarNaAba = (k: Aba) => setAba(k)
 
+  // Os selos das abas: cada um é o TAMANHO da lista que a aba mostra (L3).
   const n = (k: Aba): { txt: string; cls: string } | null => {
-    if (!seloVisivel(k, aba)) return null // T004–T008: o selo só aparece nas telas do protótipo (torre-casca.ts)
-    if (k === "precisa") return itensPrecisaPais ? { txt: String(itensPrecisaPais.length), cls: "red" } : null
+    if (!seloVisivel(k, aba)) return null // o selo só aparece onde o protótipo o desenha (torre-casca.ts)
     if (k === "tarefas") return linhas ? { txt: String(nTarefas), cls: "" } : null
-    // "Minha operação": as minhas tarefas ABERTAS — o MESMO predicado da visão "Minhas" da aba Tarefas (sem filtro de país/busca: é a minha fila inteira).
-    if (k === "minha") return linhas ? { txt: String(contagemDaVisao("minhas", linhas, permissoes?.usuarioId ?? null, agora)), cls: "" } : null
     if (k === "equipe") return nEquipe != null ? { txt: String(nEquipe), cls: "" } : null
-    if (k === "processos") return procs ? { txt: String(processosDaAba.length), cls: "" } : null
-    if (k === "terceiros") return linhas ? { txt: `${nCobrar} a cobrar`, cls: nCobrar ? "warn" : "" } : null
+    if (k === "familias") return procs ? { txt: String(processosDaAba.length), cls: "" } : null
+    if (k === "terceiros") return linhas ? { txt: String(nTerceiros), cls: nTerceiros ? "warn" : "" } : null
     return null
   }
 
@@ -325,9 +325,6 @@ export function Torre() {
       <div className="tor">
         <TorreCabecalho
           paises={paisesComContagem} pais={pais} onPais={setPais} nTodos={nTodosOsProcessos} busca={busca} onBusca={setBusca}
-          nPrecisa={itensPrecisaPais ? itensPrecisaPais.length : null}
-          onBriefing={() => setBriefingAberto(true)}
-          onRevisar={() => itensPrecisaPais && setRevisao([...itensPrecisaPais])}
         />
 
         <div className="tor-tabs-linha">
@@ -355,18 +352,11 @@ export function Torre() {
           )}
         </div>
 
-        {aba === "visao" && (
+        {aba === "hoje" && (
           linhas ? (
-            <TorreVisaoGeral
-              linhas={linhasPais} processos={procs ? processosPais : null} itensPrecisa={itensPrecisaPais} agora={agora} tend={tend}
-              filtrandoPais={filtrandoPais} paisRotulo={paisRotulo} kpiAtivo={kpi} onEscolherKpi={escolherKpi}
-              onProcessos={() => { setFiltroProc(null); setAba("processos") }} onRisco={() => { setFiltroProc("risco"); setAba("processos") }}
-              irParaAba={setAba} onRevisar={() => itensPrecisaPais && setRevisao([...itensPrecisaPais])}
-            />
+            <TorreHoje linhas={linhasPais} itens={itensPrecisaPais} erroItens={erroPrecisa} agora={agora} frase={textoDoBriefing} onAlarme={abrirAlarme} />
           ) : <div className="tor-card pad small">{erro ?? "Carregando a Torre…"}</div>
         )}
-        {aba === "precisa" && <TorrePrecisaDeVoce itens={itensPrecisaPais} carregando={!precisa && !erroPrecisa} erro={erroPrecisa} irParaAba={irParaAba} />}
-        {aba === "radar" && <TorreRadar colunas={procs?.colunas ?? []} processos={processosFiltrados} carregando={!procs && !erroProcs} erro={erroProcs} />}
         {aba === "tarefas" && (
           <TorreTarefas
             linhas={linhasPais} carregando={linhas == null && !erro} erro={!!erro} kpi={kpi} busca={busca} paisChave={pais} paisRotulo={paisRotulo}
@@ -377,20 +367,17 @@ export function Torre() {
             agruparPedido={estadoTarefas.agrupar} dentroPedido={estadoTarefas.dentro} onEstadoUrl={onEstadoUrl}
           />
         )}
-        {/* O MESMO componente da Operação da equipe (não uma cópia): só as tarefas do usuário logado (`minha_fila` do token), com as mesmas ações. */}
-        {aba === "minha" && <OperacaoV3 gestor naTorre abaInicial={opInicial} />}
         {aba === "equipe" && <TorreEquipe versao={versao} pais={pais} />}
-        {aba === "processos" && <TorreProcessos key={pedidoFase.n} processos={processosDaAba} carregando={!procs && !erroProcs} erro={erroProcs} backlog={filtrandoBacklogPais ? null : tend?.backlog ?? null} />}
+        {aba === "familias" && (
+          <TorreFamilias
+            key={pedidoFase.n} vista={vista} onVista={setVista}
+            processos={processosDaAba} processosTodos={processosFiltrados} colunas={procs?.colunas ?? []}
+            carregando={!procs && !erroProcs} erro={erroProcs} backlog={filtrandoBacklogPais ? null : tend?.backlog ?? null}
+          />
+        )}
         {aba === "terceiros" && <TorreTerceiros linhas={linhasPais} versao={versao} />}
         {erro && aba !== "tarefas" && <div className="small mt-2">{erro}</div>}
 
-        {briefingAberto && precisa && (
-          <TorreBriefing
-            texto={textoDoBriefing} n={itensPrecisaPais?.length ?? precisa.itens.length} onFechar={() => setBriefingAberto(false)}
-            onRevisar={() => { setBriefingAberto(false); setRevisao([...(itensPrecisaPais ?? precisa.itens)]) }}
-          />
-        )}
-        {revisao && <TorreRevisao itens={revisao} irParaAba={(a) => { setRevisao(null); irParaAba(a) }} onSair={() => setRevisao(null)} />}
         {relatorio && <ProcessoRelatorioDaTorre processoId={relatorio.processoId} processoRotulo={relatorio.codigo ?? relatorio.familiaNome} familiaId={relatorio.familiaId} familiaNome={relatorio.familiaNome} onFechar={() => setRelatorio(null)} />}
       </div>
     </TorreProvider>
