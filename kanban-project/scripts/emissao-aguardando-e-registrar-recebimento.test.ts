@@ -118,6 +118,9 @@ async function main() {
     ok("o histórico tem a frase clara «Recebida em dd/mm · registrado por <nome>»", !!log && /^Recebida em \d{2}\/\d{2}(\/\d{4})? · registrado por EMIREC Daniela$/.test(log.descricao), log?.descricao)
     ok("registrar de novo é recusado (já registrado)", (await registrarRecebimentoDaCertidao({ tarefaId: o1.tarefaId, usuario: { userId: daniela.id, tipo: "assistente" } })).ok === false)
 
+    // Dentro da MESMA tarefa os passos não trocam o responsável: a 4 não tira a tarefa de quem a tem.
+    ok("os passos da Emissão não mexem no responsável (dentro da mesma tarefa)", (await prisma.tarefa.findUnique({ where: { id: o1.tarefaId }, select: { responsavelId: true } }))?.responsavelId === daniela.id)
+
     secao("5) FEITO: só com os 4 passos concluídos")
     const feitoAntes = await concluidasRecentesDoUsuario(null)
     ok("com a 4 pendente a certidão NÃO está em Feito", !feitoAntes.some((l) => l.taskId === o1.tarefaId))
