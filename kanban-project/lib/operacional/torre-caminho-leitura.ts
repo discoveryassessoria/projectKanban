@@ -2,6 +2,7 @@
 // O LEITOR DO CAMINHO DO PROCESSO (servidor) — carrega do banco o que `torre-caminho.ts` (puro) precisa, em poucas consultas
 // constantes no volume. Ver o cabeçalho de `torre-caminho.ts` para as fontes e a divergência registrada (D02).
 import { prisma } from '@/lib/prisma'
+import { ehFaseAguardandoFechamento } from '@/src/lib/process-stage/fase-pre-contrato'
 import { resolveOperationalProjection } from '@/src/lib/process-stage/operational-projection'
 import { labelDaFasePorPhaseKey } from '@/src/lib/process-stage/fases-catalog'
 import { proximaFaseDoCaminho } from '@/src/lib/motor/phase-advance-helpers'
@@ -66,7 +67,8 @@ export async function lerCaminhoDoProcesso(processoId: number): Promise<CaminhoD
     const maisRecente = new Map<string, (typeof instancias)[number]>()
     for (const i of instancias) { const a = maisRecente.get(i.faseMacroKey); if (!a || i.ciclo > a.ciclo) maisRecente.set(i.faseMacroKey, i) }
     for (const [key, inst] of maisRecente) {
-      if (inst.status !== 'ATIVO' || key === proc.faseAtualKey || (ordemDe.get(key) ?? 9999) >= ordemAtual) continue
+      // "Aguardando fechamento" é pré-trabalho: a instância dela fica ATIVA por desenho e NUNCA conta como fase reaberta (só a Genealogia reabre).
+      if (inst.status !== 'ATIVO' || key === proc.faseAtualKey || (ordemDe.get(key) ?? 9999) >= ordemAtual || ehFaseAguardandoFechamento(key)) continue
       const ev = await prisma.workflowEvento.findFirst({ where: { workflowInstanceId: inst.id, tipo: 'WORKFLOW_REABERTO' }, orderBy: { id: 'desc' }, select: { criadoEm: true } })
       const proj = await resolveOperationalProjection(processoId, { faseMacroKey: key, workflowInstanceId: inst.id }).catch(() => null)
       reabertas.set(key, { em: ev?.criadoEm.toISOString() ?? null, progresso: proj ? proj.progress.percentage : null })
