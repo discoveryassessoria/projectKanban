@@ -123,7 +123,7 @@ export function ConferenciaColetaModal({ processoId, onFechar, onConcluida }: Pr
                 {envios.length === 1 ? "1 envio será descartado" : `${envios.length} envios serão descartados`}. Os dados e os arquivos são apagados em 30 dias; depois disso, quem entrar você cadastra manualmente.
               </p>
               <div className="mt-3 flex gap-2">
-                <button type="button" disabled={enviando} onClick={() => void enviar({ descartarTodos: true })} className="h-9 rounded-lg bg-red-700 px-3 text-sm font-semibold text-white disabled:opacity-60">
+                <button type="button" disabled={enviando} onClick={() => void enviar({ descartarTodos: true })} className="h-9 rounded-lg bg-red-700 px-3 text-sm font-semibold text-pure disabled:opacity-60">
                   {enviando ? "Descartando…" : `Descartar ${envios.length === 1 ? "o envio" : `os ${envios.length} envios`}`}
                 </button>
                 <button type="button" disabled={enviando} onClick={() => setConfirmandoDescarte(false)} className="h-9 rounded-lg border border-gray-300 px-3 text-sm">Voltar</button>

@@ -332,7 +332,7 @@ function DocumentoCard({
               onClick={handleDelete}
               className={`p-1.5 rounded-md transition-colors ${
                 confirmDelete 
-                  ? 'bg-red-600 text-white hover:bg-red-600' 
+                  ? 'bg-red-600 text-pure hover:bg-red-600' 
                   : 'hover:bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-red-500'
               }`}
               title={confirmDelete ? 'Clique para confirmar' : 'Excluir documento'}

@@ -255,7 +255,7 @@ export function RequerenteSelector({
                 disabled={selectedId == null || saving}
                 className={`flex-1 py-3 rounded-lg font-semibold text-sm tracking-wide transition-all flex items-center justify-center gap-2 ${
                   selectedId != null
-                    ? "bg-amber-700 text-white hover:bg-amber-800"
+                    ? "bg-amber-700 text-pure hover:bg-amber-800"
                     : "bg-gray-200 text-gray-500 cursor-not-allowed"
                 }`}
               >
