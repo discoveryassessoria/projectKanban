@@ -72,6 +72,10 @@ export interface LinhaOperacaoV3 {
   criadaEm: string | null
   atribuidaEm: string | null
   passoAtual: { ordem: number; total: number } | null
+  /** Aguardando o cartório: quando o requerimento foi enviado, quem o enviou e o lembrete de cobrança (pedido + prazo do passo). */
+  pedidoEnviadoEm?: string | null
+  pedidoPorId?: number | null
+  lembreteDeCobrancaEm?: string | null
   regraTemporalPasso: EstadoTemporalApi | null
   acompanhamentoPasso: EstadoTemporalApi | null
   emRisco: boolean

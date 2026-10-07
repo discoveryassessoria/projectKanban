@@ -364,7 +364,9 @@ async function reabrirTarefaNucleo(args: {
         select: { id: true, status: true, ordem: true },
         orderBy: { ordem: 'asc' },
       })
-      etapaAtual = etapaCorrente(steps)?.id ?? null
+      // Com destino explícito (a unidade de trabalho que se reabre — uma certidão numa instância que tem várias), a tarefa
+      // volta a ficar ancorada NESSE passo: a "etapa corrente" da instância inteira é de OUTRA certidão (e já tem a sua tarefa).
+      etapaAtual = args.stepDestinoId ?? etapaCorrente(steps)?.id ?? null
     }
 
     await tx.tarefa.update({

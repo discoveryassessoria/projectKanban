@@ -24,6 +24,8 @@ import {
 } from '@/lib/operacional/tempo-operacional'
 import { estadosTemporaisDasOperacoes, ehEsperaExterna, type EstadoTemporalDaOperacao } from '@/lib/operacional/proximo-acontecimento'
 import { escolherSubtarefaCorrente, criarCacheDeLeitura, type CacheDeLeitura } from './subtarefa-corrente'
+import { aguardandoOCartorio, SUBTAREFA_PEDIDO_ENVIADO } from './emissao-recebimento'
+import { prazoOperacional } from './tempo-operacional'
 import { ehFaseFutura, semFaseFutura } from './fase-futura'
 import type { AdvanceResultado, Prisma, PrioridadeTarefa, PrismaClient, StatusTarefa, TipoDocumento, TipoTarefa } from '@prisma/client'
 
@@ -408,6 +410,11 @@ export interface LinhaDeFila {
   aIniciar: boolean
   /** A subtarefa CORRENTE — chave e rótulo, para a coluna "Passo atual" mostrar o nível certo (subtarefa, não só passo). `null` sem motor de subtarefas. */
   passoCorrente: { chave: string; label: string } | null
+  /** Emissão: quando o requerimento foi enviado ao cartório (a subtarefa 1 concluída) e quem o enviou. `null` fora desse caso. */
+  pedidoEnviadoEm: Date | null
+  pedidoPorId: number | null
+  /** Emissão: o lembrete de cobrança — pedido + o prazo do passo (10 dias úteis, do cadastro). Só lembrete: não trava nada. */
+  lembreteDeCobrancaEm: Date | null
 }
 
 const SELECT = {
@@ -662,10 +669,28 @@ function projetar(
     })(),
     estadoOperacao: (() => {
       if (t.statusTarefa === 'CONCLUIDO_RECEBIDO' || t.statusTarefa === 'CONCLUIDO_NAO_POSSUI') return 'CONCLUIDA'
+      // Cancelada/substituída nunca está "aguardando" nada.
+      if (t.statusTarefa === 'CANCELADA' || t.statusTarefa === 'SUPERSEDIDA') return 'FILA'
       const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
+      // PEDIDO ENVIADO E RECEBIMENTO AINDA NÃO REGISTRADO = aguardando o cartório — com ou sem responsável, qualquer que seja o
+      // estado da subtarefa corrente (a regra é do fato, não de qual subtarefa está "aguardando terceiro").
+      if (aguardandoOCartorio(porSubtarefa?.statusPorSubtarefa)) return 'AGUARDANDO'
       const atual = porSubtarefa?.atual
       if (!atual) return 'FILA'
       return atual.status === 'AGUARDANDO_EXTERNO' ? 'AGUARDANDO' : 'FILA'
+    })(),
+    pedidoEnviadoEm: (() => {
+      const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
+      return aguardandoOCartorio(porSubtarefa?.statusPorSubtarefa) ? porSubtarefa?.pedidoEnviadoEm ?? null : null
+    })(),
+    pedidoPorId: (() => {
+      const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
+      return aguardandoOCartorio(porSubtarefa?.statusPorSubtarefa) ? porSubtarefa?.pedidoPorId ?? null : null
+    })(),
+    lembreteDeCobrancaEm: (() => {
+      const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
+      if (!aguardandoOCartorio(porSubtarefa?.statusPorSubtarefa) || !porSubtarefa?.pedidoEnviadoEm) return null
+      return prazoOperacional(porSubtarefa.slaDiasDoPasso, porSubtarefa.pedidoEnviadoEm)
     })(),
     aIniciar: (() => {
       const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
@@ -832,6 +857,13 @@ async function totalDePassos(
 export interface ResumoSubtarefasDoPasso {
   concluidas: number
   total: number
+  /** O estado de CADA subtarefa vigente do passo, por chave — a regra "aguardando o cartório" lê daqui (`emissao-recebimento.ts`). */
+  statusPorSubtarefa: Record<string, string>
+  /** Quando e por quem a subtarefa "Enviar requerimento ao cartório" foi concluída. */
+  pedidoEnviadoEm: Date | null
+  pedidoPorId: number | null
+  /** O prazo do passo no cadastro (dias úteis) — o "10 dias" do lembrete de cobrança. */
+  slaDiasDoPasso: number | null
   /** A subtarefa CORRENTE (não encerrada), pela ordem da definição — nunca por `sequencia` (retry count por subtarefa, não ordem entre subtarefas). */
   atual: {
     subtaskKey: string; status: string; criadoEm: Date; startedAt: Date | null
@@ -894,6 +926,7 @@ async function progressoPorSubtarefa(
   const ordemPorStepInstance = new Map<number, Map<string, number>>()
   const definicaoPorStepInstance = new Map<number, Map<string, { label: string; dependeDe: string[] }>>()
   const createdAtPorStepInstance = new Map<number, Date>()
+  const slaDoPassoPorStepInstance = new Map<number, number | null>()
   for (const l of linhas) {
     const si = l.workflowStepInstance
     if (!si || l.workflowInstanceId == null) continue
@@ -902,6 +935,7 @@ async function progressoPorSubtarefa(
     if (!inst?.workflowDefinitionId || inst.workflowVersion == null) continue
     const versao = versaoPorChave.get(`${inst.workflowDefinitionId}:${inst.workflowVersion}`)
     const passo = versao?.passos.find((p) => p.key === si.stepKey)
+    slaDoPassoPorStepInstance.set(si.id, passo?.slaDays ?? null)
     const subtarefasAtivas = passo?.subtarefas?.filter((s) => s.ativo !== false) ?? []
     if (subtarefasAtivas.length > 0) {
       totalPorStepInstance.set(si.id, subtarefasAtivas.length)
@@ -954,8 +988,12 @@ async function progressoPorSubtarefa(
     // `estadosTemporaisDasOperacoes` usa para `acompanhamentoVencido`.
     const atual = escolherSubtarefaCorrente(execs, defs, ordens)
     const defAtual = atual ? defs?.get(atual.subtaskKey) : null
+    const pedido = execs.find((e) => e.subtaskKey === SUBTAREFA_PEDIDO_ENVIADO && e.status === 'CONCLUIDO')
     resultado.set(stepInstanceId, {
       concluidas, total,
+      statusPorSubtarefa: Object.fromEntries(execs.map((e) => [e.subtaskKey, e.status])),
+      pedidoEnviadoEm: pedido?.completedAt ?? null, pedidoPorId: pedido?.executadoPorId ?? null,
+      slaDiasDoPasso: slaDoPassoPorStepInstance.get(stepInstanceId) ?? null,
       atual: atual ? {
         subtaskKey: atual.subtaskKey, status: atual.status, criadoEm: atual.criadoEm, startedAt: atual.startedAt,
         escalada: atual.escalada, totalCobrancas: totalCobrancasPorExecucaoId.get(atual.id) ?? 0,
@@ -989,6 +1027,7 @@ async function progressoPorSubtarefa(
     const [subtaskKey, def] = entrada
     resultado.set(stepInstanceId, {
       concluidas: 0, total,
+      statusPorSubtarefa: {}, pedidoEnviadoEm: null, pedidoPorId: null, slaDiasDoPasso: slaDoPassoPorStepInstance.get(stepInstanceId) ?? null,
       atual: {
         subtaskKey, status: 'DISPONIVEL',
         criadoEm: createdAtPorStepInstance.get(stepInstanceId) ?? new Date(),
@@ -1102,7 +1141,27 @@ export async function minhaFila(
   // inteira, quando `usuarioId` é `null`).
   const { estadoOperacao, ...filtrosParaWhere } = filtrosExtra
   const responsavelId = usuarioId !== null ? usuarioId : filtrosExtra.responsavelId
-  const { linhas } = await visaoGerencial({ ...filtrosParaWhere, responsavelId, porPagina: 500 }, agora, db)
+  const { linhas: dele } = await visaoGerencial({ ...filtrosParaWhere, responsavelId, porPagina: 500 }, agora, db)
+  // QUEM FEZ O PEDIDO VÊ A CERTIDÃO AGUARDANDO O CARTÓRIO MESMO QUE ELA TENHA MUDADO DE DONO (ou esteja sem responsável): só em Aguardando,
+  // nunca em A fazer. Só no escopo individual — a equipe já vê tudo.
+  let linhas = dele
+  if (usuarioId !== null) {
+    const extras = await db.subtaskExecution.findMany({
+      where: { subtaskKey: SUBTAREFA_PEDIDO_ENVIADO, status: 'CONCLUIDO', executadoPorId: usuarioId, supersededAt: null },
+      select: { stepInstanceId: true },
+    })
+    if (extras.length > 0) {
+      const ids = (await db.tarefa.findMany({
+        where: { workflowStepInstanceId: { in: extras.map((e) => e.stepInstanceId) }, OR: [{ responsavelId: null }, { responsavelId: { not: usuarioId } }] },
+        select: { id: true },
+      })).map((t) => t.id)
+      if (ids.length > 0) {
+        const { linhas: dosPedidos } = await visaoGerencial({ ...filtrosParaWhere, responsavelId: undefined, tarefaIds: ids, porPagina: 500 }, agora, db)
+        const jaTem = new Set(dele.map((l) => l.taskId))
+        linhas = [...dele, ...dosPedidos.filter((l) => !jaTem.has(l.taskId) && (l as LinhaGerencial).estadoOperacao === 'AGUARDANDO')]
+      }
+    }
+  }
   // Encerradas não são fila: o que já foi entregue não é trabalho de hoje.
   // E tarefa de FASE FUTURA não é fila (regra única — `fase-futura.ts`).
   const semConcluidas = semFaseFutura(linhas.filter((l) => l.coluna !== 'CONCLUIDA')) as LinhaGerencial[]
@@ -1922,6 +1981,8 @@ export interface LinhaGerencial extends LinhaDeFila {
 
 export interface FiltrosGerenciais {
   responsavelId?: number | null
+  /** Só estas tarefas (por id) — usado para somar à fila de quem fez o pedido as certidões aguardando o cartório que não são mais dele. */
+  tarefaIds?: number[] | null
   /** `true` recorta o que não é de ninguém — é filtro, não estado. */
   semResponsavel?: boolean
   faseMacroKey?: string | null
@@ -2042,6 +2103,7 @@ function whereGerencial(f: FiltrosGerenciais, agora: Date): Prisma.TarefaWhereIn
 
   if (f.semResponsavel) where.responsavelId = null
   else if (f.responsavelId != null) where.responsavelId = f.responsavelId
+  if (f.tarefaIds) where.id = { in: f.tarefaIds }
 
   if (f.faseMacroKey === SEM_FASE_SENTINELA) where.faseMacroKey = null
   else if (f.faseMacroKey) where.faseMacroKey = f.faseMacroKey

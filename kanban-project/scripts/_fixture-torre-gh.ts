@@ -14,10 +14,10 @@ import { concluirSubtarefaCorrentePeloPasso } from "../src/services/subtarefas-d
 
 export interface Obrigacao { processoId: number; tarefaId: number; stepInstanceId: number }
 
-export interface SubtarefaDaFixture { key: string; label: string; ordem: number; espera: boolean; dependeDe: string[] }
+export interface SubtarefaDaFixture { key: string; label: string; ordem: number; espera: boolean; dependeDe: string[]; exigeProtocolo?: boolean }
 
 /** `subs` (opcional) troca as duas subtarefas padrão — p.ex. pelas chaves reais da Emissão (enviar → confirmar → receber → validar). */
-export async function montarCenario(MARCA: string, opcoes: { diasAposCobranca?: number; escalarApos?: number; slaDays?: number; subs?: SubtarefaDaFixture[] } = {}) {
+export async function montarCenario(MARCA: string, opcoes: { diasAposCobranca?: number; escalarApos?: number; slaDays?: number; subs?: SubtarefaDaFixture[]; regraDeConclusao?: 'ACAO_DO_PASSO' | 'TODAS_SUBTAREFAS_OBRIGATORIAS' | 'QUALQUER_SUBTAREFA' } = {}) {
   const TIPO_CODE = "TST-" + MARCA.replace(/[^A-Z0-9]/gi, "").slice(0, 30)
   const PHASE_KEY = `${MARCA.toLowerCase()}_fase`
 
@@ -72,6 +72,7 @@ export async function montarCenario(MARCA: string, opcoes: { diasAposCobranca?: 
     data: {
       workflowId: wf.id, key: "solicitar_certidao", label: `${MARCA} Solicitar certidão`, ordem: 1, slaDays: opcoes.slaDays ?? 0, cardinalidade: "PROCESSO",
       diasParaIniciar: 2, diasAposCobranca: opcoes.diasAposCobranca ?? 1, escalarApos: opcoes.escalarApos ?? 2,
+      ...(opcoes.regraDeConclusao ? { regraDeConclusao: opcoes.regraDeConclusao } : {}),
     },
     select: { id: true },
   })
@@ -84,6 +85,7 @@ export async function montarCenario(MARCA: string, opcoes: { diasAposCobranca?: 
       data: {
         stepId: step.id, key: s.key, label: s.label, ordem: s.ordem, esperaExternaAoLiberar: s.espera,
         acompanhamentoAtivo: s.espera, acompanhamentoPrimeiroDias: s.espera ? 5 : null, dependeDe: s.dependeDe,
+        ...(s.exigeProtocolo ? { exigeProtocolo: true } : {}),
       },
       select: { id: true },
     })

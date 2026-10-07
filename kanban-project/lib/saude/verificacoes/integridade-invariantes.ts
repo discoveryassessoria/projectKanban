@@ -11,6 +11,7 @@
 //   R5  (retirada: tarefa sem responsável nunca é violação — "aguardando distribuição" é pendência do gestor, mostrada em HOJE.)
 //   R6  Barra de fases, Central e Torre mostram o mesmo estado (tarefa aberta presa a instância já concluída/supersedida).
 //   R7  Tela × banco: a lista "Certidões exigidas desta pessoa" gravada concorda com as necessidades que existem.
+//   R8  Passo da Emissão concluído com subtarefa ainda aberta (o defeito do casamento do Juan, 07/10/2026: a certidão sumia de Aguardando e aparecia em Feito como "Concluída").
 // ============================================================================
 import { prisma } from '@/lib/prisma'
 import { registrar } from '../catalogo'
@@ -18,7 +19,7 @@ import type { Achado, ResultadoVerificacao } from '../tipos'
 import { lerDocumentosExigidosGravado, type CodigoDocumentoExigivel } from '@/src/lib/genealogia/documentos-exigidos'
 import { PESSOA_ATIVA } from '@/src/lib/genealogia/vinculo-ativo'
 
-export type RegraDoVigia = 'R1' | 'R2' | 'R3' | 'R4' | 'R6' | 'R7'
+export type RegraDoVigia = 'R1' | 'R2' | 'R3' | 'R4' | 'R6' | 'R7' | 'R8'
 
 export interface ViolacaoDoVigia {
   regra: RegraDoVigia
@@ -178,6 +179,19 @@ export async function detectarViolacoesDeIntegridade(): Promise<{ processos: num
     }
   }
 
+  // R8 — passo da Emissão CONCLUÍDO com subtarefa vigente ainda aberta: a certidão "concluída" sem os 4 passos feitos.
+  const fechadosCedo = await prisma.phaseWorkflowStepInstance.findMany({
+    where: {
+      processoId: { in: procIds }, faseMacroKey: 'emissao_documental', status: 'CONCLUIDO',
+      execucoesDeSubtarefa: { some: { supersededAt: null, status: { in: ['PENDENTE', 'DISPONIVEL', 'EM_ANDAMENTO', 'AGUARDANDO_EXTERNO', 'BLOQUEADO'] } } },
+    },
+    select: { id: true, processoId: true, necessidadeId: true, execucoesDeSubtarefa: { where: { supersededAt: null, status: { in: ['PENDENTE', 'DISPONIVEL', 'EM_ANDAMENTO', 'AGUARDANDO_EXTERNO', 'BLOQUEADO'] } }, select: { subtaskKey: true } } },
+  })
+  for (const s of fechadosCedo) {
+    const n = s.necessidadeId != null ? necPorId.get(s.necessidadeId) : undefined
+    out.push({ regra: 'R8', processoId: s.processoId, familia: familia(s.processoId), certidao: n ? certidaoDe(n) : null, pessoa: n ? quem(n) : null, detalhe: `passo concluído com subtarefa aberta: ${s.execucoesDeSubtarefa.map((e) => e.subtaskKey).join(', ')}`, entidade: 'PhaseWorkflowStepInstance', registroId: s.id })
+  }
+
   return { processos: processos.length, violacoes: out }
 }
 
@@ -188,13 +202,14 @@ const TITULO: Record<RegraDoVigia, string> = {
   R4: 'certidão exigida sem tarefa (ou na fase errada)',
   R6: 'tarefa aberta presa a fase já concluída',
   R7: 'lista de certidões da pessoa × necessidades divergem',
+  R8: 'passo da Emissão concluído com subtarefa ainda aberta',
 }
 
 registrar({
   id: 'saude.integridade.regras-fixas',
   codigo: 'INT-002',
   nome: 'Regras fixas de integridade (Genealogia × Emissão × Torre)',
-  descricao: 'Varre todos os processos ativos contra as regras fixas (R1–R4, R6, R7) definidas em 06/10/2026 (caso Fogli): certidão só na Emissão com o registro localizado; fase concluída sem passo obrigatório aberto; certidão andada nunca "não exigida" sem decisão humana; toda certidão exigida com tarefa na fase certa; toda tarefa aberta atribuível; barra/Central/Torre no mesmo estado; lista de certidões da pessoa coerente. Somente leitura.',
+  descricao: 'Varre todos os processos ativos contra as regras fixas (R1–R4, R6–R8) definidas em 06/10/2026 (caso Fogli): certidão só na Emissão com o registro localizado; fase concluída sem passo obrigatório aberto; certidão andada nunca "não exigida" sem decisão humana; toda certidão exigida com tarefa na fase certa; toda tarefa aberta atribuível; barra/Central/Torre no mesmo estado; lista de certidões da pessoa coerente. Somente leitura.',
   dominio: 'ARVORE',
   modulo: 'Genealogia',
   severidadePadrao: 'ERRO',
