@@ -174,7 +174,7 @@ async function main() {
     const wf = readFileSync("src/components/kanban/workflow/WorkflowTab.tsx", "utf8")
     // FLUXO ÚNICO (07/10/2026): a linha do Aguardando só tem «Abrir»; o recebimento se registra no passo 2 da gaveta («Iniciar →» abre o modal).
     ok("a linha do Aguardando NÃO tem atalho de recebimento (só «Abrir»)", !/>\s*Registrar recebimento\s*</.test(abas) && !/podeRegistrar/.test(abas))
-    ok("a gaveta abre o modal «Registrar recebimento» SÓ no passo 3 (Receber certidão), pela janela do passo", /janelaDaSubtarefa\(s\.key\) === "REGISTRAR_RECEBIMENTO"/.test(wf) && /registrar-recebimento-passo/.test(wf) && /<RegistrarRecebimentoModal/.test(wf) && !/s\.key === SUBTAREFA_CONFIRMACAO && !s\.concluida \? \(\) => setRecebimentoAberto/.test(wf))
+    ok("a gaveta NÃO abre mais o modal «Registrar recebimento»: o passo 3 abre a Central (tela de recebimento)", !/RegistrarRecebimentoModal/.test(wf) && /onOpenCentral\(s\.key\)/.test(wf))
     ok("só a gaveta usa o modal (nem a Operação nem a Torre o abrem por conta própria)", !/RegistrarRecebimentoModal/.test(readFileSync("src/components/operacao/operacao-v3.tsx", "utf8")))
     ok("o modal pede a data dd/mm/aaaa (sugere hoje), anexo OPCIONAL e confirmação antes de gravar", /CampoDataTexto/.test(modal) && /Anexar a certidão \(opcional\)/.test(modal) && /confirmado: true/.test(modal) && /Confirmar/.test(modal))
     ok("o anexo não é exigido: o botão Continuar só depende da data", /disabled=\{enviando \|\| !dia\}/.test(modal) && !/required/.test(modal))
