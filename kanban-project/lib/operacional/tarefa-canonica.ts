@@ -294,6 +294,41 @@ export async function ajustarPrazoAEntradaNaFase(
   return novo
 }
 
+/**
+ * A MESMA regra em LOTE, para o processo inteiro: 3 consultas quando nada precisa mudar (processo, tarefas abertas da fase atual, entrada na fase) — em vez de 3 a 4 por
+ * tarefa, que deixava o salvamento lento (cada reconciliação de uma pessoa percorria as 16–20 certidões uma a uma). Só escreve nas que violam a regra.
+ */
+export async function ajustarPrazosDoProcessoNaFase(db: Prisma.TransactionClient | typeof import('@/lib/prisma').prisma, processoId: number): Promise<number[]> {
+  const proc = await db.processo.findUnique({ where: { id: processoId }, select: { faseAtualKey: true } })
+  if (!proc?.faseAtualKey) return []
+  const tarefas = await db.tarefa.findMany({
+    where: { processoId, faseMacroKey: proc.faseAtualKey, dataPrazo: { not: null }, statusTarefa: { notIn: ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI', 'CANCELADA', 'SUPERSEDIDA'] } },
+    select: { id: true, dataPrazo: true, workflowStepInstance: { select: { slaDays: true } } },
+  })
+  if (tarefas.length === 0) return []
+  const log = await db.phaseAdvanceLog.findFirst({
+    where: { processoId, resultado: { in: ['MOVIDO', 'AVANCADO', 'FORCADO'] }, fasePretendida: proc.faseAtualKey },
+    orderBy: { criadoEm: 'desc' }, select: { criadoEm: true },
+  })
+  if (!log) return []
+  const feitas: number[] = []
+  for (const t of tarefas) {
+    const sla = t.workflowStepInstance?.slaDays ?? null
+    const novo = prazoNaoAnteriorAEntrada(t.dataPrazo, log.criadoEm, sla)
+    if (!novo || !t.dataPrazo) continue
+    await db.tarefa.update({ where: { id: t.id }, data: { dataPrazo: novo } })
+    await db.logAuditoria.create({
+      data: {
+        acao: 'TAREFA_PRAZO_REANCORADO', entidade: 'Tarefa', entidadeId: t.id,
+        descricao: `Prazo ${t.dataPrazo.toISOString().slice(0, 10)} era anterior à entrada do processo na fase (${log.criadoEm.toISOString().slice(0, 10)}); passou a ${novo.toISOString().slice(0, 10)}${sla ? ` (entrada + SLA ${sla}d)` : ' (a própria entrada)'}.`,
+        detalhes: { de: t.dataPrazo.toISOString(), para: novo.toISOString(), entrada: log.criadoEm.toISOString(), slaDays: sla },
+      },
+    })
+    feitas.push(t.id)
+  }
+  return feitas
+}
+
 export async function materializarTarefaOperacional(
   tx: Prisma.TransactionClient,
   nova: NovaTarefaOperacional,

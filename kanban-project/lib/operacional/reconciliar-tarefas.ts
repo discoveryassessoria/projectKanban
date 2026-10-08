@@ -25,7 +25,7 @@ import type { Prisma } from '@prisma/client'
 import { STATUS_DOCUMENTO_INATIVOS } from '@/src/lib/documentos/status-inativos'
 import { nomeDaTarefa } from './nome-da-tarefa'
 import {
-  materializarTarefaOperacional, sincronizarTarefaComWorkflow, ajustarPrazoAEntradaNaFase, STATUS_TERMINAIS,
+  materializarTarefaOperacional, sincronizarTarefaComWorkflow, ajustarPrazosDoProcessoNaFase, STATUS_TERMINAIS,
 } from './tarefa-canonica'
 import { sincronizarAvisosDeTarefas } from './notificacao-canonica'
 
@@ -191,11 +191,6 @@ export async function reconciliarTarefas(
       if (!dryRun) {
         const r = await emTx(db, (tx) => sincronizarTarefaComWorkflow(tx, t.id, agora))
         if (r.mudou) res.tarefasSincronizadas++
-        // Prazo nunca anterior à entrada na fase (trabalho antecipado nasce antes do processo chegar): tarefa que já existe é reancorada aqui também.
-        const chaveT = t.necessidadeId != null ? `nec${t.necessidadeId}` : t.documentoId != null ? `doc${t.documentoId}` : ''
-        const slaT = chaveT ? slaDoTrabalho(grupos.get(chaveT) ?? []) : null
-        const novoPrazo = await emTx(db, (tx) => ajustarPrazoAEntradaNaFase(tx, t.id, slaT))
-        if (novoPrazo) res.detalhes.push({ instanciaId: inst.id, tarefaId: t.id, acao: `prazo reancorado na entrada da fase · ${novoPrazo.toISOString().slice(0, 10)}` })
       }
       res.detalhes.push({ instanciaId: inst.id, tarefaId: t.id, acao: 'já tinha tarefa · sincronizada' })
     }
@@ -302,6 +297,14 @@ export async function reconciliarTarefas(
 
     if (criada.criada) res.tarefasCriadas++
     res.detalhes.push({ instanciaId: inst.id, tarefaId: criada.tarefaId, acao: criada.criada ? `criada: ${nome}` : `reaproveitada (${criada.motivo})` })
+    }
+  }
+
+  // PRAZO NUNCA ANTERIOR À ENTRADA NA FASE — uma passada por processo (3 consultas), não uma por tarefa.
+  if (!dryRun) {
+    for (const processoId of new Set(instancias.map((i) => i.processoId))) {
+      const feitas = await ajustarPrazosDoProcessoNaFase(db, processoId)
+      for (const tarefaId of feitas) res.detalhes.push({ instanciaId: 0, tarefaId, acao: 'prazo reancorado na entrada da fase' })
     }
   }
 
