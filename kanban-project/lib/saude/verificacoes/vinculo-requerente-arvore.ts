@@ -69,6 +69,10 @@ export async function detectarVinculosDeRequerente(): Promise<ViolacaoDoVinculo[
   const familiaDe = (p: (typeof vinculos)[number]['processo']) => p.arvore?.nome ?? p.nome
   const porProcesso = new Map<number, typeof vinculos>()
   for (const v of vinculos) porProcesso.set(v.processoId, [...(porProcesso.get(v.processoId) ?? []), v])
+  // UM requerente pode estar em VÁRIOS processos (a Caroline: cidadania italiana e espanhola) e é ligado a UMA pessoa, da árvore de UM deles — no outro
+  // processo (que pode nem ter árvore ainda) isso é o normal, não vínculo cruzado. Só é cruzado se a árvore da pessoa não é de NENHUM processo dele.
+  const arvoresDoRequerente = new Map<number, Set<number>>()
+  for (const v of vinculos) if (v.processo.arvoreId != null) arvoresDoRequerente.set(v.requerenteId, (arvoresDoRequerente.get(v.requerenteId) ?? new Set<number>()).add(v.processo.arvoreId))
 
   for (const v of vinculos) {
     const { processo: proc, requerente: r } = v
@@ -79,10 +83,11 @@ export async function detectarVinculosDeRequerente(): Promise<ViolacaoDoVinculo[
       continue
     }
     if (!pes) continue
-    if (pes.arvoreId != null && pes.arvoreId !== proc.arvoreId) {
+    if (pes.arvoreId != null && pes.arvoreId !== proc.arvoreId && !arvoresDoRequerente.get(r.id)?.has(pes.arvoreId)) {
       out.push({ ...base, caso: 'D', severidade: 'ERRO', pessoa: nomePessoa(pes), detalhe: `o requerente aponta para uma pessoa da ${pes.arvore?.nome ?? `árvore #${pes.arvoreId}`}, que não é a árvore deste processo${proc.arvoreId == null ? ' (o processo não tem árvore)' : ''}` })
       continue
     }
+    if (pes.arvoreId != null && pes.arvoreId !== proc.arvoreId) continue // requerente em mais de um processo: a pessoa é da árvore de outro processo DELE (ver acima)
     if (proc.arvoreId != null && pes.arvoreId === proc.arvoreId && !ehFlagDeRequerente(pes.requerente)) {
       out.push({ ...base, caso: 'B3', severidade: 'ERRO', pessoa: nomePessoa(pes), detalhe: `o requerente está no processo, mas a pessoa ligada está marcada como «${pes.requerente ?? 'nao'}» na árvore` })
     }
