@@ -27,7 +27,7 @@ import { mesmoLugar } from '@/src/lib/genealogia/sincronizacao-registral'
 import { compararCertidoesDaFamilia } from '@/lib/operacional/ordem-certidoes'
 import { SUBTAREFA_PEDIDO_ENVIADO, SUBTAREFA_CONFIRMACAO, SUBTAREFA_CERTIDAO_RECEBIDA, SUBTAREFA_CONFERENCIA } from '@/lib/operacional/emissao-recebimento'
 
-export type RegraDoMarco = 'a' | 'c' | 'e' | 'f' | 'g' | 'i' | 'j' | 'l' | 'm' | 'n' | 'o' | 'p'
+export type RegraDoMarco = 'a' | 'c' | 'e' | 'f' | 'g' | 'i' | 'j' | 'l' | 'm' | 'n' | 'o' | 'p' | 'q'
 
 /** O detalhe do processo lido UMA vez por rodada (as regras e, i e o script leem o mesmo). */
 type Detalhe = Awaited<ReturnType<typeof import('@/lib/operacional/torre-foco')['detalheDoProcesso']>>
@@ -60,6 +60,7 @@ export const TITULO_DA_REGRA: Record<RegraDoMarco, string> = {
   j: 'Subtarefa da Emissão fora de ordem ou com selo «Disponível» sendo que depende de outra',
   m: 'Local do óbito da certidão diferente (ou ausente) na árvore',
   n: 'Abas da Torre dizendo coisas diferentes (responsável, fases, risco ou contagens)',
+  q: 'Árvore difere da Genealogia (dado da Genealogia que a árvore ainda não acompanhou)',
   p: 'Necessidade dispensada sem registro de quem dispensou (a partir de 08/10/2026)',
   o: 'Documentos por pessoa: casamento fora do dono, dispensada com exigência, ou painel × aba Documentos × árvore × Torre divergentes',
   l: 'Certidão recebida/validada sem o passo de recebimento/validação da Emissão concluído',
@@ -419,13 +420,21 @@ export async function detectarRegraP(desde: Date = DISPENSA_COM_AUTOR_DESDE): Pr
   return dispensadas.filter((d) => !comLog.has(d.id)).map((d) => ({ regra: 'p' as const, processoId: d.processoId, familia: d.processo?.nome ?? '—', certidao: d.itemCatalogo?.name ?? null, pessoa: nomeDe(d.pessoa), detalhe: 'necessidade dispensada sem linha de histórico com autor (usuário ou sistema + motivo)', entidade: 'NecessidadeDocumental', registroId: d.id }))
 }
 
+// ── q ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/** A Genealogia prevalece: todo campo em que a árvore difere de um dado PRESENTE na Genealogia e que não é ambíguo, nem revisão manual, nem local do óbito. */
+export async function detectarRegraQ(): Promise<ViolacaoDoMarco[]> {
+  const { relatorioDeCasosAntigos } = await import('@/src/services/genealogia/sincronizar-com-registro')
+  const rel = await relatorioDeCasosAntigos()
+  return rel.aplicar.map((l) => ({ regra: 'q' as const, processoId: l.processoId, familia: l.familia, certidao: l.certidao, pessoa: l.pessoa, detalhe: `${l.campo}: árvore «${l.arvoreTexto}» × Genealogia «${l.genealogiaTexto}»`, entidade: l.alvo === 'UNIAO' ? 'Uniao' : 'Pessoa', registroId: l.alvoId }))
+}
+
 export async function detectarRegrasDoMarco(opts: { profundo?: boolean } = {}): Promise<{ violacoes: ViolacaoDoMarco[]; porRegra: Record<RegraDoMarco, number> }> {
   limparMemoDeDetalhes()
   const todas = [
     ...(await detectarRegraA()), ...(await detectarRegraC()), ...(await detectarRegraE(opts)),
-    ...(await detectarRegraF()), ...(await detectarRegraG()), ...(opts.profundo ? await detectarRegraI() : []), ...(await detectarRegraJ()), ...(await detectarRegraL()), ...(await detectarRegraM()), ...(await detectarRegraN()), ...(await detectarRegraO()), ...(await detectarRegraP()),
+    ...(await detectarRegraF()), ...(await detectarRegraG()), ...(opts.profundo ? await detectarRegraI() : []), ...(await detectarRegraJ()), ...(await detectarRegraL()), ...(await detectarRegraM()), ...(await detectarRegraN()), ...(await detectarRegraO()), ...(await detectarRegraP()), ...(await detectarRegraQ()),
   ]
-  const porRegra = { a: 0, c: 0, e: 0, f: 0, g: 0, i: 0, j: 0, l: 0, m: 0, n: 0, o: 0, p: 0 } as Record<RegraDoMarco, number>
+  const porRegra = { a: 0, c: 0, e: 0, f: 0, g: 0, i: 0, j: 0, l: 0, m: 0, n: 0, o: 0, p: 0, q: 0 } as Record<RegraDoMarco, number>
   for (const v of todas) porRegra[v.regra]++
   return { violacoes: todas, porRegra }
 }

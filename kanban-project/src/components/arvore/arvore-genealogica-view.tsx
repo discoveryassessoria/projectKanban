@@ -10,7 +10,6 @@ import dagre from "dagre"
 import type { PessoaArvore, UniaoArvore, DocumentoArvore, CampoEdicaoPessoa } from "./types"
 import { RemocaoPessoaModal, type PlanoRemocaoUI } from '@/src/components/arvore/remocao-pessoa-modal'
 import { ExclusaoArvoreModal, type PlanoExclusaoArvoreUI } from '@/src/components/arvore/exclusao-arvore-modal'
-import { SincronizarComGenealogiaModal } from "./sincronizar-com-genealogia"
 import { MenuMaisArvore } from './menu-mais-arvore'
 import { AvisoEdicao, type AvisoEdicaoDados } from './aviso-edicao'
 import { RemoverVinculoModal } from './remover-vinculo-modal'
@@ -313,7 +312,6 @@ export function ArvoreGenealogicaView({
   const [idiomaPdf, setIdiomaPdf] = useState<string>(
     idiomaDoPais && TITULO_ARVORE[idiomaDoPais] ? idiomaDoPais : IDIOMA_PADRAO,
   )
-  const [mostrarSincronizacao, setMostrarSincronizacao] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const treeContainerRef = useRef<HTMLDivElement>(null)
   
@@ -1537,13 +1535,6 @@ export function ArvoreGenealogicaView({
             desabilitado={pessoas.length === 0}
           />
 
-          {/* SINCRONIZAR COM A GENEALOGIA — lista as diferenças entre a árvore e os registros localizados e aplica depois de confirmação (vale o registro). */}
-          {arvoreId && pode('arvore.editar') && pessoas.length > 0 && (
-            <button type="button" data-testid="botao-sincronizar-genealogia" className={CLASSE_BOTAO_BARRA} onClick={() => setMostrarSincronizacao(true)} title="Comparar a árvore com os dados registrais localizados na Genealogia">
-              Sincronizar com a Genealogia
-            </button>
-          )}
-
           {/* Botão Fullscreen */}
           <button
             className="p-2 hover:bg-[var(--surface-tertiary)] rounded transition-colors"
@@ -1858,9 +1849,6 @@ export function ArvoreGenealogicaView({
         />
       )}
 
-      {mostrarSincronizacao && arvoreId && (
-        <SincronizarComGenealogiaModal arvoreId={arvoreId} onFechar={() => setMostrarSincronizacao(false)} onAplicado={() => { void fetchArvore() }} />
-      )}
 
       {/* Modal Editar Pessoa */}
       {showEditPersonModal && editingPerson && (

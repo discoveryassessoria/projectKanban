@@ -9,6 +9,7 @@
 //   • EDITAR depois do passo concluído: motivo obrigatório, aviso de requerimento já enviado, histórico, sem reabrir passo / mudar fase, e dispara a sincronização.
 //   node scripts/ci/gate-build.mjs --suite todas --so sincronizacao-registral-arvore
 // ============================================================================
+import { existsSync } from "node:fs"
 import { exigirBancoDeTeste } from "./_banco-de-teste"
 import { prisma } from "../lib/prisma"
 import { criarPalco } from "./_fixture-arvore-fonte"
@@ -80,9 +81,9 @@ async function main() {
   const n1 = await nasc()
   ok("ao CONCLUIR: vazio preenche (cidade, país) e o estado «SP» fica (mesmo lugar de «São Paulo»)", n1.local_nasc === "Santo André" && n1.pais_nasc === "Brasil" && n1.estado_nasc === "SP")
   ok("data diferente: a sincronização AUTOMÁTICA não sobrescreve a árvore (continua 03/10) — só com escolha explícita", dia(n1.data_nasc) === "1937-10-03" && s1.aplicados.every((a) => a.tipo === "PREENCHER"))
-  // A escolha explícita (botão «Sincronizar com a Genealogia», item a item): aí o registro vale (03/10 → 12/10), com divergência resolvida e histórico.
+  // A escolha explícita (aviso, item a item): aí o registro vale (03/10 → 12/10), com divergência resolvida e histórico.
   const { sincronizarArvore } = await import("../src/services/genealogia/sincronizar-com-registro")
-  await sincronizarArvore({ arvoreId: c.arvoreId, autorId: P.adminId, origem: "BOTAO_NA_ARVORE", documentoId: doc.id, selecao: new Set([`PESSOA:${c.titularId}:PESSOA.data_nasc`]) })
+  await sincronizarArvore({ arvoreId: c.arvoreId, autorId: P.adminId, origem: "ESCOLHA_NO_AVISO", documentoId: doc.id, selecao: new Set([`PESSOA:${c.titularId}:PESSOA.data_nasc`]) })
   ok("escolha explícita: VALE O REGISTRO (03/10 → 12/10)", dia((await nasc()).data_nasc) === "1937-10-12")
   const logData = await prisma.logAuditoria.findFirst({ where: { acao: "SINCRONIZACAO_REGISTRAL", detalhes: { path: ["chave"], equals: "PESSOA.data_nasc" } }, select: { id: true, usuarioId: true, criadoEm: true, detalhes: true, entidade: true, entidadeId: true } })
   const det = (logData?.detalhes ?? {}) as Record<string, unknown>
@@ -149,7 +150,7 @@ async function main() {
   ok("o modal pede o motivo (passo concluído), avisa o requerimento enviado e, se o valor difere da árvore, abre a escolha (árvore · cadastro · cancelar)", /Motivo da correção \(obrigatório/.test(modal) && /aviso-requerimento-enviado/.test(modal) && /ModalConfirmacaoArvore/.test(modal) && /divergenciasDaResposta/.test(modal) && /Salvar mesmo assim/.test(modal))
   ok("salvar chama a rota de edição e o Desfazer da árvore existe no resultado", /dados-registrais`, \{\s*method: "PATCH"/.test(modal) && /sincronizacao-registral\/\$\{logId\}\/desfazer/.test(modal))
   ok("modal do passo «Localizar registro»: campo «Data do registro» e a escolha árvore · cadastro · cancelar ao receber o 409", /label="Data do registro"/.test(ler("src/components/kanban/workflow/EditorRegistralModal.tsx")) && /ModalConfirmacaoArvore/.test(ler("src/components/kanban/workflow/EditorRegistralModal.tsx")))
-  ok("árvore: botão «Sincronizar com a Genealogia» + diálogo com a lista de diferenças e confirmação", /data-testid="botao-sincronizar-genealogia"/.test(arv) && /<SincronizarComGenealogiaModal/.test(arv) && /confirmar: true/.test(ler("src/components/arvore/sincronizar-com-genealogia.tsx")))
+  ok("árvore: o botão «Sincronizar com a Genealogia» NÃO existe mais (a sincronização é automática)", !/botao-sincronizar-genealogia|SincronizarComGenealogiaModal|Sincronizar com a Genealogia/.test(arv) && !existsSync("src/components/arvore/sincronizar-com-genealogia.tsx") && !existsSync("src/app/api/arvore/[arvoreid]/sincronizacao/route.ts"))
   ok("árvore: campo que veio do registro aparece «do registro» e não se edita (TravaDoRegistro nos campos de nascimento, óbito e casamento)", (arv.match(/<TravaDoRegistro travado=/g) ?? []).length >= 7 && /do registro/.test(arv))
   ok("Inteligência da árvore lista as divergências resolvidas (com Desfazer)", /<DivergenciasResolvidas/.test(ler("src/components/arvore/inteligencia/painel-inteligencia.tsx")) && /Divergências resolvidas/.test(ler("src/components/arvore/inteligencia/divergencias-resolvidas.tsx")))
   ok("ganchos: conclusão do «Localizar registro» e edição dos dados registrais disparam a sincronização", /p\.stepKey === "localizar_registro"[\s\S]{0,200}sincronizarDocumento/.test(ler("src/services/documento-operacao.ts")) && /sincronizarDocumento\(documentoAtualizado\.id/.test(ler("src/app/api/documentos/[id]/route.ts")))

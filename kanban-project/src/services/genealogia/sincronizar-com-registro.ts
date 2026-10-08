@@ -14,7 +14,7 @@ import { prisma } from "@/lib/prisma"
 import { STATUS_DOCUMENTO_INATIVOS } from "@/src/lib/documentos/status-inativos"
 import { aplicarMudancaNaArvore } from "@/src/services/genealogia/propagar-arvore"
 import {
-  CAMPOS_SINCRONIZAVEIS, TIPOS_DE_CERTIDAO_DO_EVENTO, campoDaChave, camposTravados, diaDe, diferencasDoEvento, eventoDoTipoDeDocumento, mesmoTexto, mostrarValor, textoDeCampo as textoDe, textoDoHistorico,
+  CAMPOS_SINCRONIZAVEIS, TIPOS_DE_CERTIDAO_DO_EVENTO, ehLocalDoObito, conflitoQuaseIgual, registroAnteriorAoEvento, separarLugarUnico, suspeitaNoValorDoRegistro, campoDaChave, camposTravados, diaDe, diferencasDoEvento, eventoDoTipoDeDocumento, mesmoTexto, mostrarValor, textoDeCampo as textoDe, textoDoHistorico,
   type CampoSincronizavel, type DiferencaDeCampo, type EventoRegistral, type TipoDeDiferenca, type ValoresDoRegistro,
 } from "@/src/lib/genealogia/sincronizacao-registral"
 
@@ -31,6 +31,8 @@ export interface RegistroLocalizado {
   uniaoId: number | null
   arvoreId: number
   valores: ValoresDoRegistro
+  /** Lugares em texto único que NÃO dá para separar com segurança: o campo não é gravado — vai para a lista de revisão manual. */
+  revisaoManual?: string[]
 }
 
 export interface ItemDeSincronizacao {
@@ -77,9 +79,12 @@ export async function registrosLocalizados(db: DB, filtro: { arvoreId?: number; 
     if (!evento || d.pessoa?.arvoreId == null) continue
     const uniaoId = evento === "CASAMENTO" ? d.necessidade?.uniaoId ?? null : null
     if (evento === "CASAMENTO" && uniaoId == null) continue // sem a união não há onde gravar
+    // Cidade com o estado colado («Santo André - São Paulo»): separa quando é seguro; senão o campo fica de fora e o caso vai para revisão manual.
+    const lugar = separarLugarUnico(d.cidade_registro, d.estado_registro)
     porAlvo.set(`${evento}:${evento === "CASAMENTO" ? `U${uniaoId}` : `P${d.pessoaId}`}`, {
       documentoId: d.id, evento, pessoaId: d.pessoaId, uniaoId, arvoreId: d.pessoa.arvoreId,
-      valores: { data_evento: d.data_evento, cidade_registro: d.cidade_registro, estado_registro: d.estado_registro, pais_registro: d.pais_registro, data_registro: d.data_registro, cartorio: d.cartorio, livro: d.livro, folha: d.folha, termo: d.termo },
+      revisaoManual: lugar.revisaoManual && lugar.motivo ? [lugar.motivo] : undefined,
+      valores: { data_evento: d.data_evento, cidade_registro: lugar.cidade, estado_registro: lugar.estado, pais_registro: d.pais_registro, data_registro: d.data_registro, cartorio: d.cartorio, livro: d.livro, folha: d.folha, termo: d.termo },
     })
   }
   return [...porAlvo.values()]
@@ -160,7 +165,7 @@ export interface ResultadoDaSincronizacao { aplicados: ItemDeSincronizacao[]; lo
 export async function sincronizarArvore(args: {
   arvoreId: number
   autorId?: number | null
-  origem: "CONCLUSAO_DO_REGISTRO" | "EDICAO_DOS_DADOS_REGISTRAIS" | "BOTAO_NA_ARVORE"
+  origem: "CONCLUSAO_DO_REGISTRO" | "EDICAO_DOS_DADOS_REGISTRAIS" | "ESCOLHA_NO_AVISO" | "CASOS_ANTIGOS"
   documentoId?: number
   selecao?: ReadonlySet<string> | null
 }): Promise<ResultadoDaSincronizacao> {
@@ -199,6 +204,9 @@ export async function sincronizarArvore(args: {
                 detalhes: {
                   arvoreId, chave: i.chave, coluna: campo.coluna, rotulo: i.rotulo, evento: i.evento, alvo: i.alvo, alvoId: i.alvoId, pessoaId: i.pessoaId, pessoaNome: i.pessoaNome,
                   documentoId: i.documentoId, tipo: i.tipo, divergenciaResolvida: i.tipo === "CONFLITO", antes: i.arvore, depois: i.registro, origem,
+                  // O que o histórico precisa dizer (08/10/2026): campo, valor antigo, valor novo, quem, qual opção e a origem.
+                  opcao: origem === "ESCOLHA_NO_AVISO" ? "GENEALOGIA (escolha da pessoa)" : origem === "CASOS_ANTIGOS" ? "GENEALOGIA PREVALECE (caso antigo)" : "AUTOMATICA (árvore estava vazia)",
+                  quem: autorId != null ? `usuário #${autorId}` : "sistema",
                 } as Prisma.InputJsonValue,
               },
               select: { id: true },
@@ -383,4 +391,69 @@ export async function edicaoRecusadaPorRegistro(alvo: "PESSOA" | "UNIAO", alvoId
     if (!igual) recusados.push(c.rotulo)
   }
   return recusados.length ? recusados : null
+}
+
+
+// ─── CASOS ANTIGOS (08/10/2026): a Genealogia prevalece ─────────────────────────────────────────────────────────────────────────
+export interface LinhaDoRelatorio {
+  processoId: number
+  familia: string
+  certidao: string
+  pessoa: string
+  documentoId: number
+  alvo: "PESSOA" | "UNIAO"
+  alvoId: number
+  chave: string
+  campo: string
+  tipo: TipoDeDiferenca
+  arvore: string | null
+  genealogia: string
+  arvoreTexto: string
+  genealogiaTexto: string
+  /** Preenchido nas listas que NÃO são gravadas. */
+  motivo?: string
+}
+export interface RelatorioDeCasosAntigos {
+  geradoEm: string
+  aplicar: LinhaDoRelatorio[]
+  ambiguos: LinhaDoRelatorio[]
+  revisaoManual: LinhaDoRelatorio[]
+  ignoradosLocalDoObito: LinhaDoRelatorio[]
+}
+
+/** SÓ LEITURA. Todo campo em que a árvore difere da Genealogia (e a Genealogia tem valor) nos processos ativos, separado em: aplicar · ambíguos · revisão manual · local do óbito (não tocado). */
+export async function relatorioDeCasosAntigos(db: DB = prisma): Promise<RelatorioDeCasosAntigos> {
+  const processos = await db.processo.findMany({ where: { dataConclusao: null, arvoreId: { not: null }, NOT: { faseAtualKey: "finalizado" } }, select: { id: true, nome: true, arvoreId: true } })
+  const r: RelatorioDeCasosAntigos = { geradoEm: new Date().toISOString(), aplicar: [], ambiguos: [], revisaoManual: [], ignoradosLocalDoObito: [] }
+  for (const pr of processos) {
+    const c = await carregarContexto(db, { arvoreId: pr.arvoreId! })
+    const tipos = new Map((await db.documento.findMany({ where: { id: { in: c.registros.map((x) => x.documentoId) } }, select: { id: true, documentType: { select: { name: true } } } })).map((d) => [d.id, d.documentType?.name ?? "Certidão"]))
+    const base = (i: ItemDeSincronizacao): LinhaDoRelatorio => ({
+      processoId: pr.id, familia: pr.nome, certidao: tipos.get(i.documentoId) ?? "Certidão", pessoa: i.pessoaNome, documentoId: i.documentoId, alvo: i.alvo, alvoId: i.alvoId, chave: i.chave, campo: i.rotulo, tipo: i.tipo,
+      arvore: i.arvore, genealogia: i.registro, arvoreTexto: i.arvoreTexto, genealogiaTexto: i.registroTexto,
+    })
+    for (const reg of c.registros) for (const motivo of reg.revisaoManual ?? []) {
+      const p = c.pessoas.get(reg.pessoaId)
+      r.revisaoManual.push({ processoId: pr.id, familia: pr.nome, certidao: tipos.get(reg.documentoId) ?? "Certidão", pessoa: p ? nomeDe(p) : `Pessoa #${reg.pessoaId}`, documentoId: reg.documentoId, alvo: reg.evento === "CASAMENTO" ? "UNIAO" : "PESSOA", alvoId: reg.uniaoId ?? reg.pessoaId, chave: "cidade_registro", campo: "cidade do registro (texto único)", tipo: "CONFLITO", arvore: null, genealogia: "", arvoreTexto: "—", genealogiaTexto: "", motivo })
+    }
+    for (const i of calcularItens(c, true)) {
+      const linha = base(i)
+      if (ehLocalDoObito(i.chave)) { r.ignoradosLocalDoObito.push({ ...linha, motivo: "local do óbito não é tocado nos casos antigos" }); continue }
+      const campo = campoDaChave(i.chave)!
+      const reg = c.registros.find((x) => x.documentoId === i.documentoId)
+      let suspeita = suspeitaNoValorDoRegistro(campo, i.registro)
+      if (!suspeita && i.chave === "UNIAO.data_registro" && reg && registroAnteriorAoEvento(diaDe(reg.valores.data_evento), i.registro)) suspeita = "data do registro anterior à data do evento"
+      if (!suspeita && i.tipo === "CONFLITO") suspeita = conflitoQuaseIgual(campo, i.arvore, i.registro)
+      if (suspeita) { r.ambiguos.push({ ...linha, motivo: suspeita }); continue }
+      r.aplicar.push(linha)
+    }
+  }
+  return r
+}
+
+/** Aplica UM lote do relatório (uma árvore por vez, limitado às linhas dadas) e devolve quantos campos gravou. Histórico com o valor antigo (reversível pelo «Desfazer»). */
+export async function aplicarLoteDeCasosAntigos(arvoreId: number, linhas: ReadonlyArray<Pick<LinhaDoRelatorio, "alvo" | "alvoId" | "chave">>, autorId: number | null = null): Promise<number> {
+  const selecao = new Set(linhas.map((l) => `${l.alvo}:${l.alvoId}:${l.chave}`))
+  const r = await sincronizarArvore({ arvoreId, autorId, origem: "CASOS_ANTIGOS", selecao })
+  return r.aplicados.length
 }
