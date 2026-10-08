@@ -20,7 +20,7 @@ console.log("\n2) Fiação: uma função, todas as portas")
 const canon = ler("lib/operacional/tarefa-canonica.ts")
 ok("a tarefa que já existe é reancorada na materialização (chave e unidade)", (canon.match(/await ajustarPrazoAEntradaNaFase\(tx,/g) ?? []).length === 3)
 ok("só tarefa aberta, da fase atual do processo, é tocada; auditoria TAREFA_PRAZO_REANCORADO", /processo\?\.faseAtualKey !== t\.faseMacroKey/.test(canon) && /TAREFA_PRAZO_REANCORADO/.test(canon) && /CONCLUIDO_RECEBIDO/.test(canon))
-ok("o reconciliador aplica a regra a toda tarefa existente (processos em andamento)", /ajustarPrazoAEntradaNaFase\(tx, t\.id, slaT\)/.test(ler("lib/operacional/reconciliar-tarefas.ts")))
+ok("o reconciliador aplica a regra a todo o processo EM LOTE (3 consultas; não uma transação por tarefa — o salvamento ficava lento)", /ajustarPrazosDoProcessoNaFase\(db, processoId\)/.test(ler("lib/operacional/reconciliar-tarefas.ts")) && !/for \(const t of inst\.tarefas\)[\s\S]{0,600}ajustarPrazoAEntradaNaFase/.test(ler("lib/operacional/reconciliar-tarefas.ts")))
 ok("hover do prazo mostra a origem (vem do servidor, não da tela)", /prazoOrigem/.test(ler("lib/operacional/torre-proxima-acao.ts")) && /title=\{acao\?\.prazoOrigem/.test(ler("src/components/torre/TorreProcessos.tsx")))
 ok("o vigia reprova prazo anterior à entrada", /prazosAntesDaEntrada\(\)/.test(ler("lib/operacional/torre-coerencia-abas.ts")))
 
