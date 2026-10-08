@@ -115,7 +115,7 @@ export function TorreRadar({ colunas, processos, carregando, erro }: { colunas: 
           <div className="tor-radar-legenda">
             <span className="feita">✓ fase concluída</span>
             <span className="ritmo">no ritmo</span>
-            <span className="atencao" title="Pontuação 3 a 5 do Precisa de você, cobrança vencida, prazo hoje/amanhã ou passou da meta de tempo da fase">atenção: sem responsável, cobrança vencida, perto do prazo</span>
+            <span className="atencao" title="Pontuação 3 a 5 do Precisa de você, acompanhamento vencido, prazo hoje/amanhã ou passou da meta de tempo da fase">atenção: sem responsável, acompanhamento vencido, perto do prazo</span>
             <span className="critico" title="Pontuação 6 ou mais do Precisa de você, ou aguardando terceiro há 15+ dias sem cobrança em dia">crítico: atraso nosso + sem dono, divergência, parado 15+ dias</span>
             <span className="na">n/a: fase que essa família não precisa</span>
           </div>

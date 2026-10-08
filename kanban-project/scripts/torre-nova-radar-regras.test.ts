@@ -92,7 +92,7 @@ ok("duração longa por extenso: '4,1 meses'", textoDuracao(123, null) === "4,1 
 
 secao("TEXTOS FIXOS DO PROTÓTIPO NA TELA (T128, T143, T144, T166, T168)")
 const tela = readFileSync("src/components/torre/TorreRadar.tsx", "utf8")
-for (const t of ["Radar · cada família em cada fase", "Torre de Controle", "Buscar família…", "Todos os países", "quem é aguardado", "(Equipe, Cartório, Cliente, Tradutor, Juízo, Consulado) e há quanto tempo. Cor = risco. Clique na família para abrir o processo.", "✓ fase concluída", "no ritmo", "atenção: sem responsável, cobrança vencida, perto do prazo", "crítico: atraso nosso + sem dono, divergência, parado 15+ dias", "n/a: fase que essa família não precisa", "(cond.)", "Nenhuma família encontrada com esses filtros."])
+for (const t of ["Radar · cada família em cada fase", "Torre de Controle", "Buscar família…", "Todos os países", "quem é aguardado", "(Equipe, Cartório, Cliente, Tradutor, Juízo, Consulado) e há quanto tempo. Cor = risco. Clique na família para abrir o processo.", "✓ fase concluída", "no ritmo", "atenção: sem responsável, acompanhamento vencido, perto do prazo", "crítico: atraso nosso + sem dono, divergência, parado 15+ dias", "n/a: fase que essa família não precisa", "(cond.)", "Nenhuma família encontrada com esses filtros."])
   ok(`a tela tem o texto "${t}"`, tela.includes(t) || readFileSync("lib/operacional/torre-radar.ts", "utf8").includes(t))
 ok("sem 'exemplo do protótipo' e sem 'Com o cartório'", !/exemplo do prot|Com o cart[oó]rio|Sem ninguém/.test(tela + readFileSync("lib/operacional/torre-radar.ts", "utf8")))
 ok("o nome da família é um link para /torre/processo/[id]", /href=\{`\/torre\/processo\/\$\{p\.processoId\}`\}/.test(tela))
