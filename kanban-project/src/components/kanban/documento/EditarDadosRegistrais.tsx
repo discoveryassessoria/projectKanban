@@ -11,6 +11,8 @@ import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import { Loader2 } from "lucide-react"
 import { LAYER } from "@/src/lib/ui/layers"
+import { useLocalidade } from "@/lib/localidade/use-localidade"
+import { CartorioOrgaoField } from "@/src/components/orgaos/CartorioOrgaoField"
 import {
   CAMPOS_EDITAVEIS, MOTIVO_MINIMO, avisoDoRequerimentoEnviado, mudancasDaEdicao, mostrarMudanca, type ChaveEditavel, type ValoresEditaveis,
 } from "@/src/lib/genealogia/dados-registrais-edicao"
@@ -44,6 +46,9 @@ export function EditarDadosRegistrais({ documentoId, onFechar, onSaved }: { docu
     })
     return () => { vivo = false }
   }, [documentoId])
+
+  // A LOCALIDADE segue a regra única (`lib/localidade`): Brasil = Estado→Cidade→Cartório em lista; outro país = Província→Cidade→Cartório em texto livre.
+  const loc = useLocalidade({ ativo: !!ctx, pais: form.pais_registro ?? "", estadoOuProvincia: form.estado_registro ?? "", cidade: form.cidade_registro ?? "" })
 
   const mudancas = useMemo(() => (ctx ? mudancasDaEdicao(ctx.valores as ValoresEditaveis, form as ValoresEditaveis) : []), [ctx, form])
   const aviso = useMemo(() => (ctx ? avisoDoRequerimentoEnviado(ctx.requerimentoEnviadoEm, mudancas) : null), [ctx, mudancas])
@@ -105,7 +110,60 @@ export function EditarDadosRegistrais({ documentoId, onFechar, onSaved }: { docu
               <div key={g} className="mb-3">
                 <div className="text-[11px] font-semibold text-[var(--text-secondary)] mb-1.5">{g}</div>
                 <div className="grid grid-cols-2 gap-3">
-                  {CAMPOS_EDITAVEIS.filter((c) => c.grupo === g).map((c) => (
+                  {g === "Localidade" && (
+                    <>
+                      <div>
+                        <label className={lab} htmlFor="edr-pais_registro">País</label>
+                        <select id="edr-pais_registro" data-testid="campo-pais_registro" className={cls} value={form.pais_registro ?? ""} onChange={(e) => setForm((f) => ({ ...f, pais_registro: e.target.value, estado_registro: "", cidade_registro: "" }))}>
+                          <option value="">{loc.paises.length ? "Selecione o país" : "Carregando…"}</option>
+                          {form.pais_registro && !loc.paises.some((p) => p.nome === form.pais_registro) && <option value={form.pais_registro}>{form.pais_registro}</option>}
+                          {loc.paises.map((p) => <option key={p.codigo} value={p.nome}>{p.nome}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className={lab} htmlFor="edr-estado_registro">{loc.rotuloDivisao}</label>
+                        {loc.ehBrasil || loc.provincias.length > 0 ? (
+                          <select id="edr-estado_registro" data-testid="campo-estado_registro" className={cls} value={form.estado_registro ?? ""} onChange={(e) => setForm((f) => ({ ...f, estado_registro: e.target.value, cidade_registro: "" }))}>
+                            <option value="">{`Selecione ${loc.ehBrasil ? "o estado" : "a província"}`}</option>
+                            {form.estado_registro && !(loc.ehBrasil ? loc.ufs.map((u) => u.nome) : loc.provincias.map((p) => p.nome)).includes(form.estado_registro) && <option value={form.estado_registro}>{form.estado_registro}</option>}
+                            {(loc.ehBrasil ? loc.ufs.map((u) => u.nome) : loc.provincias.map((p) => p.nome)).map((n) => <option key={n} value={n}>{n}</option>)}
+                          </select>
+                        ) : (
+                          <input id="edr-estado_registro" data-testid="campo-estado_registro" className={cls} type="text" maxLength={50} value={form.estado_registro ?? ""} onChange={(e) => mudar("estado_registro", e.target.value)} />
+                        )}
+                      </div>
+                      <div className="col-span-2">
+                        <label className={lab} htmlFor="edr-cidade_registro">Cidade</label>
+                        {loc.ehBrasil && loc.municipios.length > 0 ? (
+                          <select id="edr-cidade_registro" data-testid="campo-cidade_registro" className={cls} value={form.cidade_registro ?? ""} onChange={(e) => mudar("cidade_registro", e.target.value)}>
+                            <option value="">Selecione a cidade</option>
+                            {form.cidade_registro && !loc.municipios.includes(form.cidade_registro) && <option value={form.cidade_registro}>{form.cidade_registro}</option>}
+                            {loc.municipios.map((m) => <option key={m} value={m}>{m}</option>)}
+                          </select>
+                        ) : (
+                          <>
+                            {/* Fora do Brasil a lista só SUGERE; cidade que a base não conhece é texto livre (nunca trava). */}
+                            <input id="edr-cidade_registro" data-testid="campo-cidade_registro" className={cls} type="text" maxLength={100} list="edr-cidades-sugeridas" value={form.cidade_registro ?? ""} onChange={(e) => mudar("cidade_registro", e.target.value)} />
+                            <datalist id="edr-cidades-sugeridas">{loc.cidadesSugeridas.map((c) => <option key={`${c.nome}|${c.provincia}`} value={c.nome}>{c.provincia ? `${c.nome} — ${c.provincia}` : c.nome}</option>)}</datalist>
+                          </>
+                        )}
+                      </div>
+                      <div className="col-span-2">
+                        {loc.ehBrasil ? (
+                          <CartorioOrgaoField
+                            documentoId={documentoId} texto={form.cartorio ?? ""} orgaoId={null} ufSigla={loc.ufSigla} cidade={form.cidade_registro ?? ""} paisNome="Brasil" requiredToComplete={false}
+                            onTextoChange={(v) => mudar("cartorio", v)} onVinculado={(o) => mudar("cartorio", o.name)}
+                          />
+                        ) : (
+                          <>
+                            <label className={lab} htmlFor="edr-cartorio">Cartório</label>
+                            <input id="edr-cartorio" data-testid="campo-cartorio" className={cls} type="text" maxLength={200} value={form.cartorio ?? ""} onChange={(e) => mudar("cartorio", e.target.value)} />
+                          </>
+                        )}
+                      </div>
+                    </>
+                  )}
+                  {CAMPOS_EDITAVEIS.filter((c) => c.grupo === g && g !== "Localidade").map((c) => (
                     <div key={c.chave} className={c.chave === "cartorio" ? "col-span-2" : ""}>
                       <label className={lab} htmlFor={`edr-${c.chave}`}>{c.rotulo}</label>
                       {c.tipo === "data" ? (
