@@ -6,7 +6,7 @@
 //
 // Regras do protótipo (inventário §1.4 e §2.9) e como ficaram:
 //   • situação de cada linha = `situacaoDaFase` da regra única de risco (`torre-risco.ts`): ok · at · pa · sd;
-//   • filtros: Todos · Precisam de alguém (≠ ok) · Atenção (at) · Parados ou sem dono (pa + sd);
+//   • filtros: Todos · Precisam de alguém (≠ ok) · Atenção (at) · Parados ou críticos (pa); «sem dono» NÃO é situação (07/10/2026);
 //   • busca: sem acento/maiúsculas em família + próxima ação + responsável;
 //   • País e Responsável: igualdade exata; combinam em E com situação e busca;
 //   • ordens: "mais atrasado primeiro" (Parado → Sem dono → Atenção → No ritmo; desempate prazo) · "Prazo mais próximo" ·
@@ -15,6 +15,7 @@
 //     30 e 24: 24 = 80% de 30 — aqui o corte acompanha a meta de cada fase); sem meta, sem cor;
 //   • paginação REAL (12 por página).
 // ============================================================================
+import { contarPorFase, contarTotais, type ProcessoParaContagem } from './torre-contagens'
 import { processoTemDono, processoTemSemDono, type ResponsaveisDoProcesso } from './responsavel-canonico'
 import { diasPorExtenso } from './tempo-extenso'
 import type { ProcessoDaTorre, ColunaDoRadar, PassoDoProcesso } from './torre-processos'
@@ -28,7 +29,7 @@ export type OrdemDeProcessos = 'atrasado' | 'prazo' | 'tempo' | 'az'
 
 export const FILTROS_DE_PROCESSOS: ReadonlyArray<{ chave: FiltroDeProcessos; rotulo: string }> = [
   { chave: 'todos', rotulo: 'Todos' }, { chave: 'precisam', rotulo: 'Precisam de alguém' },
-  { chave: 'atencao', rotulo: 'Atenção' }, { chave: 'parados', rotulo: 'Parados ou sem dono' },
+  { chave: 'atencao', rotulo: 'Atenção' }, { chave: 'parados', rotulo: 'Parados ou críticos' },
 ]
 export const ORDENS_DE_PROCESSOS: ReadonlyArray<{ chave: OrdemDeProcessos; rotulo: string }> = [
   { chave: 'atrasado', rotulo: 'Ordenar: mais atrasado primeiro' }, { chave: 'prazo', rotulo: 'Prazo mais próximo' },
@@ -73,8 +74,12 @@ export const textoNaFase = (p: Pick<ProcessoDaTorre, 'naFase' | 'metaDias'>): st
 // ─── FASES (botões) ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
 export interface BotaoDeFase { key: string; label: string; n: number }
-export const botoesDeFase = (colunas: ColunaDoRadar[], processos: ProcessoDaTorre[]): BotaoDeFase[] =>
-  colunas.map((c) => ({ key: c.key, label: c.label, n: processos.filter((p) => p.faseAtual.key === c.key).length }))
+export const botoesDeFase = (colunas: ColunaDoRadar[], processos: ProcessoDaTorre[]): BotaoDeFase[] => {
+  // O número do botão é a contagem ÚNICA por fase (`torre-contagens.ts`), a mesma do funil da Visão geral.
+  const { linhas } = contarPorFase(processos.map(paraContagem), colunas)
+  const por = new Map(linhas.map((l) => [l.key, l.total]))
+  return colunas.map((c) => ({ key: c.key, label: c.label, n: por.get(c.key) ?? 0 }))
+}
 
 /** A fase aberta ao entrar: a de MAIOR volume (no protótipo, Emissão); empate → a primeira do cadastro; sem nenhuma, a primeira. */
 export const escolherFaseInicial = (botoes: BotaoDeFase[]): string | null =>
@@ -100,7 +105,7 @@ export interface ParametrosDeProcessos {
 export const PARAMETROS_INICIAIS: ParametrosDeProcessos = { filtro: 'todos', pais: TODOS_OS_PAISES, resp: TODOS_OS_RESPONSAVEIS, busca: '', ordem: 'atrasado' }
 
 export const passaNoFiltro = (p: ProcessoDaTorre, f: FiltroDeProcessos): boolean =>
-  f === 'todos' || (f === 'precisam' && p.situacao !== 'ok') || (f === 'atencao' && p.situacao === 'at') || (f === 'parados' && (p.situacao === 'pa' || p.situacao === 'sd'))
+  f === 'todos' || (f === 'precisam' && p.situacao !== 'ok') || (f === 'atencao' && p.situacao === 'at') || (f === 'parados' && p.situacao === 'pa')
 
 /** País + Responsável + busca (tudo menos o botão de situação) — a base das contagens dos botões. */
 export function aplicarPaisRespBusca(linhas: ProcessoDaTorre[], par: Pick<ParametrosDeProcessos, 'pais' | 'resp' | 'busca'>): ProcessoDaTorre[] {
@@ -111,14 +116,14 @@ export function aplicarPaisRespBusca(linhas: ProcessoDaTorre[], par: Pick<Parame
     && (!q || textoDeBusca(p).includes(q)))
 }
 
+/** O que a contagem única precisa de um processo da Torre. */
+export const paraContagem = (p: ProcessoDaTorre): ProcessoParaContagem => ({ faseAtualKey: p.faseAtual.key, nivelDeRisco: p.nivelDeRisco, semDono: p.semDono })
+
 export interface ContagensDoFiltro { todos: number; precisam: number; atencao: number; parados: number }
 export function contagensDosFiltros(base: ProcessoDaTorre[]): ContagensDoFiltro {
-  return {
-    todos: base.length,
-    precisam: base.filter((p) => p.situacao !== 'ok').length,
-    atencao: base.filter((p) => p.situacao === 'at').length,
-    parados: base.filter((p) => p.situacao === 'pa' || p.situacao === 'sd').length,
-  }
+  // A contagem é a ÚNICA da Torre (`torre-contagens.ts`): o funil, os botões de Processos, a saúde da fase e o Radar leem dela.
+  const c = contarTotais(base.map(paraContagem))
+  return { todos: c.total, precisam: c.precisam, atencao: c.atencao, parados: c.graves }
 }
 
 /** O prazo como número de dia (ms); sem prazo vai para o fim. */
@@ -176,7 +181,7 @@ export interface SaudeDaFase {
   total: number
   ok: number
   atencao: number
-  /** Parados + sem dono (a mesma soma do botão "Parados ou sem dono"). */
+  /** Parados + críticos (a mesma soma do botão «Parados ou críticos» e do «em risco»). «Sem dono» não é situação: aparece na coluna Responsável. */
   parados: number
   /** Tempo médio real da fase (log de transições), `null` = nenhuma permanência completa registrada ("—"). */
   tempoMedioDias: number | null

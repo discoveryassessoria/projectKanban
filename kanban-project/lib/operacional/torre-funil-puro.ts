@@ -14,6 +14,8 @@
 //   · "Gargalo da semana" — a fase que mais estourou a meta (média ÷ meta); sem nenhuma estourada, a fase com mais parados.
 // O prazo NUNCA pausa por terceiro e a meta NUNCA vira prazo: este módulo só LÊ e apresenta.
 // ============================================================================
+import { textoDasPermanencias } from './torre-contagens'
+import { contarPorFase, type ProcessoParaContagem } from './torre-contagens'
 import { textoDasFasesNasPalavras } from './torre-fases'
 import { nomeDoPasso } from './torre-filtros'
 import { ehGrave, type NivelDeRisco } from './torre-risco'
@@ -145,7 +147,8 @@ export function textoDoGargaloNaFrase(g: GargaloDaFase): string {
 const decimalBR = (n: number) => String(n).replace('.', ',')
 
 /** "1 processo" · "3 processos" — o tamanho da amostra ao lado da média. */
-export const textoDaAmostra = (processos: number): string => (processos === 1 ? '1 processo' : `${processos} processos`)
+/** «1 processo concluído» · «3 processos concluídos»: são processos que JÁ SAÍRAM da fase (histórico) — nunca confundir com os que estão nela agora (coluna Processos). */
+export const textoDaAmostra = (processos: number): string => (processos === 1 ? '1 processo concluído' : `${processos} processos concluídos`)
 
 /** A média sem a amostra: "12 dias" · "1 dia" · "menos de 1 dia" · "4,1 meses" (só sem meta e a partir de 90 dias). */
 function textoDaMedia(t: TempoDaFase, meta: number | null): string {
@@ -159,7 +162,9 @@ function textoDaMedia(t: TempoDaFase, meta: number | null): string {
 export function textoDoTempoMedio(t: TempoDaFase | undefined, meta: number | null): string {
   if (!t || t.amostras === 0) return '—'
   const media = textoDaMedia(t, meta)
-  return t.processos != null && t.processos > 0 ? `${media} · ${textoDaAmostra(t.processos)}` : media
+  if (t.processos == null || t.processos <= 0) return media
+  // Duas permanências do mesmo processo contam 2 na média e 1 nos processos: o texto diz as duas coisas.
+  return t.amostras !== t.processos ? textoDasPermanencias(media, t.amostras, t.processos) : `${media} · ${textoDaAmostra(t.processos)}`
 }
 /** "15 dias" · "—" (sem meta cadastrada: nunca uma meta inventada). */
 export const textoDaMeta = (meta: number | null): string => (meta == null ? '—' : meta === 1 ? '1 dia' : `${meta} dias`)
@@ -180,7 +185,7 @@ export function classeDoFunil(risco: string): ClasseDoFunil {
 }
 
 // ─── o funil ────────────────────────────────────────────────────────────────────────────────────────────────────────────
-export interface ProcessoParaFunil { faseAtual: { key: string | null }; risco: string }
+export interface ProcessoParaFunil { faseAtual: { key: string | null }; risco: string; nivelDeRisco?: NivelDeRisco; semDono?: boolean }
 
 export interface LinhaDoFunil {
   n: number
@@ -190,7 +195,10 @@ export interface LinhaDoFunil {
   total: number
   ritmo: number
   atencao: number
+  /** Parado + crítico (a barra vermelha). */
   parados: number
+  /** Dentro de `parados`: quantos são críticos (os demais, parados). */
+  criticos: number
   /** % de cada trecho da barra (1 casa decimal, como o protótipo). */
   pctRitmo: string
   pctAtencao: string
@@ -207,6 +215,13 @@ export interface Funil { linhas: LinhaDoFunil[]; total: number; foraDoFunil: num
 
 const pct = (x: number, total: number) => (total > 0 ? `${((x / total) * 100).toFixed(1)}%` : '0.0%')
 
+/** O processo do funil → a entrada da contagem única (o nível vem de `nivelDeRisco`; sem ele, do balde antigo `risco`). */
+const paraContagemDoFunil = (p: ProcessoParaFunil): ProcessoParaContagem => ({
+  faseAtualKey: p.faseAtual.key,
+  nivelDeRisco: p.nivelDeRisco ?? (p.risco === 'ok' ? 'no_ritmo' : (p.risco as NivelDeRisco)),
+  semDono: p.semDono === true,
+})
+
 export function funilDasFases(args: {
   fases: FaseDoCadastro[]
   processos: ProcessoParaFunil[]
@@ -215,17 +230,19 @@ export function funilDasFases(args: {
 }): Funil {
   const { fases, processos, linhas, escopo } = args
   const chaves = new Set(fases.map((f) => f.key))
+  const { linhas: contagens } = contarPorFase(processos.map(paraContagemDoFunil), fases)
+  const contagemDaFase = new Map(contagens.map((c) => [c.key, c]))
   const linhasDoFunil = fases.map((f, i): LinhaDoFunil => {
-    const doFase = processos.filter((p) => p.faseAtual.key === f.key)
-    const por = { ritmo: 0, atencao: 0, parado: 0 }
-    for (const p of doFase) por[classeDoFunil(p.risco)]++
+    // A CONTAGEM É A ÚNICA DA TORRE (`torre-contagens.ts`): a mesma de Processos (botões e saúde da fase) e do Radar.
+    const c = contagemDaFase.get(f.key)!
+    const por = { ritmo: c.noRitmo, atencao: c.atencao, parado: c.graves }
     const tempo = escopo.tempos[f.key]
     const meta = escopo.metas[f.key] ?? null
     const gargalo = maiorGargalo(linhas, f.key)
     return {
-      n: i + 1, key: f.key, label: f.label, condicional: f.condicional, total: doFase.length,
-      ritmo: por.ritmo, atencao: por.atencao, parados: por.parado,
-      pctRitmo: pct(por.ritmo, doFase.length), pctAtencao: pct(por.atencao, doFase.length), pctParados: pct(por.parado, doFase.length),
+      n: i + 1, key: f.key, label: f.label, condicional: f.condicional, total: c.total,
+      ritmo: por.ritmo, atencao: por.atencao, parados: por.parado, criticos: c.criticos,
+      pctRitmo: pct(por.ritmo, c.total), pctAtencao: pct(por.atencao, c.total), pctParados: pct(por.parado, c.total),
       tempo, tempoTexto: textoDoTempoMedio(tempo, meta), meta, metaTexto: textoDaMeta(meta), estourou: estourouAMeta(tempo, meta),
       gargalo, gargaloTexto: textoDoGargalo(gargalo),
     }

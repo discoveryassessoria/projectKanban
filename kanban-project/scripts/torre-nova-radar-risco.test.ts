@@ -59,10 +59,10 @@ ok("feita, futura e n/a → null", (["feita", "futura", "na"] as const).every((e
 ok("atual → o mesmo risco do processo", riscoDaCelula("atual", base({ scoreMaximo: 9 }))?.nivel === "critico")
 
 secao("OS VOCABULÁRIOS DAS TELAS")
-ok("Radar: parado e crítico são 'crítico' (balde vermelho); atenção; no ritmo", rotuloNoRadar("parado") === "crítico" && rotuloNoRadar("critico") === "crítico" && rotuloNoRadar("atencao") === "atenção" && rotuloNoRadar("no_ritmo") === "no ritmo")
+ok("Radar: a palavra do nível é a mesma de Processos (parado · crítico · atenção · no ritmo); parado e crítico caem no balde vermelho", rotuloNoRadar("parado") === "parado" && rotuloNoRadar("critico") === "crítico" && rotuloNoRadar("atencao") === "atenção" && rotuloNoRadar("no_ritmo") === "no ritmo")
 ok("balde do Radar (ProcessoDaTorre.risco): ok · atencao · critico", baldeDoRadar("no_ritmo") === "ok" && baldeDoRadar("atencao") === "atencao" && baldeDoRadar("parado") === "critico" && baldeDoRadar("critico") === "critico")
 ok("ehGrave = parado ou crítico; precisaDeAlguem = tudo menos no ritmo", ehGrave("parado") && ehGrave("critico") && !ehGrave("atencao") && !ehGrave("no_ritmo") && precisaDeAlguem("atencao") && !precisaDeAlguem("no_ritmo"))
-ok("Processos: sem dono vence qualquer nível", (["no_ritmo", "atencao", "parado", "critico"] as const).every((n) => situacaoDaFase(n, true) === "sd"))
+ok("Processos: «sem dono» NÃO é situação — a situação é o risco, com ou sem dono", (["no_ritmo", "atencao", "parado", "critico"] as const).every((n) => situacaoDaFase(n, true) === situacaoDaFase(n, false)))
 ok("Processos: parado/crítico com dono → 'pa'; atenção → 'at'; no ritmo → 'ok'", situacaoDaFase("parado", false) === "pa" && situacaoDaFase("critico", false) === "pa" && situacaoDaFase("atencao", false) === "at" && situacaoDaFase("no_ritmo", false) === "ok")
 ok("rótulos das pílulas: No ritmo · Atenção · Parado · Sem dono", ROTULO_DA_SITUACAO.ok === "No ritmo" && ROTULO_DA_SITUACAO.at === "Atenção" && ROTULO_DA_SITUACAO.pa === "Parado" && ROTULO_DA_SITUACAO.sd === "Sem dono")
 ok("ordem 'mais atrasado primeiro': Parado → Sem dono → Atenção → No ritmo", PESO_DA_SITUACAO.pa < PESO_DA_SITUACAO.sd && PESO_DA_SITUACAO.sd < PESO_DA_SITUACAO.at && PESO_DA_SITUACAO.at < PESO_DA_SITUACAO.ok)

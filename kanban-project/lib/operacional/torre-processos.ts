@@ -33,7 +33,7 @@ import { PHASEKEY_A_INICIAR } from '@/src/lib/process-stage/fase-pre-contrato'
 import type { Prisma } from '@prisma/client'
 import { entradasNaFaseEmLote, concluidasDaFaseEmLote, tempoDesde, metasDaTorre, metaDaFaseDoPais } from './torre-fase-dados'
 import {
-  riscoDoProcesso, baldeDoRadar, situacaoDaFase, ehGrave, type NivelDeRisco, type EntradaDoRisco, type SituacaoDaFase,
+  riscoDoProcesso, riscoDoProcessoNaTorre, baldeDoRadar, situacaoDaFase, ehGrave, type NivelDeRisco, type EntradaDoRisco, type SituacaoDaFase,
 } from './torre-risco'
 import { proximaAcaoDoProcesso, prazoCurto, type ProximaAcao, type PrazoCurto } from './torre-proxima-acao'
 
@@ -240,22 +240,28 @@ const porProcesso = <T extends { processoId: number | null }>(xs: T[]): Map<numb
  * foto diária e do filtro "Críticas" do Radar. Sem metas nem dias na fase: elas só movem atenção, nunca o balde grave.
  */
 export async function processosCriticos(agora = new Date()): Promise<Set<number>> {
-  const [lidas, foraDaTorre] = await Promise.all([lerLinhasOperacionais(agora), idsDeProcessosForaDaTorre()])
-  const itens = await itensPrecisaDeVoce({ agora, linhas: lidas })
-  const linhas = semProcessosForaDaTorre(lidas, foraDaTorre).filter((l) => STATUS_ATIVOS.includes(l.statusTarefa))
-  const linhasPorProcesso = porProcesso(linhas)
-  const itensPorProcesso = porProcesso(itens)
-  const graves = new Set<number>()
-  for (const [id, is] of itensPorProcesso) {
-    const r = riscoDoProcesso(entradaDoRisco({ linhas: linhasPorProcesso.get(id) ?? [], itens: is, diasNaFase: null, metaDias: null }))
-    if (ehGrave(r.nivel)) graves.add(id)
-  }
-  // Processo sem item no Precisa de você não tem score — mas pode estar "parado" (cobrança vencida pura não gera item): olha as linhas.
-  for (const [id, ls] of linhasPorProcesso) {
-    if (graves.has(id) || itensPorProcesso.has(id)) continue
-    if (ehGrave(riscoDoProcesso(entradaDoRisco({ linhas: ls, itens: [], diasNaFase: null, metaDias: null })).nivel)) graves.add(id)
-  }
-  return graves
+  // UMA montagem do risco (07/10/2026): a mesma de `processosDaTorre` — antes esta função remontava o risco com outras linhas (sem as ADMINISTRATIVAS) e sem metas, e podia
+  // divergir do Radar/Processos. Cache curto: a aba Tarefas pede isto a cada leitura.
+  const { processos } = await processosDaTorre(agora)
+  return new Set(processos.filter((p) => riscoDoProcessoNaTorre(p).grave).map((p) => p.processoId))
+}
+
+/** O mesmo conjunto, com o cache curto de `processosDaTorreEmCache` (para a rota da aba Tarefas, que pergunta a cada leitura). */
+export async function processosCriticosEmCache(agora = new Date()): Promise<Set<number>> {
+  const { processos } = await processosDaTorreEmCache(agora)
+  return new Set(processos.filter((p) => riscoDoProcessoNaTorre(p).grave).map((p) => p.processoId))
+}
+
+let cacheDeProcessos: { ate: number; promessa: Promise<{ colunas: ColunaDoRadar[]; processos: ProcessoDaTorre[] }> } | null = null
+const TTL_DO_CACHE_MS = 8_000
+/** `processosDaTorre` com cache de poucos segundos (mesmo resultado para quem pede junto). Testes passam `agora` explícito e não usam o cache. */
+export function processosDaTorreEmCache(agora = new Date()): Promise<{ colunas: ColunaDoRadar[]; processos: ProcessoDaTorre[] }> {
+  const t = Date.now()
+  if (cacheDeProcessos && cacheDeProcessos.ate > t && Math.abs(agora.getTime() - t) < 60_000) return cacheDeProcessos.promessa
+  const promessa = processosDaTorre(agora)
+  cacheDeProcessos = { ate: t + TTL_DO_CACHE_MS, promessa }
+  promessa.catch(() => { if (cacheDeProcessos?.promessa === promessa) cacheDeProcessos = null })
+  return promessa
 }
 
 /** Anota cada linha com `processoEmRisco` — para o cartão "Processos em risco" e o filtro dele. */

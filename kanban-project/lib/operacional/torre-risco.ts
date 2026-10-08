@@ -104,13 +104,31 @@ export const ehGrave = (n: NivelDeRisco): boolean => n === 'critico' || n === 'p
 export const precisaDeAlguem = (n: NivelDeRisco): boolean => n !== 'no_ritmo'
 
 /** Rótulo no vocabulário do RADAR (3 níveis): parado e crítico são "crítico". */
-export const rotuloNoRadar = (n: NivelDeRisco): 'no ritmo' | 'atenção' | 'crítico' => (n === 'no_ritmo' ? 'no ritmo' : n === 'atencao' ? 'atenção' : 'crítico')
+/** A palavra do nível — a MESMA no Radar, em Processos e no funil (no ritmo · atenção · parado · crítico). */
+export const ROTULO_DO_NIVEL: Record<NivelDeRisco, string> = { no_ritmo: 'No ritmo', atencao: 'Atenção', parado: 'Parado', critico: 'Crítico' }
+export const rotuloNoRadar = (n: NivelDeRisco): string => ROTULO_DO_NIVEL[n].toLowerCase()
+
+/** O RISCO DE UM PROCESSO NA TORRE — a única leitura que as abas, os cartões, o briefing e a tabela de decisões fazem do nível calculado por `riscoDoProcesso`. */
+export interface RiscoNaTorre {
+  nivel: NivelDeRisco
+  rotulo: string
+  /** Parado ou crítico: é o «em risco» e as «Críticas». */
+  grave: boolean
+  /** Qualquer nível diferente de «no ritmo»: «Precisam de alguém». */
+  precisaDeAlguem: boolean
+  /** Atributo ORTOGONAL ao nível: há trabalho na fase e ninguém é dono. Nunca vira nível nem situação. */
+  semDono: boolean
+}
+export function riscoDoProcessoNaTorre(p: { nivelDeRisco: NivelDeRisco; semDono: boolean }): RiscoNaTorre {
+  return { nivel: p.nivelDeRisco, rotulo: ROTULO_DO_NIVEL[p.nivelDeRisco], grave: ehGrave(p.nivelDeRisco), precisaDeAlguem: precisaDeAlguem(p.nivelDeRisco), semDono: p.semDono }
+}
 /** O balde do Radar/`ProcessoDaTorre.risco` ('ok' | 'atencao' | 'critico'). */
 export const baldeDoRadar = (n: NivelDeRisco): 'ok' | 'atencao' | 'critico' => (n === 'no_ritmo' ? 'ok' : n === 'atencao' ? 'atencao' : 'critico')
 
 /** A coluna "Situação" da aba Processos: ok · at · pa (Parado) · sd (Sem dono). Sem dono vence qualquer nível (como no protótipo). */
 export type SituacaoDaFase = 'ok' | 'at' | 'pa' | 'sd'
-export const situacaoDaFase = (n: NivelDeRisco, semDono: boolean): SituacaoDaFase => (semDono ? 'sd' : ehGrave(n) ? 'pa' : n === 'atencao' ? 'at' : 'ok')
+/** A situação do processo na tabela = o RISCO (07/10/2026). «Sem dono» NÃO é situação: é um atributo, mostrado numa coluna só (Responsável); por isso o argumento `semDono` não mais a altera. */
+export const situacaoDaFase = (n: NivelDeRisco, _semDono?: boolean): SituacaoDaFase => (ehGrave(n) ? 'pa' : n === 'atencao' ? 'at' : 'ok')
 export const ROTULO_DA_SITUACAO: Record<SituacaoDaFase, string> = { ok: 'No ritmo', at: 'Atenção', pa: 'Parado', sd: 'Sem dono' }
 /** Ordem de "mais atrasado primeiro" (Processos): Parado → Sem dono → Atenção → No ritmo. */
 export const PESO_DA_SITUACAO: Record<SituacaoDaFase, number> = { pa: 0, sd: 1, at: 2, ok: 3 }

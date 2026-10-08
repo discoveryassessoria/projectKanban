@@ -5,9 +5,11 @@
 // com aquele filtro, sem sobras de filtros anteriores — por isso o número do cartão = o "Mostrando N" da lista.
 // "Processos ativos" (e o selo "N em risco") vêm da aba Processos. A tendência (vs semana passada) só existe quando há foto de 7 dias
 // E a definição do cartão é a mesma da foto; sem isso o cartão não mostra nada (nenhum texto de ausência).
+import { contarTotais } from "@/lib/operacional/torre-contagens"
+import { paraContagem } from "@/lib/operacional/torre-fase"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { KPI_POR_CHAVE, CAMPO_DA_FOTO, tendenciaDe, numeroDoKpi, CARTOES_DA_SITUACAO, CARTOES_DA_AGENDA, emRiscoCritico, type ChaveKpi } from "@/lib/operacional/torre-kpis"
+import { KPI_POR_CHAVE, CAMPO_DA_FOTO, tendenciaDe, numeroDoKpi, CARTOES_DA_SITUACAO, CARTOES_DA_AGENDA, type ChaveKpi } from "@/lib/operacional/torre-kpis"
 import {
   fraseDoDia, distribuicaoPorPais, detalheDosTerceiros, familiasSemResponsavel, subtituloSemResponsavel, corDaTendencia, milhar, rotuloDecisoes,
   type LinhaParaTopo,
@@ -58,9 +60,11 @@ export function TorreKpis({ linhas, processos, itensPrecisa, agora, tend, filtra
     return <i className={COR_DA_TENDENCIA[corDaTendencia(k, t.direcao)]}>{rotulo}</i>
   }
 
-  const nRisco = processos ? processos.filter(emRiscoCritico).length : null
-  const nProcessos = processos ? processos.length : null
-  const noRitmo = processos ? processos.filter((p) => p.risco === "ok").length : null
+  // UMA CONTAGEM (torre-contagens.ts): a mesma de Processos, do funil e do Radar.
+  const contagem = processos ? contarTotais(processos.map(paraContagem)) : null
+  const nRisco = contagem ? contagem.graves : null
+  const nProcessos = contagem ? contagem.total : null
+  const noRitmo = contagem ? contagem.noRitmo : null
   const decisoes = itensPrecisa ?? []
 
   const subtitulo: Record<string, string> = {
@@ -109,7 +113,7 @@ export function TorreKpis({ linhas, processos, itensPrecisa, agora, tend, filtra
             <span className="tvg-card-s">{processos ? distribuicaoPorPais(processos) : ""}</span>
           </button>
           {nRisco != null && nRisco > 0 && (
-            <button type="button" className="tvg-selo-risco" title={KPI_POR_CHAVE.risco.regra} onClick={onRisco}>{nRisco} em risco</button>
+            <button type="button" className="tvg-selo-risco" title={KPI_POR_CHAVE.risco.regra} onClick={onRisco}>{nRisco} em risco · parado ou crítico</button>
           )}
         </div>
         {CARTOES_DA_SITUACAO.map(cartao)}

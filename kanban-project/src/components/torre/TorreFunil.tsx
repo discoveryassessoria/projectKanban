@@ -44,10 +44,10 @@ export function TorreFunil({ funil, semana, carregandoDados, erroDados, aguardan
             <div className="tvg-fase"><span className="tvg-fase-n">{f.n}</span><span className="tvg-fase-nome">{f.label}</span></div>
             <div className="dir tvg-fase-total">{milhar(f.total)}</div>
             <div className="tvg-sit">
-              <div className="tvg-barra" role="img" aria-label={`${f.ritmo} no ritmo, ${f.atencao} atenção, ${f.parados} parados`}>
+              <div className="tvg-barra" role="img" aria-label={`${f.ritmo} no ritmo, ${f.atencao} atenção, ${f.parados - f.criticos} parados, ${f.criticos} críticos`}>
                 <i className="ok" style={{ width: f.pctRitmo }} /><i className="at" style={{ width: f.pctAtencao }} /><i className="pa" style={{ width: f.pctParados }} />
               </div>
-              <div className="tvg-sit-txt">{f.ritmo} no ritmo · {f.atencao} atenção · <span className={f.parados > 0 ? "tvg-parados" : ""}>{f.parados} parados</span></div>
+              <div className="tvg-sit-txt">{f.ritmo} no ritmo · {f.atencao} atenção · <span className={f.parados > 0 ? "tvg-parados" : ""}>{f.parados - f.criticos} {f.parados - f.criticos === 1 ? "parado" : "parados"} · {f.criticos} {f.criticos === 1 ? "crítico" : "críticos"}</span></div>
             </div>
             <div className={`tvg-tempo ${f.estourou ? "estourou" : ""}`}>{carregandoDados ? "…" : f.tempoTexto}</div>
             <div className="tvg-meta">{carregandoDados ? "…" : f.metaTexto}</div>

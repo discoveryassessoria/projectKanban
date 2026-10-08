@@ -3,24 +3,22 @@
 // a RÉGUA de cobrança de cada órgão (só o que o Gerenciamento cadastrou — nunca "tempo aprendido"), os Contatos do órgão,
 // o "Tempo médio real por fase" e o "Backlog". Fica ABAIXO da lista por pedido, sem mexer na estrutura do protótipo.
 // NÃO há aqui "sem resposta (dias)" nem "não localizada" por órgão, nem ranking/média comparando cartórios.
-import { ordenarPelaOrdemReal } from "@/lib/operacional/torre-fases"
+import { textoDoTempoMedio, type RespostaDoFunil } from "@/lib/operacional/torre-funil-puro"
 import { useEffect, useState } from "react"
 import { ddmmHora } from "@/lib/operacional/terceiros-pedidos"
-import { labelDaFasePorPhaseKey } from "@/src/lib/process-stage/fases-catalog"
 import { CANAIS_DE_CONTATO_UI } from "@/src/components/operacao/RegistrarContatoModal"
 import { api, erroDe, Modal } from "./torre-base"
 import "./terceiros.css"
 
 interface OrgaoRegua { orgaoId: number; nome: string; uf: string | null; canal: string; emAberto: number; regua: string; proximaCobranca: { data: string | null; vencida: boolean } }
 interface ContatoOrgao { id: string; tipo: "CONTATO" | "CANAL_ALTERADO"; quando: string; quem: string | null; tarefaId: number | null; tarefaTitulo: string | null; canal: string | null; texto: string; estornado?: boolean }
-interface TempoPorFase { fase: string; amostras: number; mediaDias: number }
-const humanizar = (k: string) => k.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase())
 
 export function TerceirosRegua({ versao }: { versao: number }) {
   const [orgaos, setOrgaos] = useState<OrgaoRegua[] | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [contatos, setContatos] = useState<{ orgao: OrgaoRegua; lista: ContatoOrgao[] | null; erro: string | null } | null>(null)
-  const [fases, setFases] = useState<TempoPorFase[] | null>(null)
+  // O tempo médio vem do MESMO funil da Visão geral (lista única de fases e o mesmo texto) — não de um cálculo à parte.
+  const [funil, setFunil] = useState<RespostaDoFunil | null>(null)
   const [erroFases, setErroFases] = useState<string | null>(null)
   const [backlog, setBacklog] = useState<{ abertas: number; fechadas: number } | null>(null)
   const [erroBacklog, setErroBacklog] = useState<string | null>(null)
@@ -31,9 +29,9 @@ export function TerceirosRegua({ versao }: { versao: number }) {
       if (!vivo) return
       if (r.ok) { setOrgaos(r.data.orgaos); setErro(null) } else setErro(erroDe(r.data, "Não foi possível carregar a régua dos órgãos."))
     })
-    void api<{ porFase: TempoPorFase[] }>("/api/operacao/tempo-medio-por-fase").then((r) => {
+    void api<RespostaDoFunil>("/api/torre/funil").then((r) => {
       if (!vivo) return
-      if (r.ok) { setFases(r.data.porFase); setErroFases(null) } else setErroFases(erroDe(r.data, "Não foi possível carregar o tempo médio por fase."))
+      if (r.ok) { setFunil(r.data); setErroFases(null) } else setErroFases(erroDe(r.data, "Não foi possível carregar o tempo médio por fase."))
     })
     void api<{ backlog: { abertas: number; fechadas: number } }>("/api/torre/tendencias").then((r) => {
       if (!vivo) return
@@ -72,11 +70,11 @@ export function TerceirosRegua({ versao }: { versao: number }) {
       <div className="tor-card pad">
         <h2 className="font-extrabold">Tempo médio real por fase</h2>
         {erroFases && <div className="small mt-1">{erroFases}</div>}
-        {!erroFases && fases == null && <div className="small mt-1">Carregando…</div>}
-        {fases?.length === 0 && <div className="small mt-1">Sem fase concluída no log de transição ainda — nada a mostrar.</div>}
-        {fases && fases.length > 0 && (
+        {!erroFases && funil == null && <div className="small mt-1">Carregando…</div>}
+        {funil && funil.fases.every((f) => !funil.geral.tempos[f.key]) && <div className="small mt-1">Sem fase concluída no log de transição ainda — nada a mostrar.</div>}
+        {funil && funil.fases.some((f) => funil.geral.tempos[f.key]) && (
           <ul className="mt-2 space-y-1">
-            {ordenarPelaOrdemReal(fases, (f) => f.fase).map((f) => <li key={f.fase} className="text-[13px]"><b>{labelDaFasePorPhaseKey(f.fase) ?? humanizar(f.fase)}</b> · {String(f.mediaDias).replace(".", ",")} dias <span className="small">(n={f.amostras})</span></li>)}
+            {funil.fases.filter((f) => funil.geral.tempos[f.key]).map((f) => <li key={f.key} className="text-[13px]"><b>{f.label}</b> · {textoDoTempoMedio(funil.geral.tempos[f.key], funil.geral.metas[f.key] ?? null)}</li>)}
           </ul>
         )}
         <div className="small mt-2">Só permanências completas (entrada e saída registradas no log de transição); fase ainda em curso não entra na média.</div>

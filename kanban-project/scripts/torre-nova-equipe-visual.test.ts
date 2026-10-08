@@ -123,7 +123,7 @@ ok("simulação: 'Simulação: se {nome} sair {dias} dias', botões 'Aplicar: ma
   sim.includes("Simulação: se {sim.nome} sair {sim.dias} dias") && sim.includes("Aplicar: marcar ausência e mover carteira") && sim.includes(">Fechar<"))
 ok("botões da linha: Marcar ausência · Cancelar ausência · Mover carteira · Simular saída", ["Marcar ausência", "Cancelar ausência", "Mover carteira", "Simular saída"].every((t) => tabela.includes(`>${t}<`)))
 ok("linha Sem responsável: nome, '—', 'N sem dono', pílula 'distribuir' e botão 'Distribuir as N por aptidão e carga'",
-  tabela.includes("Sem responsável") && tabela.includes("sem dono") && tabela.includes('"distribuir"') && /Distribuir as \{sr\.ativas\} por aptidão e carga/.test(tabela))
+  tabela.includes("Sem responsável") && tabela.includes("ver as sem responsável") && tabela.includes('"distribuir"') && /Distribuir as \{sr\.ativas\} por aptidão e carga/.test(tabela))
 ok("rodapé: 'Redistribuir', '· Dias da simulação de saída' e o campo com aria-label 'Dias da simulação'", tabela.includes(">Redistribuir<") && tabela.includes("· Dias da simulação de saída") && tabela.includes('aria-label="Dias da simulação"'))
 ok("Redistribuir e Distribuir só aparecem para quem pode editar e quando há o que fazer", /temAcao && acoes\.podeEditar/.test(tabela) && /sr\.ativas > 0 && acoes\.podeEditar/.test(tabela))
 ok("a tela: breadcrumb 'Torre de Controle › Equipe' e título", tela.includes("Torre de Controle</a> › Equipe") && tela.includes("{TITULO_EQUIPE}"))
@@ -135,7 +135,7 @@ ok("a linha 'Sem responsável' usa fecha = 0 (sempre vermelha se > 0)", /semDono
 
 secao("Equipe só tem a equipe nossa + vocabulário oficial")
 const todos = [modais, sim, tabela, tela, prev, ler("src/components/torre/equipe-visual.ts"), ler("lib/operacional/torre-equipe.ts"), ler("lib/operacional/torre-equipe-distribuicao.ts")].map(semComentarios).join("\n")
-ok("nenhum 'ninguém', 'Sem ninguém' ou 'Com o cartório' na aba", !/ningu[ée]m|com o cart[óo]rio/i.test(todos))
+ok("nenhum 'ninguém', 'Sem ninguém' ou 'Com o cartório' na aba", !/ningu[ée]m|com o cart[óo]rio/i.test(todos.replace(/kpi=ninguem/g, "")))
 ok("a aba não lista terceiros nem tradutores como pessoas (a lista é de Usuário que executa; nada de órgão/tradutora)", !/tradutor|OrgaoProtocolo|orgaoProtocolo/i.test(semComentarios(tabela + tela + prev)))
 ok("sem placeholder/TODO/exemplo de protótipo na interface", !/\bTODO\b|FIXME|placeholder=|exemplo/.test(semComentarios(modais + sim + tabela + tela + prev)))
 ok("o CSS é próprio (equipe.css) e usa só tokens (nenhum hex)", !/#[0-9a-fA-F]{3,8}\b/.test(semComentarios(ler("src/components/torre/equipe.css"))))

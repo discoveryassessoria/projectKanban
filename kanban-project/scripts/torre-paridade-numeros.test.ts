@@ -35,8 +35,8 @@ const fonte = (p: string) => readFileSync(p, "utf8")
 ok("Terceiros e Foco dizem 'com ou sem responsável' (contam todo AGUARDANDO, como o filtro da aba Tarefas)", fonte("src/components/torre/TorreTerceiros.tsx").includes("aguardando terceiros (com ou sem responsável)") && fonte("src/components/torre/ProcessoCabecalho.tsx").includes("com ou sem responsável"))
 
 console.log("Processos: o botão e a Saúde da fase dizem o que contam")
-ok("o botão e a Saúde da fase se chamam 'parados ou sem dono' (pa + sd) — não repetem o nome 'parado' do funil, que conta outra coisa",
-  fonte("src/components/torre/TorreSaudeDaFase.tsx").includes("<span>parados ou sem dono</span>") && fonte("lib/operacional/torre-fase.ts").includes("p.situacao === 'pa' || p.situacao === 'sd'"))
+ok("o botão e a Saúde da fase contam o MESMO que o funil: parados ou críticos (pa) — «sem dono» não entra na conta",
+  fonte("src/components/torre/TorreSaudeDaFase.tsx").includes("<span>parados ou críticos</span>") && fonte("lib/operacional/torre-fase.ts").includes("p.situacao === 'pa')") && !fonte("lib/operacional/torre-fase.ts").includes("p.situacao === 'sd'"))
 
 console.log(`\n${passou} ok, ${falhou} falhas`)
 process.exit(falhou ? 1 : 0)
