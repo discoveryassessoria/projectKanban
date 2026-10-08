@@ -230,6 +230,9 @@ export async function reancorarTarefaNaUnidade(
       },
     },
   })
+  // Mudou de fase: o prazo não pode ficar contado de antes da entrada (Item 4 / Passo B1). Se a entrada ainda não foi registrada nesta transação
+  // (o avanço de fase grava o log depois da reancoragem), `executarPlano` reaplica a regra logo após gravá-lo.
+  if (atual.faseMacroKey !== (args.faseMacroKey ?? null)) await ajustarPrazoAEntradaNaFase(tx, tarefa.id)
   return tarefa
 }
 
@@ -267,9 +270,11 @@ export interface ResultadoMaterializacao {
 export async function ajustarPrazoAEntradaNaFase(
   tx: Prisma.TransactionClient,
   tarefaId: number,
-  slaDays: number | null | undefined,
+  slaDaChamada?: number | null,
 ): Promise<Date | null> {
-  const t = await tx.tarefa.findUnique({ where: { id: tarefaId }, select: { processoId: true, faseMacroKey: true, dataPrazo: true, statusTarefa: true, processo: { select: { faseAtualKey: true } } } })
+  const t = await tx.tarefa.findUnique({ where: { id: tarefaId }, select: { processoId: true, faseMacroKey: true, dataPrazo: true, statusTarefa: true, processo: { select: { faseAtualKey: true } }, workflowStepInstance: { select: { slaDays: true } } } })
+  // Sem SLA informado pela chamada, vale o do PASSO em que a tarefa está ancorada (o «prazo do passo novo»).
+  const slaDays = slaDaChamada !== undefined ? slaDaChamada : t?.workflowStepInstance?.slaDays ?? null
   if (!t || t.processoId == null || t.dataPrazo == null || !t.faseMacroKey || t.processo?.faseAtualKey !== t.faseMacroKey) return null
   if (['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI', 'CANCELADA', 'SUPERSEDIDA'].includes(t.statusTarefa)) return null
   const log = await tx.phaseAdvanceLog.findFirst({

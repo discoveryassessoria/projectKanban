@@ -29,6 +29,7 @@ import { materializarExecucaoDaFase, type FonteMaterializacao } from "@/src/serv
 import { calcularObrigacoesRetroativasPendentes } from "@/src/lib/motor/reconciliar-fase-macro"
 import { resolverMacroWorkflowDoProcesso } from "@/src/lib/motor/resolver-macro-workflow"
 import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
+import { ajustarPrazoAEntradaNaFase } from "@/lib/operacional/tarefa-canonica"
 import { somarAoAviso, rotuloDaFamilia } from "@/lib/operacional/notificacao-canonica"
 import { urlVisaoGlobalDaFamilia } from "@/lib/operacional/navegacao"
 import { phaseKeyToFaseCode, isProcessoFase } from "@/src/lib/process-stage/fases-catalog"
@@ -534,6 +535,16 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
           chaveIdempotencia: chave,
         },
       })
+
+      // 6b) PRAZO NUNCA ANTERIOR À ENTRADA NA FASE: com a entrada já registrada, as tarefas abertas da fase nova (as que vieram de outra fase,
+      //     ou nasceram antecipadas) são reancoradas no prazo do passo atual — mesma função de `reancorarTarefaNaUnidade`.
+      {
+        const abertasDaFase = await tx.tarefa.findMany({
+          where: { processoId: p.processoId, faseMacroKey: p.novaFaseAtualKey, statusTarefa: { notIn: ["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI", "CANCELADA", "SUPERSEDIDA"] }, dataPrazo: { not: null } },
+          select: { id: true },
+        })
+        for (const t of abertasDaFase) await ajustarPrazoAEntradaNaFase(tx, t.id)
+      }
 
       // 7) EVENTOS CANÔNICOS no outbox transacional (contrato estável p/ efeitos
       //    futuros — inclusive o financeiro — reagirem à ENTRADA em fase).
