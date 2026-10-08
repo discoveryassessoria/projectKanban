@@ -1,12 +1,11 @@
 // src/services/registrar-recebimento.ts
 // ============================================================================
-// REGISTRAR RECEBIMENTO (Operação, 07/10/2026) — UMA ação, a qualquer momento depois que o requerimento foi enviado ao cartório
-// (antes ou depois do prazo de cobrança). Conclui "Receber confirmação do pedido" e "Receber certidão" de uma vez, deixa
-// "Conferir e validar certidão" liberada (com quem registrou como responsável) e a certidão sai de Aguardando e vai para A fazer.
+// REGISTRAR RECEBIMENTO — a janela do PASSO 3 («Receber certidão», 08/10/2026). Conclui SÓ o passo 3 e deixa «Conferir e validar certidão» liberada (com quem
+// registrou como responsável); a certidão sai de Aguardando e vai para A fazer. Exige o passo 2 («Receber confirmação do pedido») JÁ concluído — pela tela de
+// confirmação do pedido (protocolo, valor, anexo do protocolo, observações). Antes esta janela concluía o 2 e o 3 de uma vez, sem protocolo, valor nem anexo.
 //
-// Nada aqui exige anexo, comprovante, protocolo ou campo preenchido: a equipe lança pedidos de meses atrás que não têm comprovante
-// guardado. O que conclui as subtarefas é a AÇÃO da pessoa, pelo mesmo motor de sempre (`concluirSubtarefaCorrentePeloPasso`) — nunca
-// gravando status direto. As subtarefas continuam obrigatórias; só não há mais dois cliques (nem um comprovante) para passar por elas.
+// Nada aqui exige anexo da certidão: o anexo é opcional e a data pode ser de meses atrás. O que conclui o passo é a AÇÃO da pessoa, pelo mesmo motor de sempre
+// (`concluirSubtarefaCorrentePeloPasso`) — nunca gravando status direto.
 //
 // Quem pode: quem fez o pedido (executou o "Enviar requerimento"), o responsável da tarefa e o administrador (o Marco vê e faz tudo).
 // ============================================================================
@@ -19,7 +18,7 @@ import {
 
 export type ResultadoDoRecebimento =
   | { ok: true; tarefaId: number; recebidaEm: string; texto: string; responsavelDaConferenciaId: number }
-  | { ok: false; codigo: 'NAO_ENCONTRADA' | 'SEM_PERMISSAO' | 'DATA_INVALIDA' | 'PEDIDO_NAO_ENVIADO' | 'JA_REGISTRADO' | 'ENCERRADA' | 'ESTADO_MUDOU'; mensagem: string }
+  | { ok: false; codigo: 'NAO_ENCONTRADA' | 'SEM_PERMISSAO' | 'DATA_INVALIDA' | 'PEDIDO_NAO_ENVIADO' | 'JA_REGISTRADO' | 'ENCERRADA' | 'ESTADO_MUDOU' | 'CONFIRMACAO_PENDENTE'; mensagem: string }
 
 const TERMINAIS = ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI', 'CANCELADA', 'SUPERSEDIDA']
 
@@ -50,6 +49,9 @@ export async function registrarRecebimentoDaCertidao(args: {
   if (porChave.get(SUBTAREFA_PEDIDO_ENVIADO)?.status !== 'CONCLUIDO') {
     return { ok: false, codigo: 'PEDIDO_NAO_ENVIADO', mensagem: 'O requerimento ainda não foi enviado ao cartório — envie primeiro.' }
   }
+  if (porChave.get(SUBTAREFA_CONFIRMACAO)?.status !== 'CONCLUIDO') {
+    return { ok: false, codigo: 'CONFIRMACAO_PENDENTE', mensagem: 'Registre antes a confirmação do pedido (passo 2: protocolo, valor, anexo e observações). O recebimento só abre depois dela.' }
+  }
   if (porChave.get(SUBTAREFA_CERTIDAO_RECEBIDA)?.status === 'CONCLUIDO') {
     return { ok: false, codigo: 'JA_REGISTRADO', mensagem: 'O recebimento desta certidão já foi registrado.' }
   }
@@ -64,17 +66,12 @@ export async function registrarRecebimentoDaCertidao(args: {
   const fornecedorId = t.workflowStepInstance?.documento?.orgaoId ?? t.orgaoId ?? null
   const payload = { origem: 'registrar_recebimento', recebidaEm: recebida.toISOString(), semAnexo: true }
 
-  // As subtarefas 2 e 3, nesta ordem, pelo motor: cada uma só conclui se for a CORRENTE (o motor recusa a errada).
-  for (const key of [SUBTAREFA_CONFIRMACAO, SUBTAREFA_CERTIDAO_RECEBIDA]) {
-    if (porChave.get(key)?.status === 'CONCLUIDO') continue
-    const r = await concluirSubtarefaCorrentePeloPasso({
-      stepInstanceId, executadoPorId: args.usuario.userId, payload, resultado: 'recebimento_registrado',
-      fornecedorId, subtarefaKeyEsperada: key,
-      // Pedido antigo, sem protocolo guardado: registrar o recebimento nunca exige o número do cartório.
-      confirmadoSemProtocolo: true,
-    })
-    if (!r.aplicavel) return { ok: false, codigo: 'ESTADO_MUDOU', mensagem: (r.motivo === 'PASSO_BLOQUEADO' || r.motivo === 'DEPENDENCIA_PENDENTE') && r.mensagem ? r.mensagem : 'O estado da certidão mudou enquanto você registrava — recarregue e tente de novo.' }
-  }
+  // O passo 3, pelo motor: ele só conclui se for a CORRENTE (o motor recusa a errada).
+  const r = await concluirSubtarefaCorrentePeloPasso({
+    stepInstanceId, executadoPorId: args.usuario.userId, payload, resultado: 'recebimento_registrado',
+    fornecedorId, subtarefaKeyEsperada: SUBTAREFA_CERTIDAO_RECEBIDA,
+  })
+  if (!r.aplicavel) return { ok: false, codigo: 'ESTADO_MUDOU', mensagem: (r.motivo === 'PASSO_BLOQUEADO' || r.motivo === 'DEPENDENCIA_PENDENTE') && r.mensagem ? r.mensagem : 'O estado da certidão mudou enquanto você registrava — recarregue e tente de novo.' }
   // A espera automática do cartório termina (a tarefa deixa de estar "aguardando terceiros").
   await resumirTarefaSeEsperaSubtarefaEncerrada({ stepInstanceId, fornecedorId })
 

@@ -77,7 +77,7 @@ async function main() {
 
     secao("f) As 4 subtarefas são obrigatórias; anexo/comprovante/dado nunca é obrigatório")
     ok("o requerimento enviado NÃO exige anexo (constante = false)", /REQUERIMENTO_ENVIADO_OBRIGATORIO = false/.test(ler("src/lib/process-stage/requerimento-opcional.ts")))
-    ok("«Registrar recebimento» nunca exige anexo nem protocolo (confirmadoSemProtocolo)", /confirmadoSemProtocolo: true/.test(ler("src/services/registrar-recebimento.ts")))
+    ok("«Registrar recebimento» (passo 3) nunca exige anexo: só a data; o anexo da certidão é opcional na tela e o servidor não o consulta", !/documentoArquivo|\.arquivos\b/.test(ler("src/services/registrar-recebimento.ts")) && /Anexar a certidão \(opcional\)/.test(ler("src/components/operacao/RegistrarRecebimentoModal.tsx")))
     // controle positivo: um Workflow Interno da Emissão publicado com subtarefa OPCIONAL e protocolo exigido é acusado.
     const wf = await prisma.phaseInternalWorkflow.create({ data: { wfUid: `${MARCA}-emissao-opcional`, phaseKey: "emissao_documental", name: `${MARCA} Emissão`, active: true, tipoProcessoId: null, escopoExecucao: "PROCESSO" } as never, select: { id: true } })
     await prisma.phaseInternalWorkflowVersao.create({

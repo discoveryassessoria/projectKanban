@@ -53,6 +53,9 @@ async function main() {
     const linhaDaEquipe = async (tarefaId: number) => (await minhaFila(null, new Date())).find((l) => l.taskId === tarefaId)
     const enviarPedido = async (stepInstanceId: number, porId: number) => concluirSubtarefaCorrentePeloPasso({ stepInstanceId, executadoPorId: porId, payload: {}, resultado: "enviado", subtarefaKeyEsperada: "enviar_requerimento_cartorio" })
 
+    // O passo 2 se conclui pela TELA DE CONFIRMAÇÃO DO PEDIDO (Central da etapa) — nunca pela janela «Registrar recebimento», que é do passo 3.
+    const confirmarPedido = async (stepInstanceId: number, porId: number) => concluirSubtarefaCorrentePeloPasso({ stepInstanceId, executadoPorId: porId, payload: { externalProtocol: "PROT-1" }, resultado: "confirmado", subtarefaKeyEsperada: "receber_confirmacao_pedido", confirmadoSemProtocolo: true })
+
     secao("1) As subtarefas continuam obrigatórias: concluir a 1ª NÃO fecha o passo (o defeito do caso real)")
     const o1 = await c.novaObrigacao({ responsavelId: null })
     const r1 = await enviarPedido(o1.stepInstanceId, daniela.id)
@@ -90,6 +93,12 @@ async function main() {
     ok("transferida a outra pessoa: quem fez o pedido continua vendo; a outra também", (await minhaFila(daniela.id, new Date())).some((l) => l.taskId === o1.tarefaId) && (await minhaFila(outra.id, new Date())).some((l) => l.taskId === o1.tarefaId))
     ok("uma terceira pessoa NÃO vê a certidão", !(await minhaFila(marco.id, new Date())).some((l) => l.taskId === o1.tarefaId))
     await prisma.tarefa.update({ where: { id: o1.tarefaId }, data: { responsavelId: null } })
+
+    const antesDaConfirmacao = await registrarRecebimentoDaCertidao({ tarefaId: o1.tarefaId, usuario: { userId: daniela.id, tipo: "assistente" } })
+    ok("o passo 3 NÃO abre antes do passo 2: «Registrar recebimento» é recusado (confirmação do pedido pendente)", !antesDaConfirmacao.ok && antesDaConfirmacao.codigo === "CONFIRMACAO_PENDENTE" && /confirmação do pedido/.test(antesDaConfirmacao.mensagem))
+    ok("e a recusa não concluiu nada (nem o 2 nem o 3)", (await statusDe(o1.stepInstanceId)).receber_confirmacao_pedido !== "CONCLUIDO" && (await statusDe(o1.stepInstanceId)).receber_certidao !== "CONCLUIDO")
+    await confirmarPedido(o1.stepInstanceId, daniela.id)
+    ok("confirmado o pedido (passo 2), o passo 3 passa a poder ser registrado", (await statusDe(o1.stepInstanceId)).receber_confirmacao_pedido === "CONCLUIDO")
 
     secao("3) REGISTRAR RECEBIMENTO — permissão e recusas")
     const semPermissao = await registrarRecebimentoDaCertidao({ tarefaId: o1.tarefaId, usuario: { userId: outra.id, tipo: "assistente" } })
@@ -134,6 +143,7 @@ async function main() {
     await prisma.tarefa.update({ where: { id: o2.tarefaId }, data: { dataPrazo: new Date(Date.now() - 380 * dia) } })
     ok("pedido antigo e vencido continua em Aguardando", (await linhaDaEquipe(o2.tarefaId))?.estadoOperacao === "AGUARDANDO")
     const antiga = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date(Date.now() - 380 * dia))
+    await confirmarPedido(o2.stepInstanceId, daniela.id)
     const reg2 = await registrarRecebimentoDaCertidao({ tarefaId: o2.tarefaId, usuario: { userId: marco.id, tipo: "admin", nome: `${MARCA} Marco` }, recebidaEm: antiga })
     ok("o Marco registra o recebimento com data de meses atrás", reg2.ok === true, reg2.ok ? reg2.texto : reg2.mensagem)
     const st2 = await statusDe(o2.stepInstanceId)
@@ -164,7 +174,7 @@ async function main() {
     const wf = readFileSync("src/components/kanban/workflow/WorkflowTab.tsx", "utf8")
     // FLUXO ÚNICO (07/10/2026): a linha do Aguardando só tem «Abrir»; o recebimento se registra no passo 2 da gaveta («Iniciar →» abre o modal).
     ok("a linha do Aguardando NÃO tem atalho de recebimento (só «Abrir»)", !/>\s*Registrar recebimento\s*</.test(abas) && !/podeRegistrar/.test(abas))
-    ok("a gaveta abre o modal pelo «Iniciar →» do passo 2 (Receber confirmação do pedido)", /SUBTAREFA_CONFIRMACAO && !s\.concluida/.test(wf) && /iniciar-registrar-recebimento/.test(wf) && /<RegistrarRecebimentoModal/.test(wf))
+    ok("a gaveta abre o modal «Registrar recebimento» SÓ no passo 3 (Receber certidão), pela janela do passo", /janelaDaSubtarefa\(s\.key\) === "REGISTRAR_RECEBIMENTO"/.test(wf) && /registrar-recebimento-passo/.test(wf) && /<RegistrarRecebimentoModal/.test(wf) && !/s\.key === SUBTAREFA_CONFIRMACAO && !s\.concluida \? \(\) => setRecebimentoAberto/.test(wf))
     ok("só a gaveta usa o modal (nem a Operação nem a Torre o abrem por conta própria)", !/RegistrarRecebimentoModal/.test(readFileSync("src/components/operacao/operacao-v3.tsx", "utf8")))
     ok("o modal pede a data dd/mm/aaaa (sugere hoje), anexo OPCIONAL e confirmação antes de gravar", /CampoDataTexto/.test(modal) && /Anexar a certidão \(opcional\)/.test(modal) && /confirmado: true/.test(modal) && /Confirmar/.test(modal))
     ok("o anexo não é exigido: o botão Continuar só depende da data", /disabled=\{enviando \|\| !dia\}/.test(modal) && !/required/.test(modal))
