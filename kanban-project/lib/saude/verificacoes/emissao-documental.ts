@@ -558,7 +558,7 @@ registrar({
   id: 'saude.emissao.documento-avancado-sem-arquivo',
   codigo: 'EMI-010',
   nome: 'Documento em estágio avançado tem arquivo',
-  descricao: 'Documento em RECEBIDO/EM_ANALISE/TRADUZIDO/APOSTILADO/ENTREGUE sem nenhum DocumentoArquivo afirma um estágio que não tem prova física.',
+  descricao: 'Documento em RECEBIDO/EM_ANALISE/TRADUZIDO/APOSTILADO/ENTREGUE sem nenhum arquivo (nem o principal do documento, nem DocumentoArquivo) afirma um estágio que não tem prova física.',
   dominio: 'SISTEMA_DOCUMENTAL',
   modulo: 'Emissão Documental',
   severidadePadrao: 'ERRO',
@@ -571,10 +571,13 @@ registrar({
   responsavel: 'Emissão Documental',
   ativo: true,
   executar: async (): Promise<ResultadoVerificacao> => {
+    // O ARQUIVO PRINCIPAL mora nas colunas do próprio Documento (arquivo_url/arquivo_nome) — é o que a tela mostra em «Abrir arquivo principal».
+    // Só é «sem arquivo» quem não tem NENHUM dos dois (08/10/2026: 69 documentos acusados à toa, todos com arquivo_url).
     const linhas = await prisma.$queryRawUnsafe<Array<{ id: number; status: string }>>(
       `SELECT d.id, d.status FROM "Documento" d
         WHERE d.status IN ('RECEBIDO','EM_ANALISE','TRADUZIDO','APOSTILADO','ENTREGUE')
           AND NOT EXISTS (SELECT 1 FROM "DocumentoArquivo" a WHERE a."documentoId" = d.id)
+          AND COALESCE(d.arquivo_url, '') = ''
         LIMIT 100`,
     )
     if (!linhas.length) return vazio({ semArquivo: 0 }, 'Todo documento em estágio avançado tem DocumentoArquivo correspondente.')

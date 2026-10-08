@@ -328,6 +328,10 @@ async function main() {
     await prisma.documentoArquivo.delete({ where: { id: arq.id } })
     exec = await rodar("EMI-010")
     ok("detecta documento em estágio avançado sem nenhum arquivo", temAchado(exec, `emi-documento-sem-arquivo:${f.documentoId}`))
+    // O arquivo principal mora nas colunas do Documento (`arquivo_url`): documento só com ele NÃO é «sem arquivo».
+    await prisma.documento.update({ where: { id: f.documentoId }, data: { arquivo_url: "privado/anexos/documento/x.pdf", arquivo_nome: "x.pdf" } })
+    exec = await rodar("EMI-010")
+    ok("documento RECEBIDO só com o arquivo principal (arquivo_url) não dispara achado", !temAchado(exec, `emi-documento-sem-arquivo:${f.documentoId}`))
   }
 
   // ── EMI-011 — Versão marcada atual e rejeitada simultaneamente ───────────
