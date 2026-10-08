@@ -27,7 +27,7 @@ import { mesmoLugar } from '@/src/lib/genealogia/sincronizacao-registral'
 import { compararCertidoesDaFamilia } from '@/lib/operacional/ordem-certidoes'
 import { SUBTAREFA_PEDIDO_ENVIADO, SUBTAREFA_CONFIRMACAO, SUBTAREFA_CERTIDAO_RECEBIDA, SUBTAREFA_CONFERENCIA } from '@/lib/operacional/emissao-recebimento'
 
-export type RegraDoMarco = 'a' | 'c' | 'e' | 'f' | 'g' | 'i' | 'j' | 'l' | 'm' | 'n' | 'o' | 'p' | 'q' | 'r' | 's'
+export type RegraDoMarco = 'a' | 'c' | 'e' | 'f' | 'g' | 'i' | 'j' | 'l' | 'm' | 'n' | 'o' | 'p' | 'q' | 'r' | 's' | 't'
 
 /** O detalhe do processo lido UMA vez por rodada (as regras e, i e o script leem o mesmo). */
 type Detalhe = Awaited<ReturnType<typeof import('@/lib/operacional/torre-foco')['detalheDoProcesso']>>
@@ -60,6 +60,7 @@ export const TITULO_DA_REGRA: Record<RegraDoMarco, string> = {
   j: 'Subtarefa da Emissão fora de ordem ou com selo «Disponível» sendo que depende de outra',
   m: 'Local do óbito da certidão diferente (ou ausente) na árvore',
   n: 'Abas da Torre dizendo coisas diferentes (responsável, fases, risco ou contagens)',
+  t: 'Lista de províncias da Itália/Espanha fora da regra (região, comunidade ou inglês) ou cidade real que não carrega sob a sua província',
   s: 'Cartório ligado fora da regra da Localidade (órgão que não é registro civil, ou de outro país que o do registro)',
   r: 'Passo 3 (Receber certidão) concluído com o passo 2 (confirmação do pedido) por concluir — a janela do passo 2 não pode ser a do passo 3',
   q: 'Árvore difere da Genealogia (dado da Genealogia que a árvore ainda não acompanhou)',
@@ -468,13 +469,33 @@ export async function detectarRegraS(): Promise<ViolacaoDoMarco[]> {
   return out
 }
 
+// ── t ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/** Vigia VIVO das listas de província (a mesma função que o formulário chama): Itália só com província/cidade metropolitana em português ou italiano — nunca região nem inglês; Espanha com as 50 províncias + Ceuta e Melilla
+ *  — nunca comunidade; e as cidades reais da Discovery precisam carregar sob a província certa. */
+export async function detectarRegraT(): Promise<ViolacaoDoMarco[]> {
+  const { provinciasDoPais, cidadesDaProvincia } = await import('@/src/services/localidade/geografia-mundial')
+  const { MARCAS_DE_LISTA_ERRADA_IT, REGIOES_DA_ITALIA, COMUNIDADES_DA_ESPANHA, normalizarNomeDeLugar } = await import('@/lib/localidade/provincias-oficiais')
+  const out: ViolacaoDoMarco[] = []
+  const v = (detalhe: string) => out.push({ regra: 't', processoId: null, familia: '—', certidao: null, pessoa: null, detalhe, entidade: 'Localidade', registroId: out.length + 1 })
+  const it = await provinciasDoPais('IT'), es = await provinciasDoPais('ES')
+  const regioes = new Set(REGIOES_DA_ITALIA.map(normalizarNomeDeLugar)), comunidades = new Set(COMUNIDADES_DA_ESPANHA.map(normalizarNomeDeLugar))
+  if (it.length < 100) v(`a lista da Itália tem ${it.length} itens (esperado ≥ 100 províncias)`)
+  for (const p of it) { if (regioes.has(normalizarNomeDeLugar(p.nome)) || MARCAS_DE_LISTA_ERRADA_IT.some((r) => r.test(p.nome))) v(`Itália: «${p.nome}» é região ou nome em inglês — não é província`) }
+  if (es.length !== 52) v(`a lista da Espanha tem ${es.length} itens (esperado 52: 50 províncias + Ceuta + Melilla)`)
+  for (const p of es) { if (comunidades.has(normalizarNomeDeLugar(p.nome))) v(`Espanha: «${p.nome}» é comunidade autônoma — não é província`) }
+  for (const n of ['León', 'Lugo', 'Pontevedra', 'Barcelona', 'Ceuta', 'Melilla']) if (!es.some((p) => normalizarNomeDeLugar(p.nome) === normalizarNomeDeLugar(n))) v(`Espanha: falta a província «${n}»`)
+  const reais: Array<[string, string, string]> = [['IT', 'Ferrara', 'Comacchio'], ['IT', 'Mântua', 'Castelbelforte'], ['IT', 'Crotone', 'Cirò'], ['ES', 'Múrcia', 'San Javier'], ['ES', 'Múrcia', 'Torre-Pacheco'], ['ES', 'Lugo', 'Lugo'], ['ES', 'León', 'León'], ['ES', 'Granada', 'Murtas'], ['ES', 'Granada', 'Almuñécar'], ['ES', 'Granada', 'Turón'], ['ES', 'Pontevedra', 'A Guarda'], ['ES', 'Barcelona', 'Barcelona']]
+  for (const [pais, prov, cidade] of reais) { const r = await cidadesDaProvincia(pais, prov, cidade); if (!r.some((c) => normalizarNomeDeLugar(c.nome) === normalizarNomeDeLugar(cidade))) v(`${cidade} não carrega sob a província ${prov} (${pais})`) }
+  return out
+}
+
 export async function detectarRegrasDoMarco(opts: { profundo?: boolean } = {}): Promise<{ violacoes: ViolacaoDoMarco[]; porRegra: Record<RegraDoMarco, number> }> {
   limparMemoDeDetalhes()
   const todas = [
     ...(await detectarRegraA()), ...(await detectarRegraC()), ...(await detectarRegraE(opts)),
-    ...(await detectarRegraF()), ...(await detectarRegraG()), ...(opts.profundo ? await detectarRegraI() : []), ...(await detectarRegraJ()), ...(await detectarRegraL()), ...(await detectarRegraM()), ...(await detectarRegraN()), ...(await detectarRegraO()), ...(await detectarRegraP()), ...(await detectarRegraQ()), ...(await detectarRegraR()), ...(await detectarRegraS()),
+    ...(await detectarRegraF()), ...(await detectarRegraG()), ...(opts.profundo ? await detectarRegraI() : []), ...(await detectarRegraJ()), ...(await detectarRegraL()), ...(await detectarRegraM()), ...(await detectarRegraN()), ...(await detectarRegraO()), ...(await detectarRegraP()), ...(await detectarRegraQ()), ...(await detectarRegraR()), ...(await detectarRegraS()), ...(await detectarRegraT()),
   ]
-  const porRegra = { a: 0, c: 0, e: 0, f: 0, g: 0, i: 0, j: 0, l: 0, m: 0, n: 0, o: 0, p: 0, q: 0, r: 0, s: 0 } as Record<RegraDoMarco, number>
+  const porRegra = { a: 0, c: 0, e: 0, f: 0, g: 0, i: 0, j: 0, l: 0, m: 0, n: 0, o: 0, p: 0, q: 0, r: 0, s: 0, t: 0 } as Record<RegraDoMarco, number>
   for (const v of todas) porRegra[v.regra]++
   return { violacoes: todas, porRegra }
 }

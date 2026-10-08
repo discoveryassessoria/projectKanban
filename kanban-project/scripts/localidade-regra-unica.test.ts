@@ -24,16 +24,14 @@ async function main() {
   ok("«estado do nascimento» vira «província do nascimento» fora do Brasil (nos avisos e no histórico)", campoParaPais(CAMPOS_SINCRONIZAVEIS.find((c) => c.chave === "PESSOA.estado_nasc")!, "Espanha").rotulo === "província do nascimento" && campoParaPais(CAMPOS_SINCRONIZAVEIS.find((c) => c.chave === "PESSOA.estado_nasc")!, "Brasil").rotulo === "estado do nascimento")
 
   console.log("\n2) A base geográfica (as cidades reais da Discovery)")
-  const casos: Array<[string, string, string | null, boolean]> = [
-    ["Comacchio", "IT", "Emilia-Romagna", true], ["Castelbelforte", "IT", "Lombardy", true], ["San Javier", "ES", "Murcia", true], ["Torre-Pacheco", "ES", "Murcia", true],
-    ["Lugo", "ES", "Galicia", true], ["Murtas", "ES", "Andalusia", true], ["Almuñécar", "ES", "Andalusia", true], ["Cirò", "IT", "Calabria", true], ["Barcelona", "ES", "Catalonia", true],
-    ["Turón", "ES", null, false], ["A Guarda", "ES", null, false],
-  ]
-  for (const [cidade, pais, prov, existe] of casos) {
+  // Itália e Espanha têm fonte OFICIAL de província (ISTAT/INE — ver `provincias-oficiais.test.ts`); o resto do mundo usa a base geral. Aqui: cidade de OUTRO país + cidade desconhecida.
+  const jp = await cidadesDaProvincia("JP", null, "Tokyo")
+  ok("fora de Itália/Espanha a base geral encontra cidades (Tokyo, JP)", jp.some((c) => c.nome.toLowerCase().startsWith("tok")))
+  for (const [cidade, pais] of [["Comacchio", "IT"], ["Castelbelforte", "IT"], ["Cirò", "IT"], ["San Javier", "ES"], ["Torre-Pacheco", "ES"], ["Lugo", "ES"], ["Murtas", "ES"], ["Almuñécar", "ES"], ["Turón", "ES"], ["A Guarda", "ES"], ["Barcelona", "ES"]] as const) {
     const r = await cidadesDaProvincia(pais, null, cidade)
-    const achou = r.some((c) => c.nome.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase() === cidade.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase() && (!prov || c.provincia === prov))
-    ok(`${cidade} (${pais}${prov ? `, ${prov}` : ""}): ${existe ? "a base encontra" : "a base NÃO conhece — vira texto livre, sem erro"}`, achou === existe)
+    ok(`${cidade} (${pais}): a base oficial encontra`, r.some((c) => c.nome.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase() === cidade.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()))
   }
+  ok("cidade desconhecida vira texto livre, sem erro", (await cidadesDaProvincia("IT", null, "CidadeInventadaXYZ")).length === 0)
   ok("províncias carregam sozinhas por país (Espanha, Itália) e o Brasil não usa esta base", (await provinciasDoPais("ES")).length > 10 && (await provinciasDoPais("IT")).length > 50 && (await provinciasDoPais("ZZ")).length === 0)
   ok("cidade ausente / província inexistente = lista vazia (nunca exceção)", (await cidadesDaProvincia("ES", "Província Que Não Existe", "x")).length === 0 && (await cidadesDaProvincia("ZZ", null, "x")).length === 0)
 
