@@ -188,3 +188,76 @@ export function camposTravados(registros: ReadonlyArray<{ evento: EventoRegistra
   }
   return travados
 }
+
+// ─── LUGAR EM TEXTO ÚNICO («Santo André - São Paulo») ────────────────────────────────────────────────────────────────────────
+// Dados Registrais têm cidade, estado e país em campos separados. Se a cidade vier com o estado colado, separa SÓ quando é seguro: o pedaço depois do último
+// « - », «,» ou «/» é um estado brasileiro conhecido (sigla ou nome). Qualquer outra coisa (subdistrito, número, dois lugares) NÃO é adivinhada: o campo não é
+// gravado e o caso vai para a lista de revisão manual.
+const NOMES_UF: Record<string, string> = {
+  AC: "Acre", AL: "Alagoas", AP: "Amapá", AM: "Amazonas", BA: "Bahia", CE: "Ceará", DF: "Distrito Federal", ES: "Espírito Santo", GO: "Goiás", MA: "Maranhão", MT: "Mato Grosso",
+  MS: "Mato Grosso do Sul", MG: "Minas Gerais", PA: "Pará", PB: "Paraíba", PR: "Paraná", PE: "Pernambuco", PI: "Piauí", RJ: "Rio de Janeiro", RN: "Rio Grande do Norte",
+  RS: "Rio Grande do Sul", RO: "Rondônia", RR: "Roraima", SC: "Santa Catarina", SP: "São Paulo", SE: "Sergipe", TO: "Tocantins",
+}
+const estadoConhecido = (v: string): string | null => {
+  const b = semAcento(v).toLowerCase().trim()
+  for (const [uf, nome] of Object.entries(NOMES_UF)) if (b === uf.toLowerCase() || b === semAcento(nome).toLowerCase()) return nome
+  return null
+}
+export interface LugarSeparado {
+  cidade: string | null
+  estado: string | null
+  /** true = o texto tem um separador mas NÃO dá para separar com segurança — não grave, revise à mão. */
+  revisaoManual: boolean
+  motivo: string | null
+}
+export function separarLugarUnico(cidade: string | null | undefined, estado: string | null | undefined): LugarSeparado {
+  const c = textoDeCampo(cidade), e = textoDeCampo(estado)
+  if (c == null) return { cidade: null, estado: e, revisaoManual: false, motivo: null }
+  const m = /^(.+?)\s+[-–]\s+([^-–]+)$/.exec(c) ?? /^(.+?)\s*[,/]\s*([^,/]+)$/.exec(c)
+  if (!m) return { cidade: c, estado: e, revisaoManual: false, motivo: null }
+  const esquerda = m[1].trim(), direita = estadoConhecido(m[2])
+  if (direita == null) return { cidade: null, estado: e, revisaoManual: true, motivo: `«${c}»: o que vem depois do separador não é um estado conhecido` }
+  if (e != null && !mesmoLugar({ origem: "estado_registro" }, e, direita)) return { cidade: null, estado: e, revisaoManual: true, motivo: `«${c}»: o estado do texto (${direita}) difere do campo estado (${e})` }
+  return { cidade: esquerda, estado: e ?? direita, revisaoManual: false, motivo: null }
+}
+
+// ─── O QUE NÃO SE GRAVA SOZINHO ─────────────────────────────────────────────────────────────────────────────────────────────
+/** Local do óbito: fica fora dos casos antigos (decisão do Marco, 08/10/2026). Nunca é sobrescrito sem escolha explícita. */
+export const CHAVES_DO_LOCAL_DO_OBITO: readonly string[] = ["PESSOA.local_obito", "PESSOA.estado_obito", "PESSOA.pais_obito"]
+export const ehLocalDoObito = (chave: string): boolean => CHAVES_DO_LOCAL_DO_OBITO.includes(chave)
+
+/** Motivo de NÃO gravar um valor do registro que tem «cara de erro» (data impossível, texto de lixo). `null` = pode gravar. */
+export function suspeitaNoValorDoRegistro(campo: CampoSincronizavel, valor: string, agora: Date = new Date()): string | null {
+  if (campo.tipo === "data") {
+    const ano = Number(valor.slice(0, 4))
+    if (!Number.isFinite(ano) || ano < 1500) return `data impossível (${dataBR(valor)}): ano anterior a 1500`
+    if (new Date(`${valor}T00:00:00Z`).getTime() > agora.getTime() + 86_400_000) return `data no futuro (${dataBR(valor)})`
+    return null
+  }
+  if (campo.origem === "cartorio" || campo.origem === "livro" || campo.origem === "folha" || campo.origem === "termo") return valor.length > 200 ? "texto longo demais" : null
+  if (valor.length < 2) return `texto curto demais («${valor}»)`
+  if (/\d/.test(valor)) return `lugar com número («${valor}»)`
+  if (/^(n\/?a|null|undefined|nao informado|não informado|desconhecid[oa]|-+|\?+)$/i.test(valor)) return `valor sem significado («${valor}»)`
+  return null
+}
+
+/** Datas do MESMO registro que se contradizem (o registro não pode ser lavrado antes do fato). */
+export function registroAnteriorAoEvento(dataEvento: string | null, dataRegistro: string | null): boolean {
+  return dataEvento != null && dataRegistro != null && dataRegistro < dataEvento
+}
+
+/** Distância de edição (sem acento e sem caixa) — para reconhecer dois textos «quase iguais» (Águilas × Aguilar), que mais parecem erro de digitação de um dos lados do que dois lugares. */
+export function distanciaDeTexto(a: string, b: string): number {
+  const x = semAcento(a).toLowerCase().trim(), y = semAcento(b).toLowerCase().trim()
+  const d: number[][] = Array.from({ length: x.length + 1 }, (_, i) => [i, ...Array(y.length).fill(0)])
+  for (let j = 0; j <= y.length; j++) d[0][j] = j
+  for (let i = 1; i <= x.length; i++) for (let j = 1; j <= y.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1))
+  return d[x.length][y.length]
+}
+/** Conflito de TEXTO entre dois valores quase iguais: não se decide sozinho — vai para a lista de ambíguos. */
+export function conflitoQuaseIgual(campo: CampoSincronizavel, arvore: string | null, registro: string): string | null {
+  if (campo.tipo !== "texto" || arvore == null || campo.origem === "estado_registro" || campo.origem === "livro" || campo.origem === "folha" || campo.origem === "termo") return null
+  const base = (v: string) => v.replace(/\s*\([^)]*\)\s*$/, "")
+  const dist = distanciaDeTexto(base(arvore), base(registro))
+  return dist > 0 && dist <= 2 && Math.min(base(arvore).length, base(registro).length) >= 5 ? `«${arvore}» × «${registro}»: textos quase iguais (possível erro de digitação de um dos lados)` : null
+}

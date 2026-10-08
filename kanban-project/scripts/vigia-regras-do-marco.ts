@@ -20,7 +20,7 @@ const profundo = process.argv.includes("--profundo")
 ;(async () => {
   const { violacoes, porRegra } = await detectarRegrasDoMarco({ profundo })
   console.log(`VIGIA DAS REGRAS DO MARCO — ${new Date().toISOString()} — modo ${profundo ? "profundo" : "rápido"}\n`)
-  for (const r of ["a", "c", "e", "f", "g", "i", "j", "l", "m", "n", "o", "p"] as RegraDoMarco[]) {
+  for (const r of ["a", "c", "e", "f", "g", "i", "j", "l", "m", "n", "o", "p", "q"] as RegraDoMarco[]) {
     if (r === "i" && !profundo) { console.log(`(${r}) ${TITULO_DA_REGRA[r]}: não conferida no modo rápido (use --profundo)\n`); continue }
     const v = violacoes.filter((x) => x.regra === r)
     console.log(`(${r}) ${TITULO_DA_REGRA[r]}: ${v.length}`)
