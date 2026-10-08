@@ -14,7 +14,7 @@ import { prisma } from "@/lib/prisma"
 import { STATUS_DOCUMENTO_INATIVOS } from "@/src/lib/documentos/status-inativos"
 import { aplicarMudancaNaArvore } from "@/src/services/genealogia/propagar-arvore"
 import {
-  CAMPOS_SINCRONIZAVEIS, TIPOS_DE_CERTIDAO_DO_EVENTO, ehLocalDoObito, conflitoQuaseIgual, registroAnteriorAoEvento, separarLugarUnico, suspeitaNoValorDoRegistro, campoDaChave, camposTravados, diaDe, diferencasDoEvento, eventoDoTipoDeDocumento, mesmoTexto, mostrarValor, textoDeCampo as textoDe, textoDoHistorico,
+  CAMPOS_SINCRONIZAVEIS, TIPOS_DE_CERTIDAO_DO_EVENTO, registroAnteriorAoEvento, separarLugarUnico, suspeitaNoValorDoRegistro, campoDaChave, camposTravados, diaDe, diferencasDoEvento, eventoDoTipoDeDocumento, mesmoTexto, mostrarValor, textoDeCampo as textoDe, textoDoHistorico,
   type CampoSincronizavel, type DiferencaDeCampo, type EventoRegistral, type TipoDeDiferenca, type ValoresDoRegistro,
 } from "@/src/lib/genealogia/sincronizacao-registral"
 
@@ -171,9 +171,10 @@ export async function sincronizarArvore(args: {
 }): Promise<ResultadoDaSincronizacao> {
   const { arvoreId, autorId = null, origem, documentoId, selecao = null } = args
   const previa = await carregarContexto(prisma, documentoId != null ? { documentoId } : { arvoreId })
-  // REGRA (07/10/2026): valor DIFERENTE do da árvore nunca é gravado por sincronização automática — só com a confirmação explícita de quem cadastra
-  // (`confirmacao-arvore.ts`) ou com a seleção item a item do botão «Sincronizar com a Genealogia» (`selecao`). Sozinha, a sincronização só PREENCHE o que a árvore tem vazio.
-  const incluirConflitos = selecao != null
+  // A GENEALOGIA SEMPRE PREVALECE (decisão do Marco, 08/10/2026): vazio na árvore preenche e valor DIFERENTE também é gravado (conflito, texto quase igual e local do óbito
+  // inclusos), com o valor antigo no histórico (reversível). Não há exceção nem lista de «ambíguos» nesta regra; o aviso com a escolha acontece ANTES, ao salvar os
+  // Dados Registrais (`confirmacao-arvore.ts`), e o que sobra depois dele é conflito que a Genealogia resolve aqui.
+  const incluirConflitos = true
   if (calcularItens(previa, incluirConflitos).length === 0) return { aplicados: [], logs: [] }
   const processos = await prisma.processo.findMany({ where: { arvoreId }, select: { id: true } })
 
@@ -418,13 +419,12 @@ export interface RelatorioDeCasosAntigos {
   aplicar: LinhaDoRelatorio[]
   ambiguos: LinhaDoRelatorio[]
   revisaoManual: LinhaDoRelatorio[]
-  ignoradosLocalDoObito: LinhaDoRelatorio[]
 }
 
-/** SÓ LEITURA. Todo campo em que a árvore difere da Genealogia (e a Genealogia tem valor) nos processos ativos, separado em: aplicar · ambíguos · revisão manual · local do óbito (não tocado). */
+/** SÓ LEITURA. Todo campo em que a árvore difere da Genealogia (e a Genealogia tem valor) nos processos ativos, separado em: aplicar · inválidos (data impossível, lixo) · revisão manual (texto único que não separa). A GENEALOGIA SEMPRE PREVALECE (decisão do Marco, 08/10/2026): conflito, texto quase igual e local do óbito entram em «aplicar» como qualquer outro campo. */
 export async function relatorioDeCasosAntigos(db: DB = prisma): Promise<RelatorioDeCasosAntigos> {
   const processos = await db.processo.findMany({ where: { dataConclusao: null, arvoreId: { not: null }, NOT: { faseAtualKey: "finalizado" } }, select: { id: true, nome: true, arvoreId: true } })
-  const r: RelatorioDeCasosAntigos = { geradoEm: new Date().toISOString(), aplicar: [], ambiguos: [], revisaoManual: [], ignoradosLocalDoObito: [] }
+  const r: RelatorioDeCasosAntigos = { geradoEm: new Date().toISOString(), aplicar: [], ambiguos: [], revisaoManual: [] }
   for (const pr of processos) {
     const c = await carregarContexto(db, { arvoreId: pr.arvoreId! })
     const tipos = new Map((await db.documento.findMany({ where: { id: { in: c.registros.map((x) => x.documentoId) } }, select: { id: true, documentType: { select: { name: true } } } })).map((d) => [d.id, d.documentType?.name ?? "Certidão"]))
@@ -438,12 +438,10 @@ export async function relatorioDeCasosAntigos(db: DB = prisma): Promise<Relatori
     }
     for (const i of calcularItens(c, true)) {
       const linha = base(i)
-      if (ehLocalDoObito(i.chave)) { r.ignoradosLocalDoObito.push({ ...linha, motivo: "local do óbito não é tocado nos casos antigos" }); continue }
       const campo = campoDaChave(i.chave)!
       const reg = c.registros.find((x) => x.documentoId === i.documentoId)
       let suspeita = suspeitaNoValorDoRegistro(campo, i.registro)
       if (!suspeita && i.chave === "UNIAO.data_registro" && reg && registroAnteriorAoEvento(diaDe(reg.valores.data_evento), i.registro)) suspeita = "data do registro anterior à data do evento"
-      if (!suspeita && i.tipo === "CONFLITO") suspeita = conflitoQuaseIgual(campo, i.arvore, i.registro)
       if (suspeita) { r.ambiguos.push({ ...linha, motivo: suspeita }); continue }
       r.aplicar.push(linha)
     }

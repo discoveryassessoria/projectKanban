@@ -4,7 +4,7 @@
 //   • valor igual / só grafia diferente → salva normalmente, sem pergunta;     • valor diferente SEM escolha → 409 `CONFIRMACAO_ARVORE`, nada é salvo;
 //   • «ARVORE» → a Genealogia assume o da árvore (o digitado não é salvo);      • «CADASTRO» → salva e corrige a árvore; histórico nos DOIS lados;
 //   • árvore vazia → salva e preenche a árvore, sem pergunta;                   • cada campo só contra o seu: «Santos – 1º Subdistrito» (cartório) × «Santos» (cidade) NÃO dispara;
-//   • a sincronização automática nunca sobrescreve a árvore com valor diferente; • vigia: nenhuma porta de escrita do Documento fica de fora da guarda.
+//   • a sincronização automática grava o valor da Genealogia (ela sempre prevalece); • vigia: nenhuma porta de escrita do Documento fica de fora da guarda.
 //   node scripts/ci/gate-build.mjs --suite todas --so confirmacao-arvore-cadastro
 // ============================================================================
 import { exigirBancoDeTeste } from "./_banco-de-teste"
@@ -111,12 +111,12 @@ async function main() {
   const e3 = await editarDadosRegistrais({ documentoId: doc.id, autorId: P.adminId, valores: { data_evento: "1937-12-25" }, decisoes: { "PESSOA.data_nasc": "ARVORE" } })
   ok("com «árvore»: o digitado não é salvo (cadastro volta ao da árvore)", e3.ok === false ? e3.codigo === "SEM_MUDANCA" || e3.codigo === "MOTIVO_OBRIGATORIO" : dia((await docAgora()).data_evento) === "1937-11-01")
 
-  secao("D) A sincronização automática nunca sobrescreve a árvore com valor diferente")
+  secao("D) A sincronização automática: a Genealogia SEMPRE prevalece (valor diferente também é gravado, com histórico)")
   await prisma.documento.update({ where: { id: doc.id }, data: { data_evento: new Date("1999-09-09T00:00:00Z") } }) // dado legado divergente, gravado por fora
   const passo = await prisma.phaseWorkflowStepInstance.findFirstOrThrow({ where: { documentoId: doc.id, stepKey: "localizar_registro" }, select: { id: true } })
   await prisma.phaseWorkflowStepInstance.update({ where: { id: passo.id }, data: { status: "CONCLUIDO" } })
   const s = await sincronizarDocumento(doc.id, P.adminId, "CONCLUSAO_DO_REGISTRO")
-  ok("conclusão do «Localizar registro» com valor diferente NÃO muda a árvore", dia((await arv()).data_nasc) === "1937-11-01" && s.aplicados.every((a) => a.tipo === "PREENCHER"))
+  ok("conclusão do «Localizar registro» com valor diferente: a árvore passa a ter o da Genealogia (09/09/1999), como conflito resolvido", dia((await arv()).data_nasc) === "1999-09-09" && s.aplicados.some((a) => a.tipo === "CONFLITO"))
 
   secao("E) Vigia — nenhuma porta de escrita do Documento fica fora da guarda")
   const varrer = (dir: string, out: string[] = []): string[] => { for (const n of readdirSync(dir)) { const f = join(dir, n); const st = statSync(f); if (st.isDirectory()) { if (!["node_modules", ".next"].includes(n)) varrer(f, out) } else if (/\.(ts|tsx)$/.test(n) && !/\.test\./.test(n)) out.push(f) } return out }

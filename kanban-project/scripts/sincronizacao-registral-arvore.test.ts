@@ -80,7 +80,7 @@ async function main() {
   const s1 = await sincronizarDocumento(doc.id, P.adminId, "CONCLUSAO_DO_REGISTRO")
   const n1 = await nasc()
   ok("ao CONCLUIR: vazio preenche (cidade, país) e o estado «SP» fica (mesmo lugar de «São Paulo»)", n1.local_nasc === "Santo André" && n1.pais_nasc === "Brasil" && n1.estado_nasc === "SP")
-  ok("data diferente: a sincronização AUTOMÁTICA não sobrescreve a árvore (continua 03/10) — só com escolha explícita", dia(n1.data_nasc) === "1937-10-03" && s1.aplicados.every((a) => a.tipo === "PREENCHER"))
+  ok("data diferente: a Genealogia SEMPRE prevalece — a sincronização automática grava 12/10 (era 03/10), como divergência resolvida", dia(n1.data_nasc) === "1937-10-12" && s1.aplicados.some((a) => a.tipo === "CONFLITO" && a.chave === "PESSOA.data_nasc"))
   // A escolha explícita (aviso, item a item): aí o registro vale (03/10 → 12/10), com divergência resolvida e histórico.
   const { sincronizarArvore } = await import("../src/services/genealogia/sincronizar-com-registro")
   await sincronizarArvore({ arvoreId: c.arvoreId, autorId: P.adminId, origem: "ESCOLHA_NO_AVISO", documentoId: doc.id, selecao: new Set([`PESSOA:${c.titularId}:PESSOA.data_nasc`]) })
