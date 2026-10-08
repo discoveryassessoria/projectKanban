@@ -34,7 +34,7 @@ import { avisarChegouTrabalho } from './avisos-fatos'
 import { prisma } from '@/lib/prisma'
 import type { Prisma, StatusTarefa } from '@prisma/client'
 import { chaveDaUnidade, identidadeDaUnidade, tarefaVivaDaUnidade } from '@/lib/operacional/identidade-da-tarefa'
-import { prazoOperacional } from '@/lib/operacional/tempo-operacional'
+import { prazoOperacional, prazoNaoAnteriorAEntrada } from '@/lib/operacional/tempo-operacional'
 
 /** O trabalho que a tarefa representa. Sem isto ela seria órfã. */
 export interface OrigemDoTrabalho {
@@ -260,6 +260,35 @@ export interface ResultadoMaterializacao {
  * mesma transação que criou a instância de workflow, para não existir instante
  * em que o workflow exista sem a sua tarefa.
  */
+/**
+ * A REGRA «prazo nunca anterior à entrada na fase», aplicada à tarefa que JÁ EXISTE (operação antecipada). A entrada é o último movimento registrado PARA a fase
+ * (`PhaseAdvanceLog`, a mesma fonte de `entradaNaFase`). Devolve o novo prazo, ou `null` se nada mudou. Auditado.
+ */
+export async function ajustarPrazoAEntradaNaFase(
+  tx: Prisma.TransactionClient,
+  tarefaId: number,
+  slaDays: number | null | undefined,
+): Promise<Date | null> {
+  const t = await tx.tarefa.findUnique({ where: { id: tarefaId }, select: { processoId: true, faseMacroKey: true, dataPrazo: true, statusTarefa: true, processo: { select: { faseAtualKey: true } } } })
+  if (!t || t.processoId == null || t.dataPrazo == null || !t.faseMacroKey || t.processo?.faseAtualKey !== t.faseMacroKey) return null
+  if (['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI', 'CANCELADA', 'SUPERSEDIDA'].includes(t.statusTarefa)) return null
+  const log = await tx.phaseAdvanceLog.findFirst({
+    where: { processoId: t.processoId, resultado: { in: ['MOVIDO', 'AVANCADO', 'FORCADO'] }, fasePretendida: t.faseMacroKey },
+    orderBy: { criadoEm: 'desc' }, select: { criadoEm: true },
+  })
+  const novo = prazoNaoAnteriorAEntrada(t.dataPrazo, log?.criadoEm ?? null, slaDays)
+  if (!novo || !log) return null
+  await tx.tarefa.update({ where: { id: tarefaId }, data: { dataPrazo: novo } })
+  await tx.logAuditoria.create({
+    data: {
+      acao: 'TAREFA_PRAZO_REANCORADO', entidade: 'Tarefa', entidadeId: tarefaId,
+      descricao: `Prazo ${t.dataPrazo.toISOString().slice(0, 10)} era anterior à entrada do processo na fase (${log.criadoEm.toISOString().slice(0, 10)}); passou a ${novo.toISOString().slice(0, 10)}${slaDays ? ` (entrada + SLA ${slaDays}d)` : ' (a própria entrada)'}.`,
+      detalhes: { de: t.dataPrazo.toISOString(), para: novo.toISOString(), entrada: log.criadoEm.toISOString(), slaDays: slaDays ?? null },
+    },
+  })
+  return novo
+}
+
 export async function materializarTarefaOperacional(
   tx: Prisma.TransactionClient,
   nova: NovaTarefaOperacional,
@@ -284,6 +313,7 @@ export async function materializarTarefaOperacional(
       })
       return { tarefaId: existente.id, criada: false, motivo: 'revivida (causa voltou a valer)' }
     }
+    await ajustarPrazoAEntradaNaFase(tx, existente.id, nova.slaDays)
     return { tarefaId: existente.id, criada: false, motivo: 'já existia' }
   }
 
@@ -302,6 +332,7 @@ export async function materializarTarefaOperacional(
         pessoaId: unidade.pessoaId ?? undefined,
       },
     })
+    await ajustarPrazoAEntradaNaFase(tx, daUnidade.id, nova.slaDays)
     return { tarefaId: daUnidade.id, criada: false, motivo: 'a unidade já tinha tarefa' }
   }
 

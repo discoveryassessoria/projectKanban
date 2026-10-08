@@ -199,7 +199,7 @@ export function TorreProcessos({ processos, carregando, erro }: { processos: Pro
                     <div><span className={`tor-pf-pilula ${p.bola.rotulo === BOLA_NOSSA ? "nossa" : "outra"}`}>{p.bola.rotulo}</span></div>
                     <div className="tor-pf-celula" title={p.motivoDoRisco}>{acao?.texto ?? "—"}</div>
                     <div className={`tor-pf-celula${acao && acao.responsaveis.donos.length === 0 ? " sem" : ""}`} title={acao ? `${acao.responsaveis.abertas} tarefa(s) aberta(s) do processo` : undefined}>{acao ? acao.responsaveis.texto : "—"}</div>
-                    <div className={`tor-pf-celula${acao?.prazo.tom === "vermelho" ? " vermelho" : acao?.prazo.tom === "ambar" ? " ambar" : ""}`}>{acao?.prazo.texto ?? "—"}</div>
+                    <div className={`tor-pf-celula${acao?.prazo.tom === "vermelho" ? " vermelho" : acao?.prazo.tom === "ambar" ? " ambar" : ""}`} title={acao?.prazoOrigem ?? undefined}>{acao?.prazo.texto ?? "—"}</div>
                     <div><span className={`tor-pf-pilula ${p.situacao}`} title={p.motivoDoRisco}>{ROTULO_DO_NIVEL[p.nivelDeRisco]}</span></div>
                     <div className="tor-pf-acoes">
                       <Link href={`/torre/processo/${p.processoId}`} className="tor-pf-foco">Foco</Link>

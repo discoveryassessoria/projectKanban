@@ -60,6 +60,8 @@ export interface ProximaAcao {
   quantas: number
   /** QUEM tem as tarefas abertas do processo (leitura única de responsável: `responsavel-canonico.ts`). `responsavelNome` acima é só o da tarefa que manda. */
   responsaveis: ResponsaveisDoProcesso
+  /** De onde vem o prazo (hover da célula): a tarefa que manda e a regra «nunca anterior à entrada na fase». */
+  prazoOrigem?: string | null
 }
 
 const RANK_DO_TIPO: Record<TipoDaProximaAcao, number> = { cobrar: 1, distribuir: 2, desbloquear: 3, iniciar: 5, executar: 6, aguardar: 7 }
@@ -148,7 +150,8 @@ export function proximaAcaoDoProcesso(
     default:
       texto = n > 1 ? `Dar andamento a ${n} ${substantivo(mesmas, n)}` : `Dar andamento: ${l.titulo}`
   }
-  return { tipo, urgencia: urgenciaDaTarefa(l), texto, tarefaId: l.taskId, responsavelId: l.responsavelId, responsavelNome: l.responsavelNome, dataPrazo: l.dataPrazo, quantas: n, responsaveis: responsaveisDoProcesso(abertas) }
+  return { tipo, urgencia: urgenciaDaTarefa(l), texto, tarefaId: l.taskId, responsavelId: l.responsavelId, responsavelNome: l.responsavelNome, dataPrazo: l.dataPrazo, quantas: n, responsaveis: responsaveisDoProcesso(abertas),
+    prazoOrigem: l.dataPrazo ? `Prazo da tarefa «${l.titulo}»${n > 1 ? ` — a mais urgente das ${n} do mesmo tipo` : ''}: ${diaMesDoPrazo(l.dataPrazo)}. O prazo de uma tarefa nunca é anterior à entrada do processo na fase.` : null }
 }
 
 // ─── O PRAZO NA TABELA: "ontem" · "hoje" · "amanhã" · "dd/mm" ──────────────────────────────────────────────────────────────

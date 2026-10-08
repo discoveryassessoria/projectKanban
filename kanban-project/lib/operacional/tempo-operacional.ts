@@ -92,6 +92,18 @@ export function prazoOperacional(slaDays: number | null | undefined, inicio: Dat
 }
 
 /**
+ * O PRAZO DE UMA TAREFA NUNCA É ANTERIOR À ENTRADA DO PROCESSO NA FASE (Item 4 da Torre, 07/10/2026).
+ *
+ * Trabalho antecipado nasce ANTES de o processo chegar na fase (a certidão de Emissão pedida enquanto o processo ainda está em Genealogia) e leva o prazo
+ * contado do dia em que nasceu: «na fase há 1 dia desde 06/10» com prazo 30/09. A regra, num lugar só: se o prazo gravado é anterior à entrada, o prazo
+ * passa a ser a entrada + o SLA do passo (sem SLA, a própria entrada). Prazo igual ou posterior à entrada não se mexe. PURA.
+ */
+export function prazoNaoAnteriorAEntrada(prazoAtual: Date | null, entrada: Date | null, slaDays: number | null | undefined): Date | null {
+  if (entrada == null || prazoAtual == null || prazoAtual.getTime() >= entrada.getTime()) return null
+  return prazoOperacional(slaDays, entrada) ?? new Date(entrada.getTime())
+}
+
+/**
  * O DIA EM QUE A OPERAÇÃO VIVE.
  *
  * O prazo é gravado com hora (o SLA soma dias sobre o instante em que a tarefa
