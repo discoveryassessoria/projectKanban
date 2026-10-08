@@ -55,6 +55,8 @@ const DONO_RUNTIME = "src/services/necessidade-documental.ts"
  * há regra "tudo em scripts/ pode".
  */
 const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
+  "scripts/casamento-dono-unico.test.ts":
+    "dono único da certidão de casamento: monta e derruba a PRÓPRIA árvore, pessoas, união, necessidade e documentos (marca CASDONO) só no banco de teste — o reapontamento precisa de dados reais para provar que muda só o titular",
   "scripts/regras-fixas-integridade.test.ts":
     "regras fixas de integridade (vigia INT-002): semeia violações (necessidade já atendida, tarefa apagada) nos PRÓPRIOS processos (marca RFIX) só no banco de teste para provar que o vigia acusa",
   "scripts/provas-finais.test.ts":

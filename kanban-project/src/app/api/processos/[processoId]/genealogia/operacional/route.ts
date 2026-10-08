@@ -26,6 +26,8 @@ import { prisma } from "@/lib/prisma"
 import { extrairUsuarioComPermissoes, verificarPermissao } from "@/src/lib/verificar-permissao"
 import { temPermissao } from "@/src/lib/permissoes"
 import { projecoesDeCertidaoPorNecessidade } from "@/src/lib/process-stage/projecao-certidao"
+import { SELECT_UNIAO_PARA_TITULAR, titularDaUniao } from "@/src/services/genealogia/titular-uniao"
+import { estadoOperacionalDosDocumentos } from "@/lib/operacional/documento-estado"
 import { PHASEKEY_DESTINO_DO_FECHAMENTO } from "@/src/lib/process-stage/fase-pre-contrato"
 
 export async function GET(
@@ -73,6 +75,8 @@ export async function GET(
           obrigatoriedade: true,
           ciclo: true,
           itemCatalogo: { select: { id: true, code: true, name: true } },
+          uniao: { select: SELECT_UNIAO_PARA_TITULAR },
+          documentos: { select: { id: true } },
         },
         orderBy: { id: "asc" },
       }),
@@ -122,8 +126,17 @@ export async function GET(
     // este valor para o rótulo; não recalcula nada.
     const projecoes = await projecoesDeCertidaoPorNecessidade(necessidadesRaw.map((n) => n.id))
 
+    // A ETAPA REAL da certidão (`etapaDaCertidao`, a mesma da bolinha da árvore e do Briefing): o dossiê só conta como atendida a certidão recebida E validada.
+    const estados = await estadoOperacionalDosDocumentos(necessidadesRaw.flatMap((n) => n.documentos.map((d) => d.id)))
+    const etapaDe = (n: (typeof necessidadesRaw)[number]): { recebida: boolean; validada: boolean } | null => {
+      const es = n.documentos.map((d) => estados.get(d.id)).filter((x): x is NonNullable<typeof x> => x != null)
+      return es.length === 0 ? null : { recebida: es.every((e) => e.jaRecebido), validada: es.every((e) => e.validado) }
+    }
+
     const necessidades = necessidadesRaw.map((n) => ({
       situacaoCertidao: projecoes.get(n.id)?.situacao ?? null,
+      donoId: n.uniaoId != null ? titularDaUniao(n.uniao) : null,
+      certidao: etapaDe(n),
       id: n.id,
       pessoaId: n.pessoaId,
       uniaoId: n.uniaoId,

@@ -33,6 +33,7 @@ import type { GrafoGenealogico } from "../motor/grafo"
 import type { AnaliseArvore, DetalheQualidade } from "../motor/tipos"
 import {
   indicadorVazio,
+  ehDonoDaUniao,
   type IndicadorDocumental,
   type ProjecaoDocumental,
 } from "../documental/indicadores"
@@ -81,6 +82,8 @@ export function consolidarDocumental(
     if (pessoal) somarIndicadorEm(documental, pessoal)
     for (const uid of uniaoIdsDe(grafo, id)) {
       if (uniõesContadas.has(uid)) continue
+      // Só o DONO da certidão leva a união: um cônjuge dispensado do conjunto não a puxa.
+      if (!ehDonoDaUniao(projecao, uid, id)) continue
       uniõesContadas.add(uid)
       const uniao = projecao.porUniao.get(uid)
       if (uniao) somarIndicadorEm(documental, uniao)

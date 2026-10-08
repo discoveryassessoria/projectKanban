@@ -107,6 +107,8 @@ const ALVOS: Alvo[] = [
  * regra "tudo em scripts/ pode".
  */
 const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
+  "scripts/casamento-dono-unico.test.ts":
+    "dono único da certidão de casamento: monta e derruba a PRÓPRIA árvore, pessoas, união, necessidade e documentos (marca CASDONO) só no banco de teste — o reapontamento precisa de dados reais para provar que muda só o titular",
   "scripts/vinculo-requerente-servico-unico.test.ts":
     "Vínculo requerente × pessoa × processo (dono único): cria e derruba as PRÓPRIAS pessoas/requerentes/processos (marca VINCSU) só no banco de teste efêmero — nenhuma pessoa real é removida",
   "scripts/arvore-pessoa-repetida-rota-etapa6.test.ts":
