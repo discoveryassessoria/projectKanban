@@ -45,6 +45,7 @@ console.log("\n5) Cadastro no Gerenciamento: rota + tela + vigia, nada de botão
 const rota = ler("src/app/api/gerenciamento/prazo-por-pais/route.ts"), tela = ler("src/components/gerenciamentoComponents/PrazoPorPaisDoPasso.tsx")
 ok("rota GET/PUT/DELETE com permissão e auditoria", /export async function GET/.test(rota) && /export async function PUT/.test(rota) && /export async function DELETE/.test(rota) && /usuarios\.gerenciar/.test(rota) && /PRAZO_POR_PAIS_ALTERADO/.test(rota))
 ok("a tela chama a rota (adicionar, alterar, remover)", /method: "PUT"/.test(tela) && /method: "DELETE"/.test(tela) && /prazo-por-pais\?stepKey=/.test(tela))
+ok("as três chamadas da tela levam o token (sem ele a rota responde «Não autorizado»)", (tela.match(/headers: authHeaders\(\)/g) ?? []).length === 3)
 ok("o modal do passo mostra o cadastro", /<PrazoPorPaisDoPasso /.test(ler("src/components/gerenciamentoComponents/ConfiguracaoDoPassoModal.tsx")))
 ok("a migration já deixa o Brasil = 1 dia cadastrado para localizar_registro", /'localizar_registro', 'brasil', 'Brasil', 1/.test(ler("prisma/migrations/20261008190000_regra_temporal_pais/migration.sql")))
 ok("vigia u existe e entra na varredura", /detectarRegraU/.test(ler("lib/saude/verificacoes/regras-do-marco.ts")) && /"t", "u"/.test(ler("scripts/vigia-regras-do-marco.ts")))
