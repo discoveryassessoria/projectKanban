@@ -204,7 +204,7 @@ export function OperacaoV3({ gestor = false, naTorre = false, abaInicial = null 
   const aguard = useMemo(() => aguardBase.filter(qf), [aguardBase, qf])
 
   // FAMÍLIAS: o número da aba é o de famílias LISTADAS na aba (abertas + concluídas recentes) — UMA função.
-  const nFam = useMemo(() => familiasDaAba(abertosVisiveis, feitoVisivel).length, [abertosVisiveis, feitoVisivel])
+  const nFam = useMemo(() => familiasDaAba(abertosVisiveis).length, [abertosVisiveis])
   const nRadar = somaDosCartoesDoRadar({ atras, acompVenc, decis, noOrg, genOpen }, { verEscaladas: gestor })
 
 

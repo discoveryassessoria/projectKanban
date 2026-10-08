@@ -160,10 +160,11 @@ export const somaDosCartoesDoRadar = (
 ): number => c.atras.length + c.acompVenc.length + (opcoes.verEscaladas ? c.decis.length : 0) + c.noOrg.length + c.genOpen.length
 
 /** A ABA "FAMÍLIAS": UMA função dá os itens listados E o número da aba (número = itens). Chave = família cadastrada,
- *  senão o nome do processo. Entram as famílias com tarefa aberta OU concluída recente (o card "Concluídas"). */
+ *  senão o nome do processo. Entram SÓ as famílias em que a pessoa tem tarefa ABERTA (decisão do Marco, 08/10/2026): família com tarefas apenas concluídas
+ *  não é listada nem contada aqui — o que foi feito continua no «Feito». As concluídas de uma família aberta seguem nos cartões dela. */
 export const chaveDaFamilia = (l: Pick<LinhaOperacaoV3, "familiaNome" | "processoNome">): string => l.familiaNome ?? l.processoNome ?? "—"
-export function familiasDaAba<T extends Pick<LinhaOperacaoV3, "familiaNome" | "processoNome">>(abertos: readonly T[], feito: readonly T[]): string[] {
-  return [...new Set([...abertos, ...feito].map(chaveDaFamilia))]
+export function familiasDaAba<T extends Pick<LinhaOperacaoV3, "familiaNome" | "processoNome">>(abertos: readonly T[]): string[] {
+  return [...new Set(abertos.map(chaveDaFamilia))]
 }
 
 /** A FASE ATUAL REAL do processo para a família — `faseAtualDoProcessoLabel` (rótulo canônico), nunca a fase da
