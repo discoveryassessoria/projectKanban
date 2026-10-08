@@ -130,13 +130,21 @@ async function main() {
 
     secao("b) Seletores de atribuição sem pessoa (teste próprio) e d) Atribuição só na página do processo")
     ok("o teste dos seletores está na suíte", /seletores-sem-pessoa-preselecionada/.test(ler("scripts/ci/suite-critica.json")))
-    const BASELINE_PORTAS_FORA_DO_PROCESSO = [
-      "src/components/kanban/DocumentoOperationalDrawer.tsx", "src/components/kanban/ProcessoCentralOperacional.tsx", "src/components/operacao/distribuicao-tarefas.tsx",
-      "src/components/operacao/processo-expandido.tsx", "src/components/operacao/visao-global.tsx", "src/components/torre/TorreTarefas.tsx", "src/components/torre/acoes-do-item.tsx",
-    ]
+    // 07/10/2026: as 7 portas foram FECHADAS (o servidor também recusa: scripts/atribuicao-so-na-pagina-do-processo.test.ts). O detector agora vê mais padrões. O que ainda
+    // aparece fora da página do processo é LEGÍTIMO ou MORTO, nominal e com motivo — porta NOVA quebra o teste.
+    const PERMITIDAS_FORA_DO_PROCESSO: Record<string, string> = {
+      "src/components/operacao/distribuicao-tarefas.tsx": "SUCESSÃO EM MASSA (férias/afastamento: a carteira de UMA pessoa passa a outra, origem «sucessao-em-massa») — não é atribuição por processo; o resto leva ao processo",
+      "src/components/torre/TorreTarefas.tsx": "o LOTE da Torre (useLoteDeAtribuicao → /api/torre/tarefas/lote), que o Marco usa; «Atribuir» da linha só abre o processo",
+      "src/components/torre/acoes-do-item.tsx": "ATRIBUIR_SUGERIDO/ATRIBUIR_ESCOLHIDO só ABREM o processo (router.push); o servidor recusa essas ações sem a origem da página",
+      "src/components/operacao/tabela-familia.tsx": "código MORTO (só central-operacional.tsx a importa e nenhuma página monta); o servidor recusa as chamadas dela",
+    }
     const portas = portasDeAtribuicaoForaDoProcesso()
-    const novas = portas.filter((p) => !BASELINE_PORTAS_FORA_DO_PROCESSO.includes(p))
-    ok("nenhuma porta NOVA de atribuição fora da página do processo (as 7 atuais são dívida conhecida, a decidir)", novas.length === 0, novas.join(", "))
+    const novas = portas.filter((p) => !(p in PERMITIDAS_FORA_DO_PROCESSO))
+    ok("nenhuma porta NOVA de atribuição fora da página do processo (só as legítimas/mortas nominais abaixo)", novas.length === 0, novas.join(", "))
+    const sumiram = Object.keys(PERMITIDAS_FORA_DO_PROCESSO).filter((p) => !portas.includes(p))
+    ok("a lista de permitidas não tem entrada velha (arquivo que deixou de ser porta sai da lista)", sumiram.length === 0, sumiram.join(", "))
+    const FECHADAS_AGORA = ["src/components/kanban/DocumentoOperationalDrawer.tsx", "src/components/kanban/ProcessoCentralOperacional.tsx", "src/components/operacao/processo-expandido.tsx", "src/components/operacao/visao-global.tsx", "src/components/operacao/operacao-v3.tsx", "src/components/torre/PainelTorreTarefa.tsx"]
+    ok("as portas FECHADAS não voltaram", FECHADAS_AGORA.every((f) => !portas.includes(f)), FECHADAS_AGORA.filter((f) => portas.includes(f)).join(", "))
     void arquivos; void semComentarios
 
     secao("Os detectores são SOMENTE LEITURA")

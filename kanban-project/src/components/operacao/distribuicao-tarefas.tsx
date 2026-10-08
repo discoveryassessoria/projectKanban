@@ -269,7 +269,7 @@ function PainelSucessao({ funcionarios, aoFechar, aoConcluido }: {
       }
       const r2 = await fetch("/api/tarefas/redistribuir", {
         method: "POST", headers: auth(),
-        body: JSON.stringify({ tarefaIds: ids, novoResponsavelId: destinoId, motivo: "Sucessão em massa" }),
+        body: JSON.stringify({ tarefaIds: ids, novoResponsavelId: destinoId, motivo: "Sucessão em massa", origem: "sucessao-em-massa" }),
       })
       const d2: { sucesso: number; falha: number } = await r2.json()
       if (!r2.ok && r2.status !== 207) throw new Error(String(r2.status))
@@ -638,82 +638,13 @@ export function DistribuicaoTarefas() {
   const todosSelecionadosVisiveis = (linhasFiltradas?.length ?? 0) > 0 && (linhasFiltradas ?? []).every((l) => selecionados.has(l.taskId))
   const alternarTodosVisiveis = () => setSelecionados(todosSelecionadosVisiveis ? new Set() : new Set((linhasFiltradas ?? []).map((l) => l.taskId)))
 
-  const [responsavelEscolhido, setResponsavelEscolhido] = useState<Funcionario | null>(null)
-  const [prioridadeAlta, setPrioridadeAlta] = useState(false)
-  const [mensagem, setMensagem] = useState("")
-  const [loteOcupado, setLoteOcupado] = useState(false)
+  // ATRIBUIÇÃO SÓ NA PÁGINA DO PROCESSO (07/10/2026): atribuir selecionadas / grupo e «Devolver à fila» levam ao processo. O que fica aqui é a SUCESSÃO EM MASSA
+  // (férias, afastamento: a carteira de UMA pessoa passa a outra), que não é atribuição por processo.
   const [loteErro, setLoteErro] = useState<string | null>(null)
-  const [seletorAberto, setSeletorAberto] = useState(false)
-
-  const atribuirLote = async () => {
-    if (!responsavelEscolhido || linhasSelecionadas.length === 0) return
-    setLoteOcupado(true)
-    setLoteErro(null)
-    try {
-      const r = await fetch("/api/tarefas/redistribuir", {
-        method: "POST",
-        headers: auth(),
-        body: JSON.stringify({
-          tarefaIds: linhasSelecionadas.map((l) => l.taskId),
-          novoResponsavelId: responsavelEscolhido.id,
-          motivo: mensagem.trim() || null,
-        }),
-      })
-      const d: { sucesso: number; falha: number } = await r.json()
-      if (!r.ok && r.status !== 207) throw new Error(String(r.status))
-      // PRIORIDADE ALTA é um comando À PARTE — real, não decorativo: chama
-      // `alterar_prioridade` para cada tarefa que acabou de ser atribuída.
-      if (prioridadeAlta) {
-        await Promise.all(linhasSelecionadas.map((l) =>
-          fetch(`/api/tarefas/${l.taskId}/comando`, { method: "POST", headers: auth(), body: JSON.stringify({ acao: "alterar_prioridade", prioridade: "ALTA" }) }),
-        ))
-      }
-      if (d.falha > 0) setLoteErro(`${d.sucesso} atribuída${d.sucesso === 1 ? "" : "s"}, ${d.falha} ${d.falha === 1 ? "falhou" : "falharam"}.`)
-      setSelecionados(new Set())
-      setResponsavelEscolhido(null)
-      setMensagem("")
-      setPrioridadeAlta(false)
-      setRecarga((n) => n + 1)
-    } catch {
-      setLoteErro("Não foi possível atribuir agora. Tente de novo.")
-    } finally {
-      setLoteOcupado(false)
-    }
-  }
-
-  const [atribuirGrupo, setAtribuirGrupo] = useState<GrupoDistribuicao | null>(null)
-  const [grupoOcupado, setGrupoOcupado] = useState(false)
-  const [grupoErro, setGrupoErro] = useState<string | null>(null)
-  const atribuirGrupoInteiro = async (responsavelId: number) => {
-    if (!atribuirGrupo) return
-    setGrupoOcupado(true)
-    setGrupoErro(null)
-    const alvos = atribuirGrupo.linhas.filter((l) => l.coluna === "SEM_RESPONSAVEL")
-    try {
-      const r = await fetch("/api/tarefas/redistribuir", {
-        method: "POST", headers: auth(),
-        body: JSON.stringify({ tarefaIds: alvos.map((l) => l.taskId), novoResponsavelId: responsavelId }),
-      })
-      if (!r.ok && r.status !== 207) throw new Error(String(r.status))
-      setAtribuirGrupo(null)
-      setRecarga((n) => n + 1)
-    } catch {
-      setGrupoErro("Não foi possível atribuir agora. Tente de novo.")
-    } finally {
-      setGrupoOcupado(false)
-    }
-  }
-
-  const devolverAFila = async (tarefaId: number) => {
-    const enviar = (corpo: Record<string, unknown>) =>
-      fetch(`/api/tarefas/${tarefaId}/comando`, { method: "POST", headers: auth(), body: JSON.stringify(corpo) })
-    let r = await enviar({ acao: "devolver_a_fila" })
-    // Tirar o responsável de uma tarefa EM ANDAMENTO pede confirmação explícita (o servidor recusa sem ela).
-    if (r.status === 428) {
-      const d = await r.json().catch(() => ({}))
-      if (d?.codigo === "CONFIRMACAO_NECESSARIA" && window.confirm(d.error)) r = await enviar({ acao: "devolver_a_fila", confirmarTarefaEmAndamento: true })
-    }
-    setRecarga((n) => n + 1)
+  const abrirProcessoParaAtribuir = (alvos: Array<{ processoId: number | null }>) => {
+    const processos = new Set(alvos.map((l) => l.processoId).filter((x): x is number => x != null))
+    if (processos.size === 1) { router.push(`/torre/processo/${[...processos][0]}`); return }
+    setLoteErro(processos.size === 0 ? "Escolha ao menos uma tarefa para atribuir." : "As tarefas escolhidas são de mais de um processo: atribua pela página de cada processo ou pelo lote da Torre.")
   }
 
   // D6 — exportação pronta pra auditoria/compliance: lê LogAuditoria de
@@ -890,7 +821,7 @@ export function DistribuicaoTarefas() {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className={Z_POPOVER}>
-                <DropdownMenuItem onClick={() => setSeletorAberto(true)}>Atribuir para…</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => abrirProcessoParaAtribuir(linhasSelecionadas)}>Atribuir no processo</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setSelecionados(new Set())}>Limpar seleção</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -967,10 +898,10 @@ export function DistribuicaoTarefas() {
                         </div>
                         {g.semResponsavel > 0 && (
                           <button
-                            onClick={() => setAtribuirGrupo(g)}
+                            onClick={() => abrirProcessoParaAtribuir(g.linhas)}
                             className="shrink-0 rounded-md bg-[var(--action-primary)] px-2.5 py-1.5 text-[11.5px] font-medium text-[var(--action-primary-ink)] transition-opacity hover:opacity-90"
                           >
-                            Atribuir
+                            Atribuir no processo
                           </button>
                         )}
                         {g.processoId != null && (
@@ -1053,7 +984,7 @@ export function DistribuicaoTarefas() {
                                           <button className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"><MoreVertical className="h-3.5 w-3.5" /></button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent className={Z_POPOVER}>
-                                          <DropdownMenuItem onClick={() => devolverAFila(l.taskId)}>Devolver à fila</DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => abrirProcessoParaAtribuir([l])}>Abrir processo para atribuir</DropdownMenuItem>
                                         </DropdownMenuContent>
                                       </DropdownMenu>
                                     )}
@@ -1110,7 +1041,7 @@ export function DistribuicaoTarefas() {
           <div className="flex flex-col gap-4">
             <div className="rounded-lg border border-[var(--action-primary)]/40 bg-[var(--surface-elevated)] p-3.5">
               <h3 className="text-[12.5px] font-semibold text-[var(--text-primary)]">Atribuição em massa</h3>
-              <p className="mt-1 text-[11px] text-[var(--text-secondary)]">Selecione as tarefas e atribua para um ou mais membros da equipe.</p>
+              <p className="mt-1 text-[11px] text-[var(--text-secondary)]">A atribuição de responsável é feita na página do processo. Selecione as tarefas de UM processo e abra-o para atribuir.</p>
 
               <div className="mt-3 flex items-center justify-between text-[11.5px]">
                 <span className="text-[var(--text-secondary)]">Tarefas selecionadas <span className="font-semibold text-[var(--text-primary)]">{selecionados.size}</span></span>
@@ -1121,59 +1052,12 @@ export function DistribuicaoTarefas() {
 
               {loteErro && <div className="mt-2 rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2.5 py-1.5 text-[11px] text-[var(--danger-text)]">{loteErro}</div>}
 
-              <label className="mt-3 block text-[11px] font-medium text-[var(--text-secondary)]">Responsável</label>
-              {responsavelEscolhido ? (
-                <div className="mt-1 flex items-center justify-between rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2.5 py-1.5">
-                  <span className="flex items-center gap-1.5 text-[12px] text-[var(--text-primary)]">
-                    <span className="grid h-5 w-5 place-items-center rounded-full bg-[var(--pessoa-tile)] text-[8.5px] font-semibold text-[var(--pessoa)]">{iniciaisDe(responsavelEscolhido.nome)}</span>
-                    {responsavelEscolhido.nome}
-                  </span>
-                  <button onClick={() => setResponsavelEscolhido(null)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"><XIcon className="h-3.5 w-3.5" /></button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setSeletorAberto(true)}
-                  className="mt-1 w-full rounded border border-dashed border-[var(--border-default)] bg-[var(--surface-secondary)] px-2.5 py-1.5 text-left text-[12px] text-[var(--text-muted)] hover:bg-[var(--surface-tertiary)]"
-                >
-                  Selecionar…
-                </button>
-              )}
-
-              <label className="mt-3 flex items-center gap-2 text-[11px] text-[var(--text-secondary)]">
-                <input type="checkbox" checked readOnly disabled className="h-3.5 w-3.5 accent-[var(--action-primary)]" />
-                Notificar o responsável (sempre enviado)
-              </label>
-
-              <label className="mt-3 block text-[11px] font-medium text-[var(--text-secondary)]">Mensagem (opcional)</label>
-              <textarea
-                value={mensagem} onChange={(e) => setMensagem(e.target.value.slice(0, 300))} maxLength={300} rows={3}
-                className="mt-1 w-full resize-none rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
-                placeholder="Segue lote de tarefas para sua análise e execução."
-              />
-              <div className="mt-0.5 text-right text-[10px] text-[var(--text-muted)]">{mensagem.length}/300</div>
-
-              <div className="mt-3">
-                <span className="text-[11px] font-medium text-[var(--text-secondary)]">Opções avançadas</span>
-                <label className="mt-1.5 flex items-start gap-2 text-[11px] text-[var(--text-muted)]">
-                  <input type="checkbox" disabled className="mt-0.5 h-3.5 w-3.5 accent-[var(--action-primary)]" />
-                  <span>Atribuir também novas tarefas desta família que surgirem nesta fase <span className="italic">(em breve)</span></span>
-                </label>
-                <label className="mt-1.5 flex items-center gap-2 text-[11px] text-[var(--text-secondary)]">
-                  <input type="checkbox" checked readOnly disabled className="h-3.5 w-3.5 accent-[var(--action-primary)]" />
-                  Manter prazos originais
-                </label>
-                <label className="mt-1.5 flex items-center gap-2 text-[11px] text-[var(--text-primary)]">
-                  <input type="checkbox" checked={prioridadeAlta} onChange={(e) => setPrioridadeAlta(e.target.checked)} className="h-3.5 w-3.5 accent-[var(--action-primary)]" />
-                  Definir como prioridade alta
-                </label>
-              </div>
-
               <button
-                disabled={loteOcupado || !responsavelEscolhido || selecionados.size === 0}
-                onClick={atribuirLote}
-                className="mt-3 w-full rounded-md bg-[var(--action-primary)] px-3 py-1.5 text-[12px] font-medium text-[var(--action-primary-ink)] transition-opacity hover:opacity-90 disabled:opacity-40"
+                disabled={selecionados.size === 0}
+                onClick={() => abrirProcessoParaAtribuir(linhasSelecionadas)}
+                className="mt-3 w-full rounded-md bg-[var(--action-primary)] px-3 py-1.5 text-[12px] font-medium text-[var(--action-primary-ink)] transition-opacity hover:opacity-90 disabled:opacity-50"
               >
-                {loteOcupado ? "Atribuindo…" : "Atribuir selecionadas"}
+                Atribuir no processo
               </button>
             </div>
 
@@ -1202,30 +1086,6 @@ export function DistribuicaoTarefas() {
           </div>
         </div>
       </div>
-
-      {seletorAberto && (
-        <SeletorResponsavel
-          titulo="Escolher responsável"
-          atual={responsavelEscolhido?.id ?? null}
-          ocupado={false}
-          erro={null}
-          aoFechar={() => setSeletorAberto(false)}
-          aoEscolher={(id) => {
-            const f = funcionarios?.find((x) => x.id === id)
-            if (f) setResponsavelEscolhido(f)
-            setSeletorAberto(false)
-          }}
-        />
-      )}
-
-      {atribuirGrupo && (
-        <SeletorResponsavel
-          titulo={`Atribuir ${atribuirGrupo.linhas.filter((l) => l.coluna === "SEM_RESPONSAVEL").length} tarefa(s) sem responsável — ${atribuirGrupo.rotulo}`}
-          atual={null} ocupado={grupoOcupado} erro={grupoErro}
-          aoFechar={() => { setAtribuirGrupo(null); setGrupoErro(null) }}
-          aoEscolher={atribuirGrupoInteiro}
-        />
-      )}
 
       {historicoAberto && <PainelHistorico aoFechar={() => setHistoricoAberto(false)} />}
 

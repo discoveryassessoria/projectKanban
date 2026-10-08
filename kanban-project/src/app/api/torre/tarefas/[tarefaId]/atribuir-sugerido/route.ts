@@ -2,6 +2,7 @@
 // 1ª chamada (sem `confirmado`): devolve a prévia "Atribuir X a Y?" (428) e NADA é gravado. 2ª: `confirmado: true` + `assinatura` da prévia.
 // A porta é a de sempre (`atribuirTarefa`, auditada, com a origem "via sugestão do Precisa de você (confirmada por …)"); a permissão é a de
 // atribuir (`tarefas.editar`). Devolve `desfazer` para o toast de 6 s.
+import { respostaAtribuicaoSoNaPagina, veioDaPaginaDoProcesso } from '@/lib/operacional/atribuicao-origem'
 import { type NextRequest, NextResponse } from 'next/server'
 import { exigirTorre } from '@/src/lib/torre-acesso'
 import { atribuirSugerido, previaDaSugestaoDaTarefa } from '@/src/services/precisa-de-voce-acoes'
@@ -13,6 +14,8 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ tarefa
   const tarefaId = Number((await ctx.params).tarefaId)
   if (!Number.isInteger(tarefaId) || tarefaId <= 0) return NextResponse.json({ error: 'tarefa inválida' }, { status: 400 })
   const corpo = await request.json().catch(() => ({}))
+  // ATRIBUIÇÃO SÓ NA PÁGINA DO PROCESSO.
+  if (!veioDaPaginaDoProcesso(corpo)) return NextResponse.json(respostaAtribuicaoSoNaPagina(), { status: 422 })
   const { confirmado, assinatura } = confirmacaoDoCorpo(corpo)
   if (!confirmado || assinatura == null) {
     const previa = await previaDaSugestaoDaTarefa(tarefaId)

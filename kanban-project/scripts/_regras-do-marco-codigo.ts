@@ -14,6 +14,8 @@ export const semComentarios = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, "").
 const CHAMA_ATRIBUICAO = [
   /acao:\s*["']atribuir["']/, /acao:\s*["']transferir["']/, /ATRIBUIR_ESCOLHIDO/, /"ATRIBUIR"/, /\/api\/tarefas\/redistribuir/, /\/api\/tarefas\/\$\{[^}]+\}\/atribuir/,
   /\/api\/torre\/tarefas\/lote/, /atribuirEmLote/, /novoResponsavelId/, /responsavelId:\s*Number\(/,
+  // 07/10/2026 — os padrões que o detector antigo NÃO via (a tela viva /operacao e outras portas passavam batido).
+  /"atribuir"\s*:\s*"transferir"/, /["']devolver_a_fila["']/, /\/atribuir-sugerido/, /\/remover-responsavel/, /ATRIBUIR_SUGERIDO/, /\/api\/tarefas\/\$\{[^}]+\}\/comando[\s\S]{0,200}atribuir/,
 ]
 /** Os componentes que PODEM atribuir hoje, FORA da página do processo (/torre/processo/[id]). Lista-baseline: novo item aqui quebra o teste. */
 export function portasDeAtribuicaoForaDoProcesso(): string[] {

@@ -6,7 +6,7 @@
 // O TOAST é o do protótipo: "<botão> · <1ª parte do título>", com "Desfazer" quando o fato é reversível (atribuição, redistribuição,
 // desbloqueio, troca de canal — cada um lê o PRÓPRIO LogAuditoria e recusa se algo mudou depois). Avançar fase, reconciliar, registrar
 // ligação e cobrar o cliente são fatos acontecidos: o toast confirma, sem "Desfazer".
-import { ROTULO_ESCOLHA_DA_PESSOA, PESSOA_ESCOLHIDA_INICIAL } from "@/src/lib/ui/atribuicao"
+import { useRouter } from "next/navigation"
 import { useConfirmarAtribuicao } from "./ConfirmarAtribuicao"
 import { useCallback, useEffect, useState, type ReactNode } from "react"
 import { CANAIS_SOLICITACAO } from "@/src/lib/process-stage/canais-solicitacao"
@@ -30,7 +30,6 @@ interface RespAcao {
   pendencias?: Pendencia[]
 }
 type Pedido =
-  | { tipo: "pessoa"; item: ItemPrecisa; resolver: (r: string | null) => void }
   | { tipo: "justificativa"; item: ItemPrecisa; acao: "ENCERRAR_NAO_DEVIDA" | "IGNORAR_7_DIAS" | "ENCERRAR_FASE_NAO_DEVIDA"; resolver: (r: string | null) => void }
   | { tipo: "forcar"; item: ItemPrecisa; pendencias: Pendencia[]; resolver: (r: string | null) => void }
   | { tipo: "ligacao"; item: ItemPrecisa; resolver: (r: string | null) => void }
@@ -48,6 +47,7 @@ const idsFeitos = (d: RespAcao): number[] => (d.itens ? d.itens.filter((i) => i.
 
 export function useAcoesDoItem({ irParaAba, onFeito }: { irParaAba: (aba: "equipe") => void; onFeito?: (item: ItemPrecisa) => void }) {
   const { recarregar } = useTorre()
+  const router = useRouter()
   const [pedido, setPedido] = useState<Pedido | null>(null)
   const [toast, setToast] = useState<ToastPdv | null>(null)
 
@@ -96,12 +96,13 @@ export function useAcoesDoItem({ irParaAba, onFeito }: { irParaAba: (aba: "equip
     const a = qual === 1 ? item.acao1 : item.acao2
     const tarefaId = item.tarefaId ?? undefined
     switch (a.acao) {
-      case "ATRIBUIR_SUGERIDO": {
-        const { ok, d } = await chamar({ acao: a.acao, ...alvo(item) })
-        const feitas = idsFeitos(d)
-        return concluir(item, a.rotulo, ok, d, ok && feitas.length ? { tipo: "ATRIBUICAO", tarefaIds: feitas } : null)
+      // ATRIBUIÇÃO SÓ NA PÁGINA DO PROCESSO (07/10/2026): «Atribuir» (sugerido ou escolhido) leva ao processo; o servidor também recusa atribuir por aqui.
+      case "ATRIBUIR_SUGERIDO":
+      case "ATRIBUIR_ESCOLHIDO": {
+        if (item.processoId == null) { setToast({ msg: "Este item não tem processo para atribuir.", desfazer: null }); return null }
+        router.push(`/torre/processo/${item.processoId}`)
+        return "abriu o processo para atribuir"
       }
-      case "ATRIBUIR_ESCOLHIDO": return perguntar((resolver) => ({ tipo: "pessoa", item, resolver }))
       case "ENCERRAR_NAO_DEVIDA":
       case "IGNORAR_7_DIAS":
       case "ENCERRAR_FASE_NAO_DEVIDA":
@@ -141,7 +142,7 @@ export function useAcoesDoItem({ irParaAba, onFeito }: { irParaAba: (aba: "equip
       }
       default: setToast({ msg: `Ação desconhecida: ${a.acao}`, desfazer: null }); return null
     }
-  }, [chamar, concluir, perguntar, irParaAba])
+  }, [chamar, concluir, perguntar, irParaAba, router])
 
   const modais: ReactNode = (
     <>
@@ -171,7 +172,6 @@ export function useAcoesDoItem({ irParaAba, onFeito }: { irParaAba: (aba: "equip
             }}
           />
         ) : pedido.tipo === "forcar" ? <ModalForcar pedido={pedido} chamar={chamar} concluir={concluir} />
-          : pedido.tipo === "pessoa" ? <ModalPessoa pedido={pedido} chamar={chamar} concluir={concluir} alvo={alvo} />
           : pedido.tipo === "ligacao" ? <ModalLigacao pedido={pedido} chamar={chamar} concluir={concluir} />
           : <ModalCanal pedido={pedido} chamar={chamar} concluir={concluir} />
       )}
@@ -217,36 +217,6 @@ function ModalForcar({ pedido, chamar, concluir }: { pedido: Extract<Pedido, { t
       <div className="small">Avançar assim fica no histórico do processo como avanço forçado, com a sua justificativa.</div>
       <Campo rotulo="Justificativa (obrigatório, mínimo de 5 letras)">
         <textarea className="tor-in w-full" rows={3} value={texto} onChange={(e) => setTexto(e.target.value)} />
-      </Campo>
-      <Erro t={erro} />
-    </Modal>
-  )
-}
-
-function ModalPessoa({ pedido, chamar, concluir, alvo }: { pedido: Extract<Pedido, { tipo: "pessoa" }>; chamar: Chamar; concluir: Concluir; alvo: (i: ItemPrecisa) => Record<string, unknown> }) {
-  const [pessoas, setPessoas] = useState<Array<{ id: number; nome: string }> | null>(null)
-  const [sel, setSel] = useState<string>(PESSOA_ESCOLHIDA_INICIAL)
-  const [env, setEnv] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
-  useEffect(() => { void api<{ funcionarios: Array<{ id: number; nome: string }> }>("/api/operacao/atribuiveis").then((r) => setPessoas(r.ok ? r.data.funcionarios ?? [] : [])) }, [])
-  const enviar = async () => {
-    setEnv(true); setErro(null)
-    const { ok, d } = await chamar({ acao: "ATRIBUIR_ESCOLHIDO", ...alvo(pedido.item), responsavelId: Number(sel) })
-    setEnv(false)
-    if (!ok) { setErro(erroDe(d)); return }
-    const feitas = idsFeitos(d)
-    pedido.resolver(concluir(pedido.item, `Atribuir a ${pessoas?.find((p) => String(p.id) === sel)?.nome ?? "outro"}`, true, d, feitas.length ? { tipo: "ATRIBUICAO", tarefaIds: feitas } : null))
-  }
-  return (
-    <Modal titulo="Escolher outro responsável" subtitulo={pedido.item.titulo} ocupado={env} onFechar={() => pedido.resolver(null)} rodape={<>
-      <button className="tor-btn" onClick={() => pedido.resolver(null)} disabled={env}>Cancelar</button>
-      <button className="tor-btn pri" onClick={() => void enviar()} disabled={env || !sel}>{env ? "Atribuindo…" : "Atribuir"}</button>
-    </>}>
-      <Campo rotulo="Pessoa">
-        <select className="tor-in w-full" value={sel} onChange={(e) => setSel(e.target.value)}>
-          <option value="">{pessoas == null ? "Carregando…" : ROTULO_ESCOLHA_DA_PESSOA}</option>
-          {(pessoas ?? []).map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
-        </select>
       </Campo>
       <Erro t={erro} />
     </Modal>

@@ -18,7 +18,7 @@ ok("depois de atribuir, fica no histórico e dá para desfazer", /fica no histó
 ok("falha na atribuição mantém a escolha aberta com a mensagem", /setErroEscolha\(primeiraFalha \?\? "Não foi possível atribuir\."\)/.test(pagina))
 
 console.log("\nTorre › aba Tarefas")
-ok("«Atribuir» da linha abre a escolha e não atribui à sugestão", /const atribuirRapido = \(l: LinhaTorre\) => \{ setErroEscolha\(null\); setEscolhaLinha\(l\) \}/.test(tarefas) && !/atribuir-sugerido/.test(tarefas) && /<SeletorResponsavel/.test(tarefas))
-ok("a escolha atribui (ou transfere) pelo comando canônico", /\/api\/tarefas\/\$\{l\.taskId\}\/comando/.test(tarefas) && /"atribuir" : "transferir"/.test(tarefas))
+ok("«Atribuir» da linha leva à página do processo (não atribui, não usa a sugestão)", /const atribuirRapido = \(l: LinhaTorre\) => \{ if \(l\.processoId != null\) router\.push\(`\/torre\/processo\/\$\{l\.processoId\}`\) \}/.test(tarefas) && !/atribuir-sugerido/.test(tarefas) && !/<SeletorResponsavel/.test(tarefas))
+ok("a página do processo atribui pelo comando canônico, marcando a origem (o servidor só aceita dela)", /origem: "pagina-do-processo"/.test(ler("src/components/torre/TorreProcessoPagina.tsx")) && /\/api\/tarefas\/\$\{id\}\/comando/.test(ler("src/components/torre/TorreProcessoPagina.tsx")))
 console.log(`\n${passou} ok, ${falhou} falha(s)`)
 if (falhou) { console.log(falhas.join("\n")); process.exit(1) }

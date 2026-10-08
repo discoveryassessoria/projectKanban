@@ -43,7 +43,7 @@ async function main() {
     const dani = await mk("Daniela Brait", "assistente", EXEC)
     const tAdmin = await signAuthToken({ userId: admin.id, email: admin.email, tipo: admin.tipo, sessaoInicio: Date.now() })
     const lote = (b: unknown) => postLote(req("/api/torre/tarefas/lote", tAdmin, b))
-    const uma = (id: number, b?: unknown) => postUma(req(`/api/torre/tarefas/${id}/remover-responsavel`, tAdmin, b), { params: Promise.resolve({ tarefaId: String(id) }) })
+    const uma = (id: number, b?: unknown) => postUma(req(`/api/torre/tarefas/${id}/remover-responsavel`, tAdmin, { ...(typeof b === "object" && b ? b : {}), origem: "pagina-do-processo" }), { params: Promise.resolve({ tarefaId: String(id) }) })
 
     // ── o caso real: nascimento e casamento do Rodolfo Fogli, na Genealogia, com a Daniela ───────────────────────────────
     const nasc = await c.novaObrigacao({ responsavelId: dani.id })
@@ -109,8 +109,8 @@ async function main() {
 
     secao("TELAS — só pelo botão; '— selecione —' nunca remove")
     const gav = ler("src/components/kanban/DocumentoOperationalDrawer.tsx")
-    ok("gaveta da certidão: botão 'Remover responsável' ao lado de Delegar", /data-testid="remover-responsavel"/.test(gav) && /Remover responsável/.test(gav))
-    ok("o menu Delegar não remove: '— selecione —' é opção desabilitada e o onChange ignora vazio", /<option value="" disabled[^>]*>\{ROTULO_ESCOLHA_DA_PESSOA\}<\/option>/.test(gav) && /if \(e\.target\.value\) await delegarTarefa/.test(gav))
+    ok("a gaveta NÃO remove mais responsável (nem delega): mostra o atual e o atalho; a página do processo usa o lote da Torre", !/data-testid="remover-responsavel"/.test(gav) && /AtalhoAbrirProcessoParaAtribuir/.test(gav))
+    ok("o servidor recusa a remoção que não vem da página do processo (origem)", /veioDaPaginaDoProcesso/.test(ler("src/app/api/torre/tarefas/[tarefaId]/remover-responsavel/route.ts")))
     const tt = ler("src/components/torre/TorreTarefas.tsx")
     ok("barra de lote da aba Tarefas: botão 'Remover responsável' com o modal de confirmação", /<AcoesDeAtribuicaoEmLote/.test(tt) && (() => { const la = ler("src/components/torre/lote-atribuicao.tsx"); return /rodar\("REMOVER_RESPONSAVEL"\)/.test(la) && /useConfirmarAtribuicao\(\)/.test(la) && /\{lote\.modal\}/.test(la) })())
   } finally {

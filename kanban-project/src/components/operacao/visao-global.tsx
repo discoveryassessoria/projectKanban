@@ -56,7 +56,7 @@ import { ProcessoExpandido } from "./processo-expandido"
 import type { FamiliaAgrupada, ProcessoAgrupado, ColunaKanban } from "@/lib/operacional/tarefa-projecoes"
 import {
   auth, dataCurta, Estado, Etiqueta, ROTULO_PRIORIDADE, ROTULO_STATUS, ROTULO_COLUNA,
-  rotularFase, useRotulosDeFaseProntos, SeletorResponsavel, type LinhaDeFila,
+  rotularFase, useRotulosDeFaseProntos, type LinhaDeFila,
 } from "./kit-operacional"
 
 export interface LinhaGerencial extends LinhaDeFila {
@@ -298,13 +298,11 @@ export function VisaoGlobal() {
   const [maisFiltros, setMaisFiltros] = useState(false)
   const [resultado, setResultado] = useState<{ chave: string; d: Resposta | null } | null>(null)
   const [recarga, setRecarga] = useState(0)
-  const [alvo, setAlvo] = useState<LinhaGerencial | null>(null)
   const [ocupado, setOcupado] = useState(false)
   const [erroComando, setErroComando] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [ordem, setOrdem] = useState<{ campo: keyof LinhaGerencial; asc: boolean }>({ campo: "dataPrazo", asc: true })
   const [selecionados, setSelecionados] = useState<Set<number>>(new Set())
-  const [alvoLote, setAlvoLote] = useState<{ linhas: LinhaGerencial[] } | null>(null)
   const router = useRouter()
 
   // DEEP-LINK — "Distribuir tarefas" (Minha Operação, obrigação administrativa)
@@ -416,7 +414,6 @@ export function VisaoGlobal() {
           return false
         }
         setAviso(sucesso)
-        setAlvo(null)
         recarregar()
         return true
       } catch {
@@ -429,37 +426,12 @@ export function VisaoGlobal() {
     [recarregar],
   )
 
-  /**
-   * ATRIBUIÇÃO EM LOTE — a MESMA porta de sempre, chamada uma vez por tarefa.
-   */
-  const atribuirEmLote = useCallback(async (alvos: LinhaGerencial[], responsavelId: number) => {
-    setOcupado(true)
-    setErroComando(null)
-    let ok = 0
-    let falha = 0
-    for (const l of alvos) {
-      try {
-        const r = await fetch(`/api/tarefas/${l.taskId}/comando`, {
-          method: "POST",
-          headers: auth(),
-          body: JSON.stringify({ acao: l.responsavelId == null ? "atribuir" : "transferir", responsavelId }),
-        })
-        if (r.ok) ok += 1
-        else falha += 1
-      } catch {
-        falha += 1
-      }
-    }
-    setOcupado(false)
-    setAlvoLote(null)
-    setSelecionados(new Set())
-    setAviso(
-      falha === 0
-        ? `${ok} tarefa${ok === 1 ? "" : "s"} atribuída${ok === 1 ? "" : "s"}.`
-        : `${ok} atribuída${ok === 1 ? "" : "s"}, ${falha} ${falha === 1 ? "falhou" : "falharam"}.`,
-    )
-    recarregar()
-  }, [recarregar])
+  // ATRIBUIÇÃO SÓ NA PÁGINA DO PROCESSO (07/10/2026): «Atribuir/Transferir» (por tarefa ou em seleção) leva ao processo; o lote entre famílias é o da Torre.
+  const abrirProcessoParaAtribuir = useCallback((alvos: LinhaGerencial[]) => {
+    const processos = new Set(alvos.map((l) => l.processoId).filter((x): x is number => x != null))
+    if (processos.size === 1) { router.push(`/torre/processo/${[...processos][0]}`); return }
+    setAviso(processos.size === 0 ? "Esta tarefa não tem processo para atribuir." : "As tarefas escolhidas são de mais de um processo: atribua pela página de cada processo ou pelo lote da Torre.")
+  }, [router])
 
   const linhas = useMemo(() => dados?.linhas ?? [], [dados])
   const ordenadas = useMemo(() => {
@@ -842,10 +814,10 @@ export function VisaoGlobal() {
           <span className="text-[12px] font-semibold text-[var(--text-primary)]">{selecionados.size} selecionada{selecionados.size === 1 ? "" : "s"}</span>
           <Button
             size="sm"
-            onClick={() => setAlvoLote({ linhas: linhas.filter((l) => selecionados.has(l.taskId)) })}
+            onClick={() => abrirProcessoParaAtribuir(linhas.filter((l) => selecionados.has(l.taskId)))}
             className="bg-[var(--action-primary)] text-[var(--action-primary-ink)] hover:bg-[var(--action-primary-hover)]"
           >
-            Atribuir para…
+            Atribuir no processo
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setSelecionados(new Set())}>Limpar seleção</Button>
         </div>
@@ -883,7 +855,7 @@ export function VisaoGlobal() {
               ordem={ordem}
               aoOrdenar={(campo) => setOrdem((o) => ({ campo, asc: o.campo === campo ? !o.asc : true }))}
               aoAbrir={(id) => { const l = linhas.find((x) => x.taskId === id); if (l) irParaOProcesso(l.taskId, l.processoId) }}
-              aoDistribuir={setAlvo}
+              aoDistribuir={(l) => abrirProcessoParaAtribuir([l])}
               selecionados={selecionados}
               todosSelecionados={todosSelecionadosVisiveis}
               aoAlternarSelecao={alternarSelecao}
@@ -894,7 +866,7 @@ export function VisaoGlobal() {
             <Quadro
               porColuna={porColuna}
               aoAbrir={(id) => { const l = linhas.find((x) => x.taskId === id); if (l) irParaOProcesso(l.taskId, l.processoId) }}
-              aoDistribuir={setAlvo}
+              aoDistribuir={(l) => abrirProcessoParaAtribuir([l])}
               aoComandar={comandar}
               ocupado={ocupado}
             />
@@ -902,26 +874,6 @@ export function VisaoGlobal() {
         </div>
       </div>
 
-      {alvoLote && (
-        <SeletorResponsavel
-          titulo={`Atribuir ${alvoLote.linhas.length} tarefa${alvoLote.linhas.length === 1 ? "" : "s"}`}
-          atual={null} ocupado={ocupado} erro={erroComando}
-          aoFechar={() => { setAlvoLote(null); setErroComando(null) }}
-          aoEscolher={(id) => atribuirEmLote(alvoLote.linhas, id)}
-        />
-      )}
-
-      {alvo && (
-        <SeletorResponsavel
-          titulo={alvo.responsavelId == null ? "Atribuir tarefa" : `Transferir de ${alvo.responsavelNome ?? "—"}`}
-          atual={alvo.responsavelId} ocupado={ocupado} erro={erroComando}
-          aoFechar={() => { setAlvo(null); setErroComando(null) }}
-          aoEscolher={(id) =>
-            comandar(alvo.taskId, { acao: alvo.responsavelId == null ? "atribuir" : "transferir", responsavelId: id },
-              alvo.responsavelId == null ? "Tarefa atribuída." : "Tarefa transferida.")
-          }
-        />
-      )}
     </div>
   )
 }
@@ -1185,7 +1137,7 @@ function Lista({
             <td className="px-4 py-2.5 text-[12px] tabular-nums text-[var(--text-muted)]">{dataCurta(l.criadaEm)}</td>
             <td className="px-4 py-2.5 text-right">
               <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                <Button size="sm" variant="outline" onClick={() => aoDistribuir(l)}>{l.responsavelId == null ? "Atribuir" : "Transferir"}</Button>
+                <Button size="sm" variant="outline" onClick={() => aoDistribuir(l)}>{l.responsavelId == null ? "Atribuir no processo" : "Transferir no processo"}</Button>
               </div>
             </td>
           </tr>
@@ -1206,10 +1158,6 @@ const ARRASTOS: Record<string, { acao: string; rotulo: string; pedeMotivo?: bool
   "A_FAZER→BLOQUEADA": { acao: "bloquear", rotulo: "Bloquear", pedeMotivo: true },
   "AGUARDANDO_TERCEIRO→BLOQUEADA": { acao: "bloquear", rotulo: "Bloquear", pedeMotivo: true },
   "BLOQUEADA→EM_ANDAMENTO": { acao: "desbloquear", rotulo: "Desbloquear" },
-  "A_FAZER→SEM_RESPONSAVEL": { acao: "devolver_a_fila", rotulo: "Devolver à fila" },
-  "EM_ANDAMENTO→SEM_RESPONSAVEL": { acao: "devolver_a_fila", rotulo: "Devolver à fila" },
-  "AGUARDANDO_TERCEIRO→SEM_RESPONSAVEL": { acao: "devolver_a_fila", rotulo: "Devolver à fila" },
-  "BLOQUEADA→SEM_RESPONSAVEL": { acao: "devolver_a_fila", rotulo: "Devolver à fila" },
 }
 const arrastoDe = (de: ColunaKanban, para: ColunaKanban) => ARRASTOS[`${de}→${para}`] ?? null
 
@@ -1330,7 +1278,7 @@ function Card({ l, aoAbrir, aoDistribuir, aoArrastar }: { l: LinhaGerencial; aoA
         <div className="flex shrink-0 items-center gap-2">
           {l.dataPrazo && <span className={`text-[11px] tabular-nums ${l.atrasada ? "font-medium text-[var(--danger-text)]" : "text-[var(--text-secondary)]"}`}>{dataCurta(l.dataPrazo)}</span>}
           <Button size="sm" variant="outline" onClick={aoDistribuir} className="h-6 px-2 text-[11px]">
-            {l.responsavelId == null ? "Atribuir" : "Transferir"}
+            {l.responsavelId == null ? "Atribuir no processo" : "Transferir no processo"}
           </Button>
         </div>
       </div>

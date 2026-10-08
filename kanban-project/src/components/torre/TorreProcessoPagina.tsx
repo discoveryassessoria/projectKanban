@@ -118,7 +118,7 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
     const feitas: number[] = []
     let primeiraFalha: string | null = null
     for (const id of ids) {
-      const r = await api<{ ok?: boolean; erro?: string }>(`/api/tarefas/${id}/comando`, "POST", { acao: "atribuir", responsavelId })
+      const r = await api<{ ok?: boolean; erro?: string }>(`/api/tarefas/${id}/comando`, "POST", { acao: "atribuir", responsavelId, origem: "pagina-do-processo" })
       if (r.ok) feitas.push(id); else primeiraFalha = primeiraFalha ?? erroDe(r.data)
     }
     setOcupado(false)

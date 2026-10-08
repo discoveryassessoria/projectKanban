@@ -178,7 +178,7 @@ async function main() {
     const t = ler(rota)
     ok(`${rota.replace("src/app/api/torre/", "")}: sem confirmação devolve a prévia (428) e não grava`, /pedirConfirmacao\(/.test(t) && /confirmacaoDoCorpo\(/.test(t))
   }
-  for (const tela of ["PainelTorreTarefa", "acoes-do-item", "TorreProcessoPagina", "TorreEquipe"]) {
+  for (const tela of ["acoes-do-item", "TorreProcessoPagina", "TorreEquipe"]) {
     ok(`${tela}: passa pelo modal 'Atribuir X a Y?'`, /useConfirmarAtribuicao\(\)/.test(ler(`src/components/torre/${tela}.tsx`)) && /\{modal(Confirmacao)?\}/.test(ler(`src/components/torre/${tela}.tsx`)))
   }
   ok("a assinatura da prévia é conferida de novo na execução (sugestão que mudou é recusada)", /assinaturaConfirmada/.test(ler("src/services/precisa-de-voce-acoes.ts")) && /SUGESTAO_MUDOU/.test(ler("src/app/api/torre/processos/[processoId]/distribuir/route.ts")))

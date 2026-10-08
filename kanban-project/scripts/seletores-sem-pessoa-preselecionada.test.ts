@@ -68,7 +68,7 @@ const carregamLista = arquivos.filter((f) => /\/api\/operacao\/atribuiveis/.test
 const naoAuditados = carregamLista.filter((f) => !(f in AUDITADOS))
 ok("todo arquivo que carrega a lista de atribuíveis está auditado (seletor novo precisa entrar aqui)", naoAuditados.length === 0, naoAuditados.join(", "))
 
-const compartilhado = ["src/components/torre/lote-atribuicao.tsx", "src/components/torre/acoes-do-item.tsx", "src/components/operacao/distribuicao-tarefas.tsx", "src/components/kanban/InitOperationModal.tsx", "src/components/kanban/DocumentoOperationalDrawer.tsx"]
+const compartilhado = ["src/components/torre/lote-atribuicao.tsx", "src/components/operacao/distribuicao-tarefas.tsx", "src/components/kanban/InitOperationModal.tsx"]
 for (const f of compartilhado) ok(`${f.split("/").pop()} usa o rótulo compartilhado «— escolha a pessoa —»`, /ROTULO_ESCOLHA_DA_PESSOA/.test(ler(f)) && /ui\/atribuicao/.test(ler(f)))
 
 const PRE_SELECAO = /\bset(Pessoa|Responsavel|ResponsavelId|PessoaId|PessoaIdEstado|Destino|DestinoId|Origem|OrigemId|Sel|Assignee)\([^)]*(\[0\]|\.find\(|funcionarios\b|usuarios\b)/
@@ -82,9 +82,9 @@ const estadoComPessoa = Object.keys(AUDITADOS).filter((f) => {
 })
 ok("nenhum estado de seletor de atribuição nasce com pessoa (useState de responsável/destino/origem/sel)", estadoComPessoa.length === 0, estadoComPessoa.join(", "))
 ok("o hook do lote não tem mais opção de pré-escolher", !/preEscolher/.test(ler("src/components/torre/lote-atribuicao.tsx")) && !/preEscolher/.test(ler("src/components/torre/TorreProcessoPagina.tsx")) && !/preEscolher/.test(ler("src/components/torre/TorreTarefas.tsx")))
-ok("o «Delegar» da gaveta começa em «— escolha a pessoa —», não no dono atual", /value=\{PESSOA_ESCOLHIDA_INICIAL\}/.test(ler("src/components/kanban/DocumentoOperationalDrawer.tsx")))
+ok("a gaveta NÃO atribui mais: mostra o responsável e o atalho «Abrir processo para atribuir»", !/PESSOA_ESCOLHIDA_INICIAL/.test(ler("src/components/kanban/DocumentoOperationalDrawer.tsx")) && /AtalhoAbrirProcessoParaAtribuir/.test(ler("src/components/kanban/DocumentoOperationalDrawer.tsx")))
 ok("o «Responsável inicial» da operação começa vazio (o Auto é uma escolha, não o padrão)", /useState<string>\(PESSOA_ESCOLHIDA_INICIAL\)/.test(ler("src/components/kanban/InitOperationModal.tsx")))
-ok("os botões que gravam dependem da pessoa: Precisa de você (!sel) e Sucessão (!origemId || !destinoId)", /disabled=\{env \|\| !sel\}/.test(ler("src/components/torre/acoes-do-item.tsx")) && /disabled=\{ocupado \|\| !origemId \|\| !destinoId\}/.test(ler("src/components/operacao/distribuicao-tarefas.tsx")))
+ok("o botão que grava depende da pessoa: Sucessão (!origemId || !destinoId); o Precisa de você não atribui mais (leva ao processo)", /disabled=\{ocupado \|\| !origemId \|\| !destinoId\}/.test(ler("src/components/operacao/distribuicao-tarefas.tsx")))
 
 console.log(`\n${falhou === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${passou} ok, ${falhou} falhas`)
 if (falhou > 0) { console.log(falhas.join("\n")); process.exit(1) }

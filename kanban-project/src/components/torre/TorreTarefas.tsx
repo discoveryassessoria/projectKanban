@@ -260,20 +260,8 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
   }
 
   // ─── AÇÕES DA LINHA ──────────────────────────────────────────────────────
-  // ATRIBUIR abre a ESCOLHA do funcionário (a mesma lista da Operação): nunca atribui sozinho à sugestão (essa é a ação «Atribuir a <sugerido>» do painel da tarefa).
-  const [escolhaLinha, setEscolhaLinha] = useState<LinhaTorre | null>(null)
-  const [erroEscolha, setErroEscolha] = useState<string | null>(null)
-  const [atribuindo, setAtribuindo] = useState(false)
-  const atribuirRapido = (l: LinhaTorre) => { setErroEscolha(null); setEscolhaLinha(l) }
-  const atribuirA = async (l: LinhaTorre, responsavelId: number) => {
-    setAtribuindo(true); setErroEscolha(null)
-    const r = await api<{ ok?: boolean; erro?: string }>(`/api/tarefas/${l.taskId}/comando`, "POST", { acao: l.responsavelId == null ? "atribuir" : "transferir", responsavelId })
-    setAtribuindo(false)
-    if (!r.ok) { setErroEscolha(erroDe(r.data)); return }
-    setEscolhaLinha(null)
-    avisar("Responsável atribuído · fica no histórico", { tipo: "ATRIBUICAO", tarefaIds: [l.taskId] } as Desfazer)
-    recarregar()
-  }
+  // ATRIBUIÇÃO SÓ NA PÁGINA DO PROCESSO (07/10/2026): «Atribuir» da linha leva ao processo; o LOTE (acima) continua aqui.
+  const atribuirRapido = (l: LinhaTorre) => { if (l.processoId != null) router.push(`/torre/processo/${l.processoId}`) }
   const iniciarRapido = async (l: LinhaTorre) => {
     const r = await api<{ mensagem?: string }>(`/api/torre/tarefas/${l.taskId}/iniciar`, "POST", {})
     avisar(r.ok ? (r.data.mensagem ?? "Iniciada.") : erroDe(r.data))
@@ -422,14 +410,6 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
           />
         )}
 
-      {escolhaLinha && (
-        <SeletorResponsavel
-          titulo={escolhaLinha.responsavelId == null ? "Atribuir tarefa" : `Transferir de ${escolhaLinha.responsavelNome ?? "—"}`}
-          atual={escolhaLinha.responsavelId} ocupado={atribuindo} erro={erroEscolha}
-          aoFechar={() => { setEscolhaLinha(null); setErroEscolha(null) }}
-          aoEscolher={(id) => void atribuirA(escolhaLinha, id)}
-        />
-      )}
       {modal && <ModalDaAcao acao={modal.acao} linha={modal.linha} agora={agora} onFechar={() => setModal(null)} />}
 
       {repactuarLote && (

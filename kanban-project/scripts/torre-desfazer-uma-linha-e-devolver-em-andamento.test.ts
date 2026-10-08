@@ -126,7 +126,7 @@ async function main() {
     ok("comando: CONFIRMACAO_NECESSARIA → 428", /CONFIRMACAO_NECESSARIA:\s*428/.test(rota))
     ok("comando: repassa confirmarTarefaEmAndamento a devolverAFila", /devolverAFila\(\{[^}]*confirmarTarefaEmAndamento: body\?\.confirmarTarefaEmAndamento === true/.test(rota))
     ok("redistribuir: repassa a flag", /confirmarTarefaEmAndamento: b\?\.confirmarTarefaEmAndamento === true/.test(readFileSync("src/app/api/tarefas/redistribuir/route.ts", "utf8")))
-    for (const f of ["src/components/operacao/tabela-familia.tsx", "src/components/operacao/visao-global.tsx", "src/components/operacao/distribuicao-tarefas.tsx", "src/components/kanban/ProcessoCentralOperacional.tsx"]) {
+    for (const f of ["src/components/operacao/tabela-familia.tsx", "src/components/operacao/visao-global.tsx"]) { // (distribuição e Central do processo deixaram de devolver à fila: levam ao processo)
       const s = readFileSync(f, "utf8")
       ok(`UI pede confirmação: ${f.split("/").pop()}`, s.includes("CONFIRMACAO_NECESSARIA") && s.includes("confirmarTarefaEmAndamento: true"))
     }

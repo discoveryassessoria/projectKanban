@@ -17,7 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { textoPrazoDaTarefa } from "@/src/lib/tarefa/texto-prazo"
 import { useRouter, useSearchParams } from "next/navigation"
 import { urlArvoreDoProcesso, urlOperacionalDoProcesso, ABAS_DA_OPERACAO, type AbaDaOperacao } from "@/lib/operacional/navegacao"
-import { auth, SeletorResponsavel } from "./kit-operacional"
+import { auth } from "./kit-operacional"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { useJsonLocalStorage } from "@/src/lib/cliente"
 import { DocumentoOperationalDrawer } from "@/src/components/kanban/DocumentoOperationalDrawer"
@@ -124,9 +124,6 @@ export function OperacaoV3({ gestor = false, naTorre = false, abaInicial = null 
   // A atribuição entra no histórico pela porta canônica (não há escrita paralela aqui).
   const { pode: podePermissao } = usePermissoes()
   const podeAtribuir = podePermissao("tarefas.editar")
-  const [atribuirAberto, setAtribuirAberto] = useState(false)
-  const [atribuirOcupado, setAtribuirOcupado] = useState(false)
-  const [atribuirErro, setAtribuirErro] = useState<string | null>(null)
   const [drawerTaskId, setDrawerTaskId] = useState<number | null>(null)
   const [group, setGroup] = useState<AgruparFilaPor>("pessoa")
   const [radar, setRadar] = useState<FiltroRadar>(null)
@@ -286,25 +283,12 @@ export function OperacaoV3({ gestor = false, naTorre = false, abaInicial = null 
     dados.recarregar()
   }, [avisar, dados])
 
-  const atribuirSelecionadas = useCallback(async (responsavelId: number) => {
-    const alvos = filaBase.filter((l) => sel[l.taskId])
-    setAtribuirOcupado(true); setAtribuirErro(null)
-    let falhas = 0
-    for (const l of alvos) {
-      try {
-        const r = await fetch(`/api/tarefas/${l.taskId}/comando`, {
-          method: "POST", headers: auth(),
-          body: JSON.stringify({ acao: l.responsavelId == null ? "atribuir" : "transferir", responsavelId }),
-        })
-        if (!r.ok) falhas++
-      } catch { falhas++ }
-    }
-    setAtribuirOcupado(false)
-    if (falhas > 0) { setAtribuirErro(`${falhas} tarefa${falhas === 1 ? "" : "s"} não pôde${falhas === 1 ? "" : "ram"} ser atribuída${falhas === 1 ? "" : "s"}.`); dados.recarregar(); return }
-    setAtribuirAberto(false); setSel({})
-    avisar(`${alvos.length} tarefa${alvos.length === 1 ? "" : "s"} atribuída${alvos.length === 1 ? "" : "s"}.`)
-    dados.recarregar()
-  }, [filaBase, sel, avisar, dados])
+  // ATRIBUIÇÃO SÓ NA PÁGINA DO PROCESSO (07/10/2026): «Atribuir» leva ao processo das tarefas escolhidas (o lote de várias famílias é o da Torre).
+  const abrirProcessoParaAtribuir = useCallback(() => {
+    const processos = new Set(filaBase.filter((l) => sel[l.taskId]).map((l) => l.processoId).filter((x): x is number => x != null))
+    if (processos.size === 1) { router.push(`/torre/processo/${[...processos][0]}`); return }
+    avisar(processos.size === 0 ? "Escolha ao menos uma tarefa para atribuir." : "As tarefas escolhidas são de mais de um processo: atribua pela página de cada processo ou pelo lote da Torre.")
+  }, [filaBase, sel, router, avisar])
 
   if (dados.erro) {
     return (
@@ -406,7 +390,7 @@ export function OperacaoV3({ gestor = false, naTorre = false, abaInicial = null 
                 setTransversalProcessoId(primeira.processoId)
               }}
               podeAtribuir={podeAtribuir}
-              onAtribuir={() => { setAtribuirErro(null); setAtribuirAberto(true) }}
+              onAtribuir={abrirProcessoParaAtribuir}
               onVerFamilia={(fam) => { setTab("fam"); setFamOpen({ fam, estagio: "iniciar" }); setFamUltimo((m) => ({ ...m, [fam]: "iniciar" })) }}
               novasIds={novasIds}
             />
@@ -499,15 +483,6 @@ export function OperacaoV3({ gestor = false, naTorre = false, abaInicial = null 
           <span>{toast}</span>
           <button className="opv3-btn opv3-sm" onClick={() => setToast(null)} style={{ background: "#1d3466", color: "#fff", borderColor: "#2c4a86" }}>ok</button>
         </div>
-      )}
-
-      {atribuirAberto && (
-        <SeletorResponsavel
-          titulo={`Atribuir ${Object.keys(sel).length} tarefa${Object.keys(sel).length === 1 ? "" : "s"}`}
-          atual={null} ocupado={atribuirOcupado} erro={atribuirErro}
-          aoFechar={() => { setAtribuirAberto(false); setAtribuirErro(null) }}
-          aoEscolher={atribuirSelecionadas}
-        />
       )}
 
       {transversalProcessoId != null && (
@@ -621,7 +596,7 @@ function AbaFila({
             <span style={{ fontSize: 12, fontWeight: 600, color: "#8a3f15" }}>{selCount} sel.</span>
             <button className="opv3-btn opv3-acc opv3-sm" onClick={onIniciarSelecionadas}>Iniciar (enviar ao cartório) as {selCount}</button>
             <button className="opv3-btn opv3-sm" onClick={() => onVincularTodos(Object.keys(sel).map(Number))}>Vincular órgão</button>
-            {podeAtribuir && <button className="opv3-btn opv3-sm" onClick={onAtribuir}>Atribuir</button>}
+            {podeAtribuir && <button className="opv3-btn opv3-sm" onClick={onAtribuir} title="A atribuição é feita na página do processo">Atribuir no processo</button>}
             <button className="opv3-btn opv3-sm" onClick={() => setSel({})}>Limpar</button>
           </div>
         )}
