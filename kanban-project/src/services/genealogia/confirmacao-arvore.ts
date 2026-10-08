@@ -19,7 +19,7 @@ import type { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { aplicarMudancaNaArvore } from "@/src/services/genealogia/propagar-arvore"
 import {
-  CAMPOS_SINCRONIZAVEIS, diaDe, diferencasDoEvento, eventoDoTipoDeDocumento, mesmoTexto, mostrarValor, semParenteses, textoDeCampo, valorDoRegistro,
+  CAMPOS_SINCRONIZAVEIS, campoParaPais, diaDe, diferencasDoEvento, eventoDoTipoDeDocumento, mesmoTexto, mostrarValor, semParenteses, textoDeCampo, valorDoRegistro,
   type CampoSincronizavel, type EventoRegistral, type ValoresDoRegistro,
 } from "@/src/lib/genealogia/sincronizacao-registral"
 
@@ -153,7 +153,7 @@ export async function planejarConfirmacao(args: {
     const escolha = args.decisoes[d.campo.chave]
     if (escolha !== "ARVORE" && escolha !== "CADASTRO") {
       plano.pendentes.push({
-        chave: d.campo.chave, rotulo: d.campo.rotulo, alvo: alvo.alvo, alvoId: alvo.alvoId, pessoaNome: alvo.pessoaNome,
+        chave: d.campo.chave, rotulo: campoParaPais(d.campo, (args.novos.pais_registro ?? args.atuais.pais_registro) as string | null | undefined).rotulo, alvo: alvo.alvo, alvoId: alvo.alvoId, pessoaNome: alvo.pessoaNome,
         arvore: d.arvore!, arvoreTexto: mostrarValor(d.campo, d.arvore), digitado: d.registro, digitadoTexto: mostrarValor(d.campo, d.registro),
       })
       continue

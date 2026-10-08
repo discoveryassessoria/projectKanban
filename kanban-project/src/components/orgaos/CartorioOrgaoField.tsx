@@ -61,6 +61,7 @@ export function CartorioOrgaoField({
       if (q) params.set("q", q)
       if (ufSigla) params.set("uf", ufSigla)
       if (cidadeSel) params.set("cidade", cidadeSel)
+      params.set("pais", "Brasil")
       fetch(`/api/operacao/orgaos/busca?${params.toString()}`, { headers: auth() })
         .then((r) => (r.ok ? r.json() : { orgaos: [] }))
         .then((j) => { if (ativo) setResultado(j.orgaos ?? []) })

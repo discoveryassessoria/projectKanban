@@ -14,7 +14,7 @@ import { prisma } from "@/lib/prisma"
 import { STATUS_DOCUMENTO_INATIVOS } from "@/src/lib/documentos/status-inativos"
 import { aplicarMudancaNaArvore } from "@/src/services/genealogia/propagar-arvore"
 import {
-  CAMPOS_SINCRONIZAVEIS, TIPOS_DE_CERTIDAO_DO_EVENTO, registroAnteriorAoEvento, separarLugarUnico, suspeitaNoValorDoRegistro, campoDaChave, camposTravados, diaDe, diferencasDoEvento, eventoDoTipoDeDocumento, mesmoTexto, mostrarValor, textoDeCampo as textoDe, textoDoHistorico,
+  CAMPOS_SINCRONIZAVEIS, TIPOS_DE_CERTIDAO_DO_EVENTO, registroAnteriorAoEvento, separarLugarUnico, suspeitaNoValorDoRegistro, campoDaChave, camposTravados, campoParaPais, diaDe, diferencasDoEvento, eventoDoTipoDeDocumento, mesmoTexto, mostrarValor, textoDeCampo as textoDe, textoDoHistorico,
   type CampoSincronizavel, type DiferencaDeCampo, type EventoRegistral, type TipoDeDiferenca, type ValoresDoRegistro,
 } from "@/src/lib/genealogia/sincronizacao-registral"
 
@@ -131,7 +131,7 @@ const itemDe = (c: Contexto, r: RegistroLocalizado, d: DiferencaDeCampo): ItemDe
   if (c.desfeitos.has(`${alvo}:${alvoId}:${d.campo.chave}:${d.registro}`)) return null // o usuário já desfez ESTE valor do registro
   const p = c.pessoas.get(r.pessoaId)
   return {
-    chave: d.campo.chave, rotulo: d.campo.rotulo, evento: r.evento, alvo, alvoId, pessoaId: r.pessoaId, pessoaNome: p ? nomeDe(p) : `Pessoa #${r.pessoaId}`,
+    chave: d.campo.chave, rotulo: campoParaPais(d.campo, r.valores.pais_registro).rotulo, evento: r.evento, alvo, alvoId, pessoaId: r.pessoaId, pessoaNome: p ? nomeDe(p) : `Pessoa #${r.pessoaId}`,
     documentoId: r.documentoId, tipo: d.tipo, arvore: d.arvore, registro: d.registro,
     arvoreTexto: mostrarValor(d.campo, d.arvore), registroTexto: mostrarValor(d.campo, d.registro),
   }
@@ -200,7 +200,7 @@ export async function sincronizarArvore(args: {
             const log = await tx.logAuditoria.create({
               data: {
                 acao: ACAO_SINCRONIZACAO, entidade: p.id != null ? "Processo" : "Pessoa", entidadeId: p.id ?? i.pessoaId,
-                descricao: `Árvore sincronizada com a Genealogia — ${i.pessoaNome}, ${textoDoHistorico(campo, i.arvore, i.registro)}`,
+                descricao: `Árvore sincronizada com a Genealogia — ${i.pessoaNome}, ${textoDoHistorico({ ...campo, rotulo: i.rotulo }, i.arvore, i.registro)}`,
                 usuarioId: autorId,
                 detalhes: {
                   arvoreId, chave: i.chave, coluna: campo.coluna, rotulo: i.rotulo, evento: i.evento, alvo: i.alvo, alvoId: i.alvoId, pessoaId: i.pessoaId, pessoaNome: i.pessoaNome,

@@ -10,6 +10,7 @@
 
 "use client"
 
+import { rotuloDaDivisao, exigeCartorioVinculado } from "@/lib/localidade/regra-localidade"
 import { useState, useEffect, useCallback } from "react"
 import { useApi } from "@/src/lib/dados"
 import { useFecharComEsc } from "@/src/lib/ui/escape-stack"
@@ -298,13 +299,15 @@ function ConteudoModal({
   const paisCodigo = paisSelecionado?.codigo ?? (form.pais_registro ? null : "BR")
   const ehBrasil = paisCodigo === "BR"
 
-  // -- CIDADE FORA DO BRASIL: mesma base mundial (Cidade, GeoNames população
-  //    ≥ 5000), sugerida por texto — MESMO padrão já usado pra Cartório
-  //    (busca na base local, nunca serviço externo por tecla).
-  const cidadesMundoReq = useApi<{ cidades?: { id: number; nome: string; regiao: string | null }[] }>(
-    !ehBrasil && paisCodigo ? `/api/geografia/cidades?paisCodigo=${paisCodigo}&q=${encodeURIComponent(form.cidade_registro)}` : null,
+  // -- FORA DO BRASIL (regra única `lib/localidade/regra-localidade.ts`): PROVÍNCIA e CIDADE carregam sozinhas da base geográfica do servidor
+  //    (`/api/localidades/*`, sem chave nem limite). Cidade que a base não conhece = texto livre; a lista só ajuda, nunca trava.
+  const provinciasReq = useApi<{ provincias?: { codigo: string; nome: string }[] }>(!ehBrasil && paisCodigo ? `/api/localidades/provincias?pais=${paisCodigo}` : null)
+  const provinciasDoMundo = provinciasReq.dados?.provincias ?? []
+  const cidadesMundoReq = useApi<{ cidades?: { nome: string; provincia: string | null }[] }>(
+    !ehBrasil && paisCodigo ? `/api/localidades/cidades?pais=${paisCodigo}${form.estado_registro ? `&provincia=${encodeURIComponent(form.estado_registro)}` : ""}&q=${encodeURIComponent(form.cidade_registro)}` : null,
   )
   const cidadesDoMundo = cidadesMundoReq.dados?.cidades ?? []
+  const rotuloDivisao = rotuloDaDivisao(form.pais_registro)
 
   // -- Estado → Cidade em cascata, direto do IBGE (fonte pública oficial, sem
   //    chave/custo). "Cartório" continua texto livre — nem todo cartório tem
@@ -369,7 +372,8 @@ function ConteudoModal({
   const cartorioOk = form.cartorio.trim().length > 0
   // Cartório sem órgão vinculado bloqueia a conclusão em QUALQUER país (gap de cadastro real, nunca silencioso): o vínculo é feito aqui mesmo,
   // escolhendo na busca ou em "Cadastrar este cartório" (nome, cidade e país obrigatórios). O servidor repete a regra (ORGAO_NAO_VINCULADO).
-  const orgaoOk = !cartorioOk || form.orgaoId != null
+  // Só o BRASIL exige o cartório vinculado ao cadastro; fora dele o nome digitado basta (regra única da Localidade).
+  const orgaoOk = !cartorioOk || !exigeCartorioVinculado(form.pais_registro) || form.orgaoId != null
   const livroOk = form.livro.trim().length > 0
   const folhaOk = form.folha.trim().length > 0
   const termoOk = form.termo.trim().length > 0
@@ -386,7 +390,7 @@ function ConteudoModal({
     if (isModoBuscar && !podeConcluirEtapa) {
       const faltando = [
         !nomeRegistradoOk && "Nome registrado",
-        !estadoOk && "Estado",
+        !estadoOk && rotuloDivisao,
         !cidadeOk && "Cidade",
         !cartorioOk && "Cartório",
         !orgaoOk && `Cartório "${form.cartorio}" a mapear — escolha um órgão na busca ou use "Cadastrar este cartório"`,
@@ -602,7 +606,7 @@ function ConteudoModal({
                       </strong>
                       ,{" "}
                       <strong className={estadoOk && cidadeOk ? "text-green-800" : "text-[var(--accent-text)]"}>
-                        Estado / Cidade
+                        {rotuloDivisao} / Cidade
                       </strong>
                       ,{" "}
                       <strong className={cartorioOk ? "text-green-800" : "text-[var(--accent-text)]"}>
@@ -690,10 +694,17 @@ function ConteudoModal({
                         options={ufs.map((u) => u.nome)}
                         placeholder={ufs.length ? "Selecione o estado" : "Carregando…"}
                       />
+                    ) : provinciasDoMundo.length > 0 ? (
+                      <SelectField
+                        label="Província"
+                        value={form.estado_registro}
+                        onChange={(v) => setForm({ ...form, estado_registro: v, cidade_registro: "" })}
+                        options={provinciasDoMundo.map((p) => p.nome)}
+                        placeholder="Selecione a província"
+                      />
                     ) : (
-                      // País fora do Brasil não tem UF — a região aparece junto do
-                      // nome da cidade, na sugestão, quando a fonte tem essa info.
-                      <div />
+                      // A base não conhece as províncias deste país: texto livre, nunca trava.
+                      <Field label="Província" value={form.estado_registro} onChange={(v) => setForm({ ...form, estado_registro: v })} />
                     )}
                     {ehBrasil ? (
                       <SelectField
@@ -717,31 +728,39 @@ function ConteudoModal({
                         />
                         <datalist id="cidades-mundo-sugeridas">
                           {cidadesDoMundo.map((c) => (
-                            <option key={c.id} value={c.nome}>{c.regiao ? `${c.nome} — ${c.regiao}` : c.nome}</option>
+                            <option key={`${c.nome}|${c.provincia}`} value={c.nome}>{c.provincia ? `${c.nome} — ${c.provincia}` : c.nome}</option>
                           ))}
                         </datalist>
                       </>
                     )}
-                    <CartorioOrgaoField
-                      documentoId={documentoId as number}
-                      texto={form.cartorio}
-                      orgaoId={form.orgaoId}
-                      ufSigla={ufSigla}
-                      cidade={form.cidade_registro}
-                      paisNome={ehBrasil ? "Brasil" : form.pais_registro}
-                      requiredToComplete={isModoBuscar}
-                      onTextoChange={aoMudarCartorio}
-                      onVinculado={(o) => setForm((f) => ({ ...f, cartorio: o.name, orgaoId: o.id }))}
-                    />
-                    {ehBrasil && ufSigla && cartoriosDaApi.length === 0 && (
-                      <div className="col-span-2 text-[10.5px] text-[var(--text-secondary)]">
-                        {form.cidade_registro ? "Nenhum cartório sincronizado para esta cidade ainda." : "Selecione a cidade para ver os cartórios dessa região."}
-                      </div>
-                    )}
-                    {!ehBrasil && (
-                      <div className="col-span-2 text-[10.5px] text-[var(--text-secondary)]">
-                        Fora do Brasil a busca usa o cadastro de Órgãos; se não achar, use “Cadastrar este cartório” (nome, cidade e país). Para concluir, o órgão precisa estar vinculado.
-                      </div>
+                    {ehBrasil ? (
+                      <>
+                        <CartorioOrgaoField
+                          documentoId={documentoId as number}
+                          texto={form.cartorio}
+                          orgaoId={form.orgaoId}
+                          ufSigla={ufSigla}
+                          cidade={form.cidade_registro}
+                          paisNome="Brasil"
+                          requiredToComplete={isModoBuscar}
+                          onTextoChange={aoMudarCartorio}
+                          onVinculado={(o) => setForm((f) => ({ ...f, cartorio: o.name, orgaoId: o.id }))}
+                        />
+                        {ufSigla && cartoriosDaApi.length === 0 && (
+                          <div className="col-span-2 text-[10.5px] text-[var(--text-secondary)]">
+                            {form.cidade_registro ? "Nenhum cartório sincronizado para esta cidade ainda." : "Selecione a cidade para ver os cartórios dessa região."}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      // FORA DO BRASIL: cartório em TEXTO LIVRE — só o nome digitado; sem lista, sem base nacional e sem obrigar cadastro.
+                      <Field
+                        label="Cartório"
+                        requiredToComplete={isModoBuscar}
+                        value={form.cartorio}
+                        onChange={(v) => setForm({ ...form, cartorio: v, orgaoId: null })}
+                        colSpan={2}
+                      />
                     )}
                     {!isModoBuscar && (
                       <>
