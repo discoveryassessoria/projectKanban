@@ -28,7 +28,7 @@
 import { prisma } from "@/lib/prisma"
 import { exigirBancoDeTeste } from "./_banco-de-teste"
 import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
-import { dispensarNecessidade, reativarNecessidade, MOTIVO_DOCUMENTO_DISPENSADO } from "@/src/services/necessidade-documental"
+import { dispensarNecessidade, dispensaDoSistema, reativarNecessidade, MOTIVO_DOCUMENTO_DISPENSADO } from "@/src/services/necessidade-documental"
 
 const MARCA = "DISPTASK"
 
@@ -101,7 +101,7 @@ async function main() {
   const c1 = await palco("C1", "ATIVO")
   // Fase termina normalmente DEPOIS de a tarefa já existir — como no Santin.
   await prisma.phaseWorkflowInstance.update({ where: { id: c1.workflowInstanceId }, data: { status: "CONCLUIDO" } })
-  await dispensarNecessidade(c1.necessidadeId, "teste: pessoa não precisa mais de documentação")
+  await dispensarNecessidade(c1.necessidadeId, "teste: pessoa não precisa mais de documentação", prisma, false, dispensaDoSistema("teste"))
   const necDepois1 = await prisma.necessidadeDocumental.findUniqueOrThrow({ where: { id: c1.necessidadeId }, select: { status: true } })
   ok("1a) necessidade foi dispensada", necDepois1.status === "DISPENSADA")
   const stepDepois1 = await prisma.phaseWorkflowStepInstance.findFirstOrThrow({ where: { necessidadeId: c1.necessidadeId }, select: { status: true } })
@@ -119,7 +119,7 @@ async function main() {
   const c2 = await palco("C2", "ATIVO")
   await prisma.phaseWorkflowInstance.update({ where: { id: c2.workflowInstanceId }, data: { status: "CONCLUIDO" } })
   await prisma.tarefa.update({ where: { id: c2.tarefaId }, data: { dataInicio: new Date(), statusTarefa: "EM_ANDAMENTO" } })
-  await dispensarNecessidade(c2.necessidadeId, "teste: dispensa depois de iniciada")
+  await dispensarNecessidade(c2.necessidadeId, "teste: dispensa depois de iniciada", prisma, false, dispensaDoSistema("teste"))
   const r2 = await reconciliarTarefas({ processoId: c2.processoId })
   ok("2a) reconciliarTarefas NÃO cancelou (contabiliza como 'aguardando decisão')", r2.tarefasAguardandoDecisao === 1 && r2.tarefasEncerradasSemCausa === 0)
   const tarefaDepois2 = await prisma.tarefa.findUniqueOrThrow({ where: { id: c2.tarefaId }, select: { statusTarefa: true, causaRemovidaEm: true } })
@@ -211,7 +211,7 @@ async function main() {
   const tarefa6 = await prisma.tarefa.findFirstOrThrow({ where: { processoId: proc6.id, workflowInstanceId: inst6.id }, select: { id: true } })
 
   // documentacao=false (Priscila-like): dispensa tudo.
-  await dispensarNecessidade(nec6.id, "teste: fora da linhagem, documentacao=false")
+  await dispensarNecessidade(nec6.id, "teste: fora da linhagem, documentacao=false", prisma, false, dispensaDoSistema("teste"))
   const necPosDispensa = await prisma.necessidadeDocumental.findUniqueOrThrow({ where: { id: nec6.id }, select: { status: true } })
   ok("6a) dispensada", necPosDispensa.status === "DISPENSADA")
   const docPosDispensa = await prisma.documento.findUniqueOrThrow({ where: { id: doc6.id }, select: { status: true, motivoBloqueio: true } })

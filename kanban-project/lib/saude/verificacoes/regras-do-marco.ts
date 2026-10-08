@@ -27,7 +27,7 @@ import { mesmoLugar } from '@/src/lib/genealogia/sincronizacao-registral'
 import { compararCertidoesDaFamilia } from '@/lib/operacional/ordem-certidoes'
 import { SUBTAREFA_PEDIDO_ENVIADO, SUBTAREFA_CONFIRMACAO, SUBTAREFA_CERTIDAO_RECEBIDA, SUBTAREFA_CONFERENCIA } from '@/lib/operacional/emissao-recebimento'
 
-export type RegraDoMarco = 'a' | 'c' | 'e' | 'f' | 'g' | 'i' | 'j' | 'l' | 'm' | 'n' | 'o'
+export type RegraDoMarco = 'a' | 'c' | 'e' | 'f' | 'g' | 'i' | 'j' | 'l' | 'm' | 'n' | 'o' | 'p'
 
 /** O detalhe do processo lido UMA vez por rodada (as regras e, i e o script leem o mesmo). */
 type Detalhe = Awaited<ReturnType<typeof import('@/lib/operacional/torre-foco')['detalheDoProcesso']>>
@@ -60,6 +60,7 @@ export const TITULO_DA_REGRA: Record<RegraDoMarco, string> = {
   j: 'Subtarefa da Emissão fora de ordem ou com selo «Disponível» sendo que depende de outra',
   m: 'Local do óbito da certidão diferente (ou ausente) na árvore',
   n: 'Abas da Torre dizendo coisas diferentes (responsável, fases, risco ou contagens)',
+  p: 'Necessidade dispensada sem registro de quem dispensou (a partir de 08/10/2026)',
   o: 'Documentos por pessoa: casamento fora do dono, dispensada com exigência, ou painel × aba Documentos × árvore × Torre divergentes',
   l: 'Certidão recebida/validada sem o passo de recebimento/validação da Emissão concluído',
 }
@@ -405,13 +406,26 @@ export async function detectarRegraO(): Promise<ViolacaoDoMarco[]> {
   return divs.map((d, i) => ({ regra: 'o' as const, processoId: d.processoId, familia: d.familia, certidao: d.certidao, pessoa: d.pessoa, detalhe: d.detalhe, entidade: 'Documento', registroId: d.documentoId ?? i + 1 }))
 }
 
+// ── p ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/** A regra vale daqui para a frente: o histórico antigo NÃO é reescrito (a dispensa manual de 06/10 18:20 do Bernardo ficou sem autor e assim permanece). */
+export const DISPENSA_COM_AUTOR_DESDE = new Date('2026-10-08T12:45:00Z')
+export async function detectarRegraP(desde: Date = DISPENSA_COM_AUTOR_DESDE): Promise<ViolacaoDoMarco[]> {
+  const dispensadas = await prisma.necessidadeDocumental.findMany({
+    where: { status: 'DISPENSADA', updatedAt: { gte: desde } },
+    select: { id: true, processoId: true, itemCatalogo: { select: { name: true } }, pessoa: { select: { nome: true, sobrenome: true } }, processo: { select: { nome: true } } },
+  })
+  if (dispensadas.length === 0) return []
+  const comLog = new Set((await prisma.logAuditoria.findMany({ where: { acao: 'NECESSIDADE_DISPENSADA', entidade: 'NecessidadeDocumental', entidadeId: { in: dispensadas.map((d) => d.id) }, criadoEm: { gte: desde } }, select: { entidadeId: true } })).map((l) => l.entidadeId))
+  return dispensadas.filter((d) => !comLog.has(d.id)).map((d) => ({ regra: 'p' as const, processoId: d.processoId, familia: d.processo?.nome ?? '—', certidao: d.itemCatalogo?.name ?? null, pessoa: nomeDe(d.pessoa), detalhe: 'necessidade dispensada sem linha de histórico com autor (usuário ou sistema + motivo)', entidade: 'NecessidadeDocumental', registroId: d.id }))
+}
+
 export async function detectarRegrasDoMarco(opts: { profundo?: boolean } = {}): Promise<{ violacoes: ViolacaoDoMarco[]; porRegra: Record<RegraDoMarco, number> }> {
   limparMemoDeDetalhes()
   const todas = [
     ...(await detectarRegraA()), ...(await detectarRegraC()), ...(await detectarRegraE(opts)),
-    ...(await detectarRegraF()), ...(await detectarRegraG()), ...(opts.profundo ? await detectarRegraI() : []), ...(await detectarRegraJ()), ...(await detectarRegraL()), ...(await detectarRegraM()), ...(await detectarRegraN()), ...(await detectarRegraO()),
+    ...(await detectarRegraF()), ...(await detectarRegraG()), ...(opts.profundo ? await detectarRegraI() : []), ...(await detectarRegraJ()), ...(await detectarRegraL()), ...(await detectarRegraM()), ...(await detectarRegraN()), ...(await detectarRegraO()), ...(await detectarRegraP()),
   ]
-  const porRegra = { a: 0, c: 0, e: 0, f: 0, g: 0, i: 0, j: 0, l: 0, m: 0, n: 0, o: 0 } as Record<RegraDoMarco, number>
+  const porRegra = { a: 0, c: 0, e: 0, f: 0, g: 0, i: 0, j: 0, l: 0, m: 0, n: 0, o: 0, p: 0 } as Record<RegraDoMarco, number>
   for (const v of todas) porRegra[v.regra]++
   return { violacoes: todas, porRegra }
 }

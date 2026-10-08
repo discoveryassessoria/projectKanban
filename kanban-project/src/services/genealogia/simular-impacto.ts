@@ -33,7 +33,7 @@ import { definirFlagDaPessoa } from "@/src/services/processo-requerentes"
 import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { materializarGenealogia } from "@/src/services/genealogia/materializar-genealogia"
-import { removerNecessidadesDaUniao } from "@/src/services/necessidade-documental"
+import { removerNecessidadesDaUniao, dispensaDoSistema } from "@/src/services/necessidade-documental"
 
 type DB = Prisma.TransactionClient
 
@@ -434,14 +434,14 @@ async function aplicarMudancaProposta(db: DB, entrada: EntradaSimulacao): Promis
   if (uniao?.acao === "remover" && uniao.uniaoId) {
     // Como na remoção real: as necessidades da união saem ANTES (o CHECK
     // `sujeito_xor` recusaria apagar a união com necessidade apontando para ela).
-    await removerNecessidadesDaUniao(uniao.uniaoId, db)
+    await removerNecessidadesDaUniao(uniao.uniaoId, db, undefined, dispensaDoSistema("simulação de impacto (desfeita ao final)"))
     await db.uniao.delete({ where: { id: uniao.uniaoId } })
   }
 
   if (entrada.removerPessoa) {
     const unioes = await db.uniao.findMany({ where: { OR: [{ pessoa1Id: pessoaId }, { pessoa2Id: pessoaId }] }, select: { id: true } })
     for (const u of unioes) {
-      await removerNecessidadesDaUniao(u.id, db)
+      await removerNecessidadesDaUniao(u.id, db, undefined, dispensaDoSistema("simulação de impacto (desfeita ao final)"))
       await db.uniao.delete({ where: { id: u.id } })
     }
     await db.pessoa.update({ where: { id: pessoaId }, data: { removidaEm: new Date() } })

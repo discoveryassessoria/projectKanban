@@ -558,7 +558,7 @@ async function reconciliarEfinalizar(
     // APONTA — ARV-001 — e nunca dispensa sozinho).
     if (n.status === "PENDENTE") {
       const motivo = opts.motivo ? `necessidade removida pela árvore: ${opts.motivo}` : "Regra deixou de ser aplicável (reconciliação)"
-      const r = await dispensarNecessidade(n.id, motivo, db)
+      const r = await dispensarNecessidade(n.id, motivo, db, false, { usuarioId: opts.autor?.id ?? null, origem: opts.autor?.nome ? "alteração na árvore" : "reconciliação da Genealogia" })
       res.dispensadas++
       res.fatos.push({ tipo: "REMOVIDA", necessidadeId: n.id, rotulo: "", documentoIds: r.documentoIds, tarefasAbertas: 0 })
     } else if (n.status === "EM_ATENDIMENTO" || n.status === "ATENDIDA" || n.status === "NAO_LOCALIZADA") {

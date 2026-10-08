@@ -203,9 +203,35 @@ export async function atenderNecessidade(necessidadeId: number, db: DB = prisma)
   await evento(db, necessidadeId, "ATENDIDA")
 }
 
-/** → DISPENSADA (requisito deixou de ser exigido). Idempotente. */
+/**
+ * QUEM dispensou (08/10/2026). TODA dispensa registra autor: o usuário que pediu, ou «sistema» com a origem dizendo por quê (reconciliação, união desfeita…).
+ * Antes a dispensa manual do Bernardo (06/10 18:20) ficou sem autor nenhum — o evento só guardava o motivo. O parâmetro é OBRIGATÓRIO: chamador novo que não
+ * diz quem dispensa não compila.
+ */
+export interface AutorDaDispensa { usuarioId: number | null; origem: string }
+export const dispensaDoSistema = (origem: string): AutorDaDispensa => ({ usuarioId: null, origem })
+export const ACAO_NECESSIDADE_DISPENSADA = "NECESSIDADE_DISPENSADA"
+
+async function registrarDispensa(db: DB, necessidadeId: number, motivo: string | undefined, manual: boolean, autor: AutorDaDispensa): Promise<void> {
+  const [n, u] = await Promise.all([
+    db.necessidadeDocumental.findUnique({ where: { id: necessidadeId }, select: { processoId: true, itemCatalogo: { select: { name: true } }, pessoa: { select: { nome: true, sobrenome: true } }, uniao: { select: { pessoa1: { select: { nome: true, sobrenome: true } }, pessoa2: { select: { nome: true, sobrenome: true } } } } } }),
+    autor.usuarioId != null ? db.usuario.findUnique({ where: { id: autor.usuarioId }, select: { nome: true } }) : Promise.resolve(null),
+  ])
+  const nome = (p: { nome: string; sobrenome: string | null } | null | undefined) => (p ? [p.nome, p.sobrenome].filter(Boolean).join(" ") : null)
+  const de = nome(n?.pessoa) ?? [nome(n?.uniao?.pessoa1), nome(n?.uniao?.pessoa2)].filter(Boolean).join(" + ")
+  const quem = autor.usuarioId != null ? `${u?.nome ?? `usuário #${autor.usuarioId}`} (${autor.origem})` : `sistema (${autor.origem})`
+  await db.logAuditoria.create({
+    data: {
+      acao: ACAO_NECESSIDADE_DISPENSADA, entidade: "NecessidadeDocumental", entidadeId: necessidadeId, usuarioId: autor.usuarioId,
+      descricao: `Necessidade «${n?.itemCatalogo?.name ?? "documento"}${de ? ` · ${de}` : ""}» dispensada${manual ? " (manual)" : ""} por ${quem}${motivo ? `: ${motivo}` : ""}`,
+      detalhes: { processoId: n?.processoId ?? null, motivo: motivo ?? null, manual, autorId: autor.usuarioId, origem: autor.origem } as Prisma.InputJsonValue,
+    },
+  })
+}
+
+/** → DISPENSADA (requisito deixou de ser exigido). Idempotente. Grava SEMPRE uma linha de histórico com o autor e o motivo. */
 export async function dispensarNecessidade(
-  necessidadeId: number, motivo?: string, db: DB = prisma, manual = false,
+  necessidadeId: number, motivo: string | undefined, db: DB, manual: boolean, autor: AutorDaDispensa,
 ): Promise<{ dispensada: boolean; documentoIds: number[] }> {
   const n = await db.necessidadeDocumental.findUnique({ where: { id: necessidadeId }, select: { status: true, dispensaManual: true } })
   if (!n) return { dispensada: false, documentoIds: [] }
@@ -214,11 +240,13 @@ export async function dispensarNecessidade(
     // marca agora (dispensa que era automática vira sticky por decisão de operador).
     if (manual && !n.dispensaManual) {
       await db.necessidadeDocumental.update({ where: { id: necessidadeId }, data: { dispensaManual: true } })
+      await registrarDispensa(db, necessidadeId, motivo ? `${motivo} (a dispensa passou a ser manual)` : "a dispensa passou a ser manual", true, autor)
     }
     return { dispensada: false, documentoIds: [] }
   }
   await db.necessidadeDocumental.update({ where: { id: necessidadeId }, data: { status: "DISPENSADA", dispensaManual: manual } })
-  await evento(db, necessidadeId, "DISPENSADA", motivo ? { motivo } : undefined)
+  await evento(db, necessidadeId, "DISPENSADA", { ...(motivo ? { motivo } : {}), autorId: autor.usuarioId, origem: autor.origem } as Prisma.InputJsonValue)
+  await registrarDispensa(db, necessidadeId, motivo, manual, autor)
 
   // A NECESSIDADE E A ETAPA SÃO DUAS LINHAS — dispensar só a necessidade deixava a
   // etapa operacional ("Localizar registro da certidão") viva, contando pendente na
@@ -610,6 +638,7 @@ export async function removerNecessidadesDaUniao(
   uniaoId: number,
   db: DB = prisma,
   motivo = "necessidade removida pela árvore: a união foi desfeita",
+  autor: AutorDaDispensa = dispensaDoSistema("união desfeita na árvore"),
 ): Promise<{ removidas: number; bloqueadas: { id: number; status: string }[]; documentoIds: number[] }> {
   const alvos = await db.necessidadeDocumental.findMany({ where: { uniaoId }, select: { id: true, status: true } })
   const bloqueadas = alvos.filter((n) => n.status !== "PENDENTE" && n.status !== "DISPENSADA")
@@ -618,7 +647,7 @@ export async function removerNecessidadesDaUniao(
   for (const n of alvos) {
     // Dispensa primeiro: cancela passos, tira o Documento de jogo, deixa o motivo
     // no evento (a varredura de tarefas lê dali).
-    const r = await dispensarNecessidade(n.id, motivo, db)
+    const r = await dispensarNecessidade(n.id, motivo, db, false, autor)
     documentoIds.push(...r.documentoIds)
   }
   if (alvos.length === 0) return { removidas: 0, bloqueadas: [], documentoIds }

@@ -2,7 +2,7 @@
 // CP-3 — detalhe + transições de estado da NecessidadeDocumental (append-only).
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { verificarPermissao } from "@/src/lib/verificar-permissao"
+import { verificarPermissao, extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 import { marcarNaoLocalizada, reabrir, retornoGenealogia, dispensarNecessidade, atenderNecessidade, iniciarAtendimentoNecessidade } from "@/src/services/necessidade-documental"
 import { tentarAvancoAutomaticoSeNecessidadeDaFaseAtual } from "@/src/lib/motor/auto-avanco"
 import { notificarNecessidadeTransicionada } from "@/src/services/registral/gancho-documental"
@@ -87,7 +87,7 @@ export async function PATCH(
         // Transição CANÔNICA pelo serviço de domínio (nenhuma escrita direta de status).
         // Dispensa pedida por quem opera a tela — MANUAL: não reativa sozinha
         // na próxima reconciliação, mesmo com a regra ainda achando aplicável.
-        await dispensarNecessidade(id, typeof body.motivo === "string" ? body.motivo : undefined, undefined, true)
+        await dispensarNecessidade(id, typeof body.motivo === "string" ? body.motivo : undefined, prisma, true, { usuarioId: (await extrairUsuarioComPermissoes(request))?.userId ?? null, origem: "dispensa pela tela da necessidade" })
         await avancar()
         await reconciliarRegistral()
         return NextResponse.json({ necessidade: await prisma.necessidadeDocumental.findUnique({ where: { id } }) })

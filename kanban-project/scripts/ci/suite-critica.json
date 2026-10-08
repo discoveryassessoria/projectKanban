@@ -251,6 +251,7 @@
     "scripts/torre-contagens-risco-unicos.test.ts",
     "scripts/prazo-nunca-antes-da-entrada.test.ts",
     "scripts/casamento-dono-unico.test.ts",
+    "scripts/dispensa-sempre-com-autor.test.ts",
     "scripts/prazo-reancoragem-troca-de-fase.test.ts",
     "scripts/cobranca-so-com-pedido-enviado.test.ts",
     "scripts/torre-fases-fonte-unica.test.ts",
