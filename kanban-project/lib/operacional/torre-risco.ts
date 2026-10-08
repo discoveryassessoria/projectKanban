@@ -158,7 +158,7 @@ export function riscoDoProcesso(e: EntradaDoRisco): RiscoCalculado {
   else if ((s.semResponsavel ?? 0) > 0) motivos.push(`${plural(s.semResponsavel!, 'tarefa sem responsável', 'tarefas sem responsável')}`)
   if ((s.bloqueadas ?? 0) > 0) motivos.push(`${plural(s.bloqueadas!, 'tarefa bloqueada', 'tarefas bloqueadas')}`)
   if (s.cobrancasSemResposta) motivos.push('2+ cobranças sem resposta')
-  if ((s.acompanhamentoVencido ?? 0) > 0 && !parado) motivos.push(`${plural(s.acompanhamentoVencido!, 'cobrança vencida', 'cobranças vencidas')}`)
+  if ((s.acompanhamentoVencido ?? 0) > 0 && !parado) motivos.push(`${plural(s.acompanhamentoVencido!, 'acompanhamento vencido', 'acompanhamentos vencidos')}`)
   if ((s.vencemEmBreve ?? 0) > 0) motivos.push(`${plural(s.vencemEmBreve!, 'tarefa com prazo hoje ou amanhã', 'tarefas com prazo hoje ou amanhã')}`)
   if (passouDaMeta) motivos.push(`${diasPorExtenso(e.diasNaFase ?? 0)} na fase (meta ${diasPorExtenso(e.metaDias ?? 0)})`)
   if (motivos.length === 0 && nivel !== 'no_ritmo') motivos.push(`pontuação ${score} no Precisa de você`)

@@ -24,5 +24,9 @@ ok("Tarefas: cobravelVencida vem de ehCobravelVencido", /cobravelVencida: ehCobr
 ok("Visão geral (cartão 'cob') usa ehCobravelVencido", /cob: \(l, agora\) => ehCobravelVencido\(l, agora\)/.test(ler("lib/operacional/torre-kpis.ts")))
 ok("o vigia compara cartão × aba × Tarefas × Terceiros × botão", /compararCobrancas\(linhas, agora\)/.test(ler("lib/operacional/torre-coerencia-abas.ts")))
 
+console.log("\n3) O motivo do risco não chama de «cobrança» o que é acompanhamento vencido")
+const risco = readFileSync("lib/operacional/torre-risco.ts", "utf8")
+ok("torre-risco: motivo diz «acompanhamento(s) vencido(s)»", /'acompanhamento vencido', 'acompanhamentos vencidos'/.test(risco) && !/'cobrança vencida', 'cobranças vencidas'/.test(risco))
+
 console.log(`\n${n - falhou}/${n} verificações`)
 if (falhou > 0) process.exit(1)
