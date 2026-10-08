@@ -222,10 +222,6 @@ export function separarLugarUnico(cidade: string | null | undefined, estado: str
 }
 
 // ─── O QUE NÃO SE GRAVA SOZINHO ─────────────────────────────────────────────────────────────────────────────────────────────
-/** Local do óbito: fica fora dos casos antigos (decisão do Marco, 08/10/2026). Nunca é sobrescrito sem escolha explícita. */
-export const CHAVES_DO_LOCAL_DO_OBITO: readonly string[] = ["PESSOA.local_obito", "PESSOA.estado_obito", "PESSOA.pais_obito"]
-export const ehLocalDoObito = (chave: string): boolean => CHAVES_DO_LOCAL_DO_OBITO.includes(chave)
-
 /** Motivo de NÃO gravar um valor do registro que tem «cara de erro» (data impossível, texto de lixo). `null` = pode gravar. */
 export function suspeitaNoValorDoRegistro(campo: CampoSincronizavel, valor: string, agora: Date = new Date()): string | null {
   if (campo.tipo === "data") {
@@ -244,20 +240,4 @@ export function suspeitaNoValorDoRegistro(campo: CampoSincronizavel, valor: stri
 /** Datas do MESMO registro que se contradizem (o registro não pode ser lavrado antes do fato). */
 export function registroAnteriorAoEvento(dataEvento: string | null, dataRegistro: string | null): boolean {
   return dataEvento != null && dataRegistro != null && dataRegistro < dataEvento
-}
-
-/** Distância de edição (sem acento e sem caixa) — para reconhecer dois textos «quase iguais» (Águilas × Aguilar), que mais parecem erro de digitação de um dos lados do que dois lugares. */
-export function distanciaDeTexto(a: string, b: string): number {
-  const x = semAcento(a).toLowerCase().trim(), y = semAcento(b).toLowerCase().trim()
-  const d: number[][] = Array.from({ length: x.length + 1 }, (_, i) => [i, ...Array(y.length).fill(0)])
-  for (let j = 0; j <= y.length; j++) d[0][j] = j
-  for (let i = 1; i <= x.length; i++) for (let j = 1; j <= y.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1))
-  return d[x.length][y.length]
-}
-/** Conflito de TEXTO entre dois valores quase iguais: não se decide sozinho — vai para a lista de ambíguos. */
-export function conflitoQuaseIgual(campo: CampoSincronizavel, arvore: string | null, registro: string): string | null {
-  if (campo.tipo !== "texto" || arvore == null || campo.origem === "estado_registro" || campo.origem === "livro" || campo.origem === "folha" || campo.origem === "termo") return null
-  const base = (v: string) => v.replace(/\s*\([^)]*\)\s*$/, "")
-  const dist = distanciaDeTexto(base(arvore), base(registro))
-  return dist > 0 && dist <= 2 && Math.min(base(arvore).length, base(registro).length) >= 5 ? `«${arvore}» × «${registro}»: textos quase iguais (possível erro de digitação de um dos lados)` : null
 }
