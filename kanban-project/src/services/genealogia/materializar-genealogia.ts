@@ -16,6 +16,7 @@
 // a segunda criava o Documento. Nasce vazio (rascunho, sem cartório/livro/folha) —
 // ver `documentoTemDadosPreenchidos` para distinguir rascunho de dado real.
 
+import { slaDoPassoDaNecessidade } from "@/lib/operacional/prazo-por-pais"
 import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
 import { reabrirGenealogiaParaNecessidadeTardiaTx, reconciliarGenealogiaEEmissaoTx } from "@/src/services/genealogia/trava-emissao-por-genealogia"
 import { prisma } from "@/lib/prisma"
@@ -506,7 +507,9 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
                 // default do modelo, e nada o lê para decidir tarefa.
                 obrigatorio: ap.obrigatoriedade === "OBRIGATORIA", ciclo: instancia.ciclo,
                 status: "DISPONIVEL", necessidadeId: necessidade.id, documentoId,
-                papel: "equipe_documental", slaDays: slaDaysLocalizarRegistro,
+                papel: "equipe_documental",
+                // PRAZO POR PAÍS DO REGISTRO (cadastro `RegraTemporalPais`) — o único decisor é `slaDoPassoDaNecessidade`.
+                slaDays: (await slaDoPassoDaNecessidade(db, { stepKey: STEP_LOCALIZAR, necessidadeId: necessidade.id, slaDoPasso: slaDaysLocalizarRegistro })).slaDays,
                 chaveIdempotencia: chave,
                 snapshot: { stepKey: STEP_LOCALIZAR, label: labelLocalizarRegistro, requisito: snapshot } as Prisma.InputJsonValue,
                 snapshotSchemaVersion: 1,

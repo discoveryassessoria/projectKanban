@@ -6,6 +6,7 @@
 // Idempotente (chaves determinísticas). Snapshot imutável/versionado. Transação única.
 // NÃO cria Tarefa, NÃO sincroniza, NÃO avança fase, NÃO toca legado.
 
+import { slaDoPassoDaNecessidade } from "@/lib/operacional/prazo-por-pais"
 import { DOCUMENTO_STATUS_NOT_IN_INATIVOS } from "@/src/lib/documentos/status-inativos"
 import { PESSOA_ATIVA } from "@/src/lib/genealogia/vinculo-ativo"
 import { randomUUID } from "crypto"
@@ -633,7 +634,8 @@ async function materializarAlvos(
           : undefined,
         prioridade: a.def.priority,
         papel: a.def.owner ?? null,
-        slaDays: a.def.slaDays,
+        // PRAZO POR PAÍS DO REGISTRO (cadastro `RegraTemporalPais`): o único decisor é `slaDoPassoDaNecessidade`.
+        slaDays: (await slaDoPassoDaNecessidade(tx, { stepKey: a.def.key, necessidadeId: a.necessidadeId, slaDoPasso: a.def.slaDays })).slaDays,
         // ENTIDADE DO ESCOPO — persistida na instância, não deduzida depois.
         pessoaId: a.pessoaId,
         necessidadeId: a.necessidadeId,
@@ -1169,7 +1171,7 @@ export async function reconciliarNovaVersaoNaInstanciaAtual(
   // conta própria (ver `materializarAlvos`, bloco REENTRADA).
   const materializados = await prisma.phaseWorkflowStepInstance.findMany({
     where: { workflowInstanceId: instancia.id, ciclo: instancia.ciclo, status: { notIn: ["SUPERSEDIDO", "CANCELADO", "CONCLUIDO", "DISPENSADO"] } },
-    select: { id: true, stepKey: true, startedAt: true },
+    select: { id: true, stepKey: true, startedAt: true, necessidadeId: true },
   })
   const materializadoPorChave = new Map(materializados.map((m) => [m.stepKey, m]))
 
@@ -1225,8 +1227,12 @@ export async function reconciliarNovaVersaoNaInstanciaAtual(
     }
 
     // SLA — sempre tratado à parte (nunca bloqueia por si só).
-    if (antes.slaDays !== depois.slaDays) {
-      slaMudancas.push({ stepInstanceId: mat.id, stepKey: key, slaAntigo: antes.slaDays, slaNovo: depois.slaDays })
+    // O SLA EFETIVO (com a regra do país do registro), nunca o do passo cru: uma certidão do Brasil com 1 dia não pode voltar a
+    // 30 só porque o prazo padrão do passo foi republicado, e republicar sem mexer no prazo não pode «mudar» o prazo dela.
+    const slaAntigoEfetivo = (await slaDoPassoDaNecessidade(prisma, { stepKey: key, necessidadeId: mat.necessidadeId, slaDoPasso: antes.slaDays })).slaDays
+    const slaNovoEfetivo = (await slaDoPassoDaNecessidade(prisma, { stepKey: key, necessidadeId: mat.necessidadeId, slaDoPasso: depois.slaDays })).slaDays
+    if (slaAntigoEfetivo !== slaNovoEfetivo) {
+      slaMudancas.push({ stepInstanceId: mat.id, stepKey: key, slaAntigo: slaAntigoEfetivo, slaNovo: slaNovoEfetivo })
     }
 
     // SUBTAREFAS — cada chave é avaliada por si.
