@@ -86,19 +86,22 @@ ok("radar==='noorg' segue a mesma lista de precisaDeOrgaoEmissor", linhasDoRadar
 secao("B3 — aba Famílias: o número é o de famílias LISTADAS")
 const aberA = L({ taskId: 1, familiaNome: "Antão" })
 const feitoC = L({ taskId: 2, familiaNome: "Cibils", processoNome: "Cibils", estadoOperacao: "CONCLUIDA", statusTarefa: "CONCLUIDO_RECEBIDO", faseAtualDoProcessoLabel: "Emissão documental", faseMacroKey: "genealogia" })
-const nomes = familiasDaAba([aberA], [feitoC])
-ok("Antão (aberta) + Cibils (só concluída recente) → 2 famílias", nomes.length === 2 && nomes[0] === "Antão" && nomes[1] === "Cibils")
-ok("sem duplicar: mesma família aberta e concluída → 1", familiasDaAba([aberA], [L({ taskId: 9, familiaNome: "Antão" })]).length === 1)
+const nomes = familiasDaAba([aberA])
+ok("Antão (aberta) lista; Cibils (SÓ concluída recente) NÃO entra — decisão do Marco 08/10/2026", nomes.length === 1 && nomes[0] === "Antão" && familiasDaAba([aberA, feitoC].filter((l) => l.estadoOperacao !== "CONCLUIDA")).length === 1)
+ok("sem duplicar: mesma família aberta e concluída → 1", familiasDaAba([aberA, L({ taskId: 9, familiaNome: "Antão" })]).length === 1)
 ok("sem família cadastrada cai no nome do processo", chaveDaFamilia({ familiaNome: null, processoNome: "Proc 7" }) === "Proc 7")
 const htmlFam = renderToStaticMarkup(createElement(AbaFamilias, { abertos: [aberA], feito: [feitoC], famOpen: null, setFamOpen: nada, famUltimo: {}, setFamUltimo: nada, onAbrir: nada, onAbrirProcesso: nada }))
+ok("renderizado: família só com tarefa concluída (Cibils) NÃO aparece na aba", !htmlFam.includes("Cibils"))
 const nCards = (htmlFam.match(/Gargalo:/g) ?? []).length
 ok("renderizado: nº de famílias na aba = familiasDaAba().length", nCards === nomes.length, `${nCards}`)
-ok("a tela da aba usa a MESMA função para o número", /familiasDaAba\(abertosVisiveis, feitoVisivel\)\.length/.test(v3) && /familiasDaAba\(abertos, feito\)/.test(abas))
+ok("a tela da aba usa a MESMA função para o número", /familiasDaAba\(abertosVisiveis\)\.length/.test(v3) && /familiasDaAba\(abertos\)/.test(abas))
 
 secao("B4 — fase da família = fase ATUAL REAL do processo (não a da tarefa)")
 ok("Cibils: tarefa em 'genealogia' mas processo em Emissão documental → 'Emissão documental'", faseAtualDaFamilia([feitoC]) === "Emissão documental")
 ok("sem rótulo em nenhuma linha → '—' (nunca a chave crua)", faseAtualDaFamilia([L({ faseAtualDoProcessoLabel: null })]) === "—")
-ok("renderizado: o selo da família mostra 'Emissão documental' e nunca 'genealogia'", htmlFam.includes("Emissão documental") && !/>genealogia</.test(htmlFam))
+const abertaCibils = L({ taskId: 3, familiaNome: "Cibils", processoNome: "Cibils", faseAtualDoProcessoLabel: "Emissão documental", faseMacroKey: "genealogia" })
+const htmlCibils = renderToStaticMarkup(createElement(AbaFamilias, { abertos: [abertaCibils], feito: [feitoC], famOpen: null, setFamOpen: nada, famUltimo: {}, setFamUltimo: nada, onAbrir: nada, onAbrirProcesso: nada }))
+ok("renderizado: o selo da família mostra 'Emissão documental' e nunca 'genealogia'", htmlCibils.includes("Emissão documental") && !/>genealogia</.test(htmlCibils))
 ok("a aba não lê mais faseMacroKey para o selo", !/ts\[0\]\?\.faseMacroKey/.test(abas))
 
 // ── B5 ───────────────────────────────────────────────────────────────────────

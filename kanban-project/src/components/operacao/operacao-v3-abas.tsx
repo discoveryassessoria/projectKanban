@@ -272,7 +272,7 @@ export function AbaFamilias({
   // (`faseAtualDoProcessoLabel`), gargalo = a MESMA `precisaDeOrgaoEmissor` do cartão do Radar, marco = próxima fase
   // do caminho do processo (só quando a linha a traz).
   const familias = useMemo(() => {
-    return familiasDaAba(abertos, feito).map((nome) => {
+    return familiasDaAba(abertos).map((nome) => {
       const ts = todas.filter((l) => chaveDaFamilia(l) === nome)
       const abertosDaFam = abertos.filter((l) => chaveDaFamilia(l) === nome)
       return {
