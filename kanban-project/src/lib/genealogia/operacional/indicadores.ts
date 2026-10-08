@@ -91,9 +91,9 @@ export function consolidarDocumental(
   }
   const resolvidas = documental.atendidas + documental.dispensadas
   documental.progresso =
-    documental.necessarias > 0 ? Math.round((resolvidas / documental.necessarias) * 100) : null
+    documental.necessarias > 0 && documental.dispensadas < documental.necessarias ? Math.round((resolvidas / documental.necessarias) * 100) : null
   documental.situacao =
-    documental.necessarias === 0
+    documental.necessarias === 0 || documental.dispensadas >= documental.necessarias
       ? "sem_exigencia"
       : documental.naoLocalizadas > 0
         ? "bloqueado"
