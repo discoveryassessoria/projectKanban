@@ -3,6 +3,7 @@
 // a RÉGUA de cobrança de cada órgão (só o que o Gerenciamento cadastrou — nunca "tempo aprendido"), os Contatos do órgão,
 // o "Tempo médio real por fase" e o "Backlog". Fica ABAIXO da lista por pedido, sem mexer na estrutura do protótipo.
 // NÃO há aqui "sem resposta (dias)" nem "não localizada" por órgão, nem ranking/média comparando cartórios.
+import { ordenarPelaOrdemReal } from "@/lib/operacional/torre-fases"
 import { useEffect, useState } from "react"
 import { ddmmHora } from "@/lib/operacional/terceiros-pedidos"
 import { labelDaFasePorPhaseKey } from "@/src/lib/process-stage/fases-catalog"
@@ -75,7 +76,7 @@ export function TerceirosRegua({ versao }: { versao: number }) {
         {fases?.length === 0 && <div className="small mt-1">Sem fase concluída no log de transição ainda — nada a mostrar.</div>}
         {fases && fases.length > 0 && (
           <ul className="mt-2 space-y-1">
-            {fases.map((f) => <li key={f.fase} className="text-[13px]"><b>{labelDaFasePorPhaseKey(f.fase) ?? humanizar(f.fase)}</b> · {String(f.mediaDias).replace(".", ",")} dias <span className="small">(n={f.amostras})</span></li>)}
+            {ordenarPelaOrdemReal(fases, (f) => f.fase).map((f) => <li key={f.fase} className="text-[13px]"><b>{labelDaFasePorPhaseKey(f.fase) ?? humanizar(f.fase)}</b> · {String(f.mediaDias).replace(".", ",")} dias <span className="small">(n={f.amostras})</span></li>)}
           </ul>
         )}
         <div className="small mt-2">Só permanências completas (entrada e saída registradas no log de transição); fase ainda em curso não entra na média.</div>

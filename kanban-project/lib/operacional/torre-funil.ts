@@ -14,6 +14,7 @@
 //     pausados nem os em "Aguardando fechamento" (fora da Torre, filtro canônico `processo-pre-contrato.ts`);
 //   · "AGUARDANDO FECHAMENTO: N" — a linha PRÓPRIA (geral e por país), FORA do total e da barra de risco.
 // ============================================================================
+import { ehFaseTerminal } from './torre-fases'
 import { prisma } from '@/lib/prisma'
 import { FASES, phaseKeyToFaseCode } from '@/src/lib/process-stage/fases-catalog'
 import { fasesDoRadar } from './torre-processos'
@@ -29,13 +30,8 @@ import {
 
 // `inicioDaSemana` mora em torre-tendencias.ts (a MESMA de `tendenciasDaTorre`, para "abre/fecha" nunca divergir).
 
-const ORDEM_DA_ULTIMA_FASE = Math.max(...Object.values(FASES).map((f) => f.ordem))
-
-/** A fase é TERMINAL no catálogo (a de maior ordem; Análise tem `next: null` por ramificar, mas não é o fim)? O processo que chega nela deixa de ser ativo — não é etapa do funil. */
-export const faseTerminal = (phaseKey: string): boolean => {
-  const code = phaseKeyToFaseCode(phaseKey)
-  return code != null && FASES[code].ordem === ORDEM_DA_ULTIMA_FASE
-}
+/** A fase é TERMINAL (Finalizado)? O processo que chega nela deixa de ser ativo — não é etapa do funil. A regra é a da lista única de fases (`torre-fases.ts`). */
+export const faseTerminal = (phaseKey: string): boolean => ehFaseTerminal(phaseKey)
 
 /** A chave da fase "Protocolado" no catálogo em código (nunca literal solto na regra). */
 export const FASE_PROTOCOLADA: string = FASES.PROTOCOLADO.phaseKey

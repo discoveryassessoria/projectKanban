@@ -15,6 +15,7 @@
 // O "progresso" (certidões prontas "a de b") é a FONTE ÚNICA `documentacaoRequeridaDoProcesso` — pesada por processo —, por isso NÃO
 // vai nesta lista leve: a tela pede só o das linhas da página (`certidoesDosProcessos`).
 // ============================================================================
+import { lerFasesDaTorre } from './torre-fases-leitura'
 import { VINCULO_PROCESSO_ATIVO } from '@/src/lib/genealogia/vinculo-ativo'
 import { prisma } from '@/lib/prisma'
 import { achadosVigentesDaParede } from '@/lib/saude/parede-a-frente'
@@ -149,44 +150,28 @@ export function bolaDoProcesso(linhas: Array<Pick<LinhaDaTorre, 'estadoOperacao'
 }
 
 /**
- * As fases ATIVAS do cadastro, na ordem padrão (todas — a poda das terminais é `colunasDoRadar`). SEM "Aguardando fechamento"
- * (`a_iniciar`): o processo nela está FORA do Radar/Processos/funil, então ela não é coluna nem botão de fase (o funil mostra o
- * contador dela numa linha PRÓPRIA, fora do total — `contarAguardandoFechamento`).
+ * AS FASES DA TORRE — a LISTA ÚNICA (`torre-fases.ts`, 07/10/2026): ordem real do processo (Genealogia → … → Protocolado), sem a antessala «Aguardando fechamento» (`a_iniciar`, fora
+ * do Radar/Processos/funil — o funil mostra o contador dela numa linha PRÓPRIA) e sem a terminal «Finalizado». Visão geral, Radar, Processos, Tarefas, Terceiros, Kanban e o
+ * rodapé «As 5 palavras» leem desta mesma lista.
  */
 export async function fasesDoRadar(): Promise<ColunaDoRadar[]> {
-  const fases = await prisma.catalogoFase.findMany({ where: { ativo: true, phaseKey: { not: PHASEKEY_A_INICIAR } }, orderBy: [{ ordemPadrao: 'asc' }, { id: 'asc' }], select: { phaseKey: true, label: true, conditionalPadrao: true } })
-  return fases.map((f) => ({ key: f.phaseKey, label: f.label, condicional: f.conditionalPadrao }))
+  const fases = await lerFasesDaTorre()
+  return fases.map((f) => ({ key: f.key, label: f.label, condicional: f.condicional }))
 }
 
 /**
- * AS COLUNAS DO RADAR = as fases do cadastro MENOS as TERMINAIS: a fase que é a última de TODO macrofluxo em que aparece e onde
- * nenhum processo ativo está (processo que chega lá está concluído — não é "ativo", então a coluna só teria "—"). Nunca poda
- * uma coluna onde há processo ativo. Pura.
+ * AS COLUNAS DO RADAR = a lista única de fases, sem poda. (Antes cada aba podava a sua — «terminal em todo macro», «sem processo ativo» — e as listas divergiam: 9 × 10 fases.)
+ * Pura; mantém a assinatura por compatibilidade.
  */
 export function colunasDoRadar(
-  todas: ColunaDoRadar[], ordensPorTipo: ReadonlyMap<number, ReadonlyMap<string, number>>, fasesComProcessoAtivo: ReadonlySet<string>,
+  todas: ColunaDoRadar[], _ordensPorTipo?: ReadonlyMap<number, ReadonlyMap<string, number>>, _fasesComProcessoAtivo?: ReadonlySet<string>,
 ): ColunaDoRadar[] {
-  return todas.filter((c) => {
-    if (fasesComProcessoAtivo.has(c.key)) return true
-    const ordens = [...ordensPorTipo.values()].filter((o) => o.has(c.key))
-    if (ordens.length === 0) return true // fase que nenhum macrofluxo usa: não é "terminal", segue o cadastro
-    return !ordens.every((o) => o.get(c.key) === Math.max(...o.values()))
-  })
+  return todas
 }
 
-/**
- * AS COLUNAS DO RADAR / BOTÕES DE FASE de hoje — a MESMA poda de `processosDaTorre`, em 3 consultas pequenas (sem ler tarefas), para
- * quem só precisa da lista de fases (os botões da aba Processos).
- */
+/** AS COLUNAS DO RADAR / BOTÕES DE FASE de hoje — a MESMA lista única. */
 export async function colunasVisiveisDaTorre(): Promise<ColunaDoRadar[]> {
-  const [todas, ativos, tiposEmUso] = await Promise.all([
-    fasesDoRadar(),
-    prisma.processo.groupBy({ by: ['faseAtualKey'], where: ONDE_PROCESSO_ATIVO_DA_TORRE }),
-    prisma.processo.groupBy({ by: ['tipoProcessoMotorId'], where: ONDE_PROCESSO_ATIVO_DA_TORRE }),
-  ])
-  const tipos = tiposEmUso.map((t) => t.tipoProcessoMotorId).filter((x): x is number => x != null)
-  const ordens = await Promise.all(tipos.map((t) => ordensDeFase(t)))
-  return colunasDoRadar(todas, new Map(tipos.map((t, i) => [t, ordens[i]] as const)), new Set(ativos.map((a) => a.faseAtualKey).filter((x): x is string => x != null)))
+  return fasesDoRadar()
 }
 
 async function fasesSemPassos(agora: Date): Promise<Set<string>> {

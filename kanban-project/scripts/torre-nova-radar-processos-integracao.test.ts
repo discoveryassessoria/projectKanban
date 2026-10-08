@@ -58,9 +58,9 @@ async function main() {
   const todas = ["genealogia", "emissao", "analise", "finalizado", "livre"].map((key) => ({ key, label: key, condicional: false }))
   const mapa = (...pares: Array<[number, Array<[string, number]>]>) => new Map(pares.map(([t, ps]) => [t, new Map(ps)] as const))
   const um = mapa([1, [["genealogia", 1], ["emissao", 2], ["analise", 3], ["finalizado", 4]]])
-  ok("a última fase do macrofluxo sem processo ativo nela não é coluna; a que nenhum macrofluxo usa fica", colunasDoRadar(todas, um, new Set()).map((c) => c.key).join() === "genealogia,emissao,analise,livre")
+  ok("SEM PODA por aba (07/10/2026): as colunas são a lista única de fases — o terminal já não está nela (ehFaseTerminal)", colunasDoRadar(todas, um, new Set()).map((c) => c.key).join() === "genealogia,emissao,analise,finalizado,livre")
   ok("…mas se há processo ativo nela, a coluna fica (nunca poda onde há trabalho)", colunasDoRadar(todas, um, new Set(["finalizado"])).map((c) => c.key).join() === "genealogia,emissao,analise,finalizado,livre")
-  ok("fase que é a última de um macrofluxo mas intermediária de outro NÃO é terminal", colunasDoRadar(todas, mapa([1, [["genealogia", 1], ["emissao", 2]]], [2, [["genealogia", 1], ["emissao", 2], ["analise", 3]]]), new Set()).some((c) => c.key === "emissao"))
+  ok("a fase que é a última de um macrofluxo continua coluna (nenhuma poda por aba)", colunasDoRadar(todas, mapa([1, [["genealogia", 1], ["emissao", 2]]], [2, [["genealogia", 1], ["emissao", 2], ["analise", 3]]]), new Set()).some((c) => c.key === "emissao"))
 
   secao("PURO — a semana começa na segunda-feira, 00:00 em São Paulo")
   const seg = janelaDoDiaOperacionalDe("2026-09-28").inicio.toISOString()
