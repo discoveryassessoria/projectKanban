@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 import { autorizarAbertura } from "@/src/lib/anexos/porta"
 import { urlAssinadaDoAnexo } from "@/src/lib/anexos/storage"
+import { mimeDoAnexo } from "@/src/lib/anexos/mime"
 import { prisma } from "@/lib/prisma"
 
 export const dynamic = "force-dynamic"
@@ -22,7 +23,8 @@ export async function POST(req: NextRequest) {
 
   const chave = body.chave as string
   const nome = typeof body.nome === "string" && body.nome.trim() ? body.nome.trim() : chave.split("/").pop() ?? "arquivo"
-  const mime = typeof body.mime === "string" && body.mime.trim() ? body.mime.trim() : "application/octet-stream"
+  // Sem tipo informado, o tipo sai da extensão: «genérico» faz o navegador BAIXAR em vez de mostrar (ver `src/lib/anexos/mime.ts`).
+  const mime = mimeDoAnexo({ mime: typeof body.mime === "string" ? body.mime : null, nome: typeof body.nome === "string" ? body.nome : null, chave })
   try {
     const r = await urlAssinadaDoAnexo(chave, nome, mime, body.baixar === true)
     // Quem ABRIU (clique) o quê, sem o endereço assinado (que é a credencial): só a chave e o domínio. Miniatura/pré-visualização não audita
