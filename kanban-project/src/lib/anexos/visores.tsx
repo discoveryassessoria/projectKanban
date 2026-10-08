@@ -11,16 +11,16 @@ const Espera = ({ className, erro }: { className?: string; erro: string | null }
   </div>
 )
 
-type PropsImg = Omit<ImgHTMLAttributes<HTMLImageElement>, "src"> & { valor: string | null | undefined }
-export function ImagemDeAnexo({ valor, alt, ...resto }: PropsImg) {
-  const { url, erro } = useUrlDeAnexo(valor)
+type PropsImg = Omit<ImgHTMLAttributes<HTMLImageElement>, "src"> & { valor: string | null | undefined; nome?: string; mime?: string }
+export function ImagemDeAnexo({ valor, alt, nome, mime, ...resto }: PropsImg) {
+  const { url, erro } = useUrlDeAnexo(valor, { nome, mime })
   if (!url) return <Espera className={resto.className} erro={erro} />
   return <img {...resto} src={url} alt={alt ?? ""} />
 }
 
-type PropsIframe = Omit<IframeHTMLAttributes<HTMLIFrameElement>, "src"> & { valor: string | null | undefined }
-export function IframeDeAnexo({ valor, title, ...resto }: PropsIframe) {
-  const { url, erro } = useUrlDeAnexo(valor)
+type PropsIframe = Omit<IframeHTMLAttributes<HTMLIFrameElement>, "src"> & { valor: string | null | undefined; nome?: string; mime?: string }
+export function IframeDeAnexo({ valor, title, nome, mime, ...resto }: PropsIframe) {
+  const { url, erro } = useUrlDeAnexo(valor, { nome, mime })
   if (!url) return <Espera className={resto.className} erro={erro} />
   return <iframe {...resto} src={url} title={title} />
 }
