@@ -13,6 +13,7 @@
 //   g  A certidão só entra em Feito com os 4 passos concluídos.
 //   i  Contadores batem: sem responsável + com cada pessoa = abertas (cabeçalho × tabela × Caminho).
 //   l  Certidão recebida/validada SÓ com o passo da Emissão correspondente concluído (Localizar registro na Genealogia nunca recebe nem valida).
+//   n  As abas da Torre dizem a MESMA coisa (responsável, fases, risco, contagens): cada dado vem de UMA função no servidor (`torre-coerencia-abas.ts`).
 //   m  Local do óbito: a cidade/estado da certidão de óbito LOCALIZADA e a árvore (Pessoa.local_obito/estado_obito) dizem o mesmo lugar.
 //   j  Fluxo do recebimento: nenhuma subtarefa da Emissão concluída fora de ordem, e nenhuma gravada «Disponível» enquanto depende de outra.
 //
@@ -26,7 +27,7 @@ import { mesmoLugar } from '@/src/lib/genealogia/sincronizacao-registral'
 import { compararCertidoesDaFamilia } from '@/lib/operacional/ordem-certidoes'
 import { SUBTAREFA_PEDIDO_ENVIADO, SUBTAREFA_CONFIRMACAO, SUBTAREFA_CERTIDAO_RECEBIDA, SUBTAREFA_CONFERENCIA } from '@/lib/operacional/emissao-recebimento'
 
-export type RegraDoMarco = 'a' | 'c' | 'e' | 'f' | 'g' | 'i' | 'j' | 'l' | 'm'
+export type RegraDoMarco = 'a' | 'c' | 'e' | 'f' | 'g' | 'i' | 'j' | 'l' | 'm' | 'n'
 
 /** O detalhe do processo lido UMA vez por rodada (as regras e, i e o script leem o mesmo). */
 type Detalhe = Awaited<ReturnType<typeof import('@/lib/operacional/torre-foco')['detalheDoProcesso']>>
@@ -58,6 +59,7 @@ export const TITULO_DA_REGRA: Record<RegraDoMarco, string> = {
   i: 'Contadores que não batem',
   j: 'Subtarefa da Emissão fora de ordem ou com selo «Disponível» sendo que depende de outra',
   m: 'Local do óbito da certidão diferente (ou ausente) na árvore',
+  n: 'Abas da Torre dizendo coisas diferentes (responsável, fases, risco ou contagens)',
   l: 'Certidão recebida/validada sem o passo de recebimento/validação da Emissão concluído',
 }
 
@@ -388,13 +390,20 @@ export async function detectarRegraM(): Promise<ViolacaoDoMarco[]> {
   }
 }
 
+// ── n ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+export async function detectarRegraN(): Promise<ViolacaoDoMarco[]> {
+  const { compararAbasDaTorre } = await import('@/lib/operacional/torre-coerencia-abas')
+  const divs = await compararAbasDaTorre()
+  return divs.map((d, i) => ({ regra: 'n' as const, processoId: null, familia: '—', certidao: null, pessoa: d.chave, detalhe: `[${d.assunto}] ${d.abas}: ${d.detalhe}`, entidade: 'Torre', registroId: i + 1 }))
+}
+
 export async function detectarRegrasDoMarco(opts: { profundo?: boolean } = {}): Promise<{ violacoes: ViolacaoDoMarco[]; porRegra: Record<RegraDoMarco, number> }> {
   limparMemoDeDetalhes()
   const todas = [
     ...(await detectarRegraA()), ...(await detectarRegraC()), ...(await detectarRegraE(opts)),
-    ...(await detectarRegraF()), ...(await detectarRegraG()), ...(opts.profundo ? await detectarRegraI() : []), ...(await detectarRegraJ()), ...(await detectarRegraL()), ...(await detectarRegraM()),
+    ...(await detectarRegraF()), ...(await detectarRegraG()), ...(opts.profundo ? await detectarRegraI() : []), ...(await detectarRegraJ()), ...(await detectarRegraL()), ...(await detectarRegraM()), ...(await detectarRegraN()),
   ]
-  const porRegra = { a: 0, c: 0, e: 0, f: 0, g: 0, i: 0, j: 0, l: 0, m: 0 } as Record<RegraDoMarco, number>
+  const porRegra = { a: 0, c: 0, e: 0, f: 0, g: 0, i: 0, j: 0, l: 0, m: 0, n: 0 } as Record<RegraDoMarco, number>
   for (const v of todas) porRegra[v.regra]++
   return { violacoes: todas, porRegra }
 }

@@ -27,6 +27,7 @@ const AGORA = new Date("2026-10-01T15:00:00Z") // 12:00 em São Paulo
 const prazoEm = (d: number) => new Date(AGORA.getTime() + d * 86_400_000).toISOString()
 const acao = (texto: string, resp: string | null, dias: number | null) => ({
   texto, tipo: "executar" as const, urgencia: null, tarefaId: 1, responsavelId: resp ? 1 : null, responsavelNome: resp, dataPrazo: dias == null ? null : prazoEm(dias), quantas: 1,
+  responsaveis: resp ? { donos: [{ id: 1, nome: resp, n: 1 }], semDono: 0, abertas: 1, texto: resp } : { donos: [], semDono: 1, abertas: 1, texto: "Sem responsável" },
   prazo: prazoCurto(dias == null ? null : prazoEm(dias), AGORA),
 })
 const d = (n: number) => ({ desde: "2026-09-01T12:00:00.000Z", origem: "AVANCO_DE_FASE", dias: n, horas: n * 24 })
