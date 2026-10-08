@@ -1586,7 +1586,7 @@ export async function controlarOperacaoV2(
       // solicitar/receber/validar certidão pelo documentoId — achado real: Antonio,
       // óbito, continuava pedindo depois de cancelado na fase anterior).
       if (docAlvo?.necessidadeId != null) {
-        await dispensarNecessidade(docAlvo.necessidadeId, obs || "Operação cancelada", tx, true)
+        await dispensarNecessidade(docAlvo.necessidadeId, obs || "Operação cancelada", tx, true, { usuarioId: ctx?.usuarioId ?? null, origem: "cancelamento da operação do documento" })
       }
       // ANDAMENTO — evento imutável de cancelamento, exatamente UM por operação
       // cancelada de verdade (a trava de idempotência acima garante isso — nunca

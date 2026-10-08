@@ -467,6 +467,15 @@ function atomosDoLog(l: Extract<LinhaCrua, { fonte: 'LOG' }>, ctx: ContextoDoHis
       a.pessoaId = n?.pessoaId ?? a.pessoaId
       return [a]
     }
+    case 'NECESSIDADE_DISPENSADA': {
+      // 08/10/2026: toda dispensa grava QUEM fez. A dispensa que vem de uma mudança na árvore já aparece como «deixou de ser exigida» (NECESSIDADE_REMOVIDA_PELA_ARVORE) —
+      // aqui entra só a dispensa MANUAL (tela da necessidade, cancelamento da operação do documento), com o autor.
+      if (d.manual !== true) return []
+      const n = l.entidadeId != null ? ctx.necessidades[l.entidadeId] : undefined
+      const a = novoAtomo(ctx, { ...origem, rank: 2, tipo: 'ARVORE', subtipo: 'exigencia_removida', verbo: 'dispensou a exigência:', motivo: txt(d.motivo) }, { necessidadeId: l.entidadeId })
+      a.objeto = n?.rotulo ?? null
+      return [a]
+    }
     case 'NECESSIDADE_ATENDIDA_SEM_CAUSA_CONSOLIDADO': {
       // AÇÃO DO SISTEMA (nunca de uma pessoa): "restaurou a lista de certidões exigidas de X (óbito) — remoção não intencional; N avisos consolidados".
       const texto = txt(d.textoDoSistema)

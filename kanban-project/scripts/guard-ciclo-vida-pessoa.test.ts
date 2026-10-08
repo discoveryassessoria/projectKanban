@@ -107,6 +107,8 @@ const ALVOS: Alvo[] = [
  * regra "tudo em scripts/ pode".
  */
 const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
+  "scripts/dispensa-sempre-com-autor.test.ts":
+    "dispensa sempre com autor: monta e derruba as PRÓPRIAS pessoas, união e necessidades (marca DISPAUT) só no banco de teste — o teste precisa de necessidades reais para provar o histórico de cada caminho de dispensa",
   "scripts/casamento-dono-unico.test.ts":
     "dono único da certidão de casamento: monta e derruba a PRÓPRIA árvore, pessoas, união, necessidade e documentos (marca CASDONO) só no banco de teste — o reapontamento precisa de dados reais para provar que muda só o titular",
   "scripts/vinculo-requerente-servico-unico.test.ts":

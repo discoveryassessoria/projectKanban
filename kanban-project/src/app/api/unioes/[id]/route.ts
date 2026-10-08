@@ -166,7 +166,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       arvoreId: antes.pessoa1?.arvoreId ?? antes.pessoa2?.arvoreId ?? null, autorId,
       motivo: () => "união desfeita (pessoa deixou de ser casada)",
       fn: async (tx) => {
-        const r = await removerNecessidadesDaUniao(id, tx, "necessidade removida pela árvore: união desfeita (pessoa deixou de ser casada)")
+        const r = await removerNecessidadesDaUniao(id, tx, "necessidade removida pela árvore: união desfeita (pessoa deixou de ser casada)", { usuarioId: autorId, origem: "união desfeita na árvore" })
         if (r.bloqueadas.length > 0) throw new UniaoComFatoError(r.bloqueadas)
         await tx.uniao.delete({ where: { id } })
         return r
