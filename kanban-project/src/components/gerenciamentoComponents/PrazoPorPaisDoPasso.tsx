@@ -8,6 +8,12 @@
 // ============================================================================
 import { useEffect, useState } from "react"
 
+// As rotas de Gerenciamento exigem o token; é o mesmo cabeçalho que as outras abas já mandam.
+function authHeaders(): HeadersInit {
+  const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
+  return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
+}
+
 interface Regra { id: number; paisNome: string; slaDays: number; ativo: boolean }
 
 const inp = "w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] px-2.5 py-1.5 text-[12.5px] text-[var(--text-primary)]"
@@ -25,7 +31,7 @@ export default function PrazoPorPaisDoPasso({ stepKey, prazoPadrao }: { stepKey:
   const [rodada, setRodada] = useState(0)
   useEffect(() => {
     let vivo = true
-    fetch(`/api/gerenciamento/prazo-por-pais?stepKey=${encodeURIComponent(stepKey)}`, { cache: "no-store" })
+    fetch(`/api/gerenciamento/prazo-por-pais?stepKey=${encodeURIComponent(stepKey)}`, { cache: "no-store", headers: authHeaders() })
       .then(async (r) => ({ ok: r.ok, j: await r.json().catch(() => ({})) }))
       .then(({ ok, j }) => {
         if (!vivo) return
@@ -40,7 +46,7 @@ export default function PrazoPorPaisDoPasso({ stepKey, prazoPadrao }: { stepKey:
   const salvar = async (paisNome: string, dias: number) => {
     setOcupado(true); setMsg("")
     try {
-      const r = await fetch("/api/gerenciamento/prazo-por-pais", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stepKey, paisNome, slaDays: dias }) })
+      const r = await fetch("/api/gerenciamento/prazo-por-pais", { method: "PUT", headers: authHeaders(), body: JSON.stringify({ stepKey, paisNome, slaDays: dias }) })
       const j = await r.json().catch(() => ({}))
       if (!r.ok) { setMsg(j.error ?? "Não foi possível salvar."); return false }
       setMsg(`Salvo: ${paisNome} = ${dias} dia(s).`); await carregar(); return true
@@ -49,7 +55,7 @@ export default function PrazoPorPaisDoPasso({ stepKey, prazoPadrao }: { stepKey:
   const remover = async (r: Regra) => {
     setOcupado(true); setMsg("")
     try {
-      const resp = await fetch(`/api/gerenciamento/prazo-por-pais?id=${r.id}`, { method: "DELETE" })
+      const resp = await fetch(`/api/gerenciamento/prazo-por-pais?id=${r.id}`, { method: "DELETE", headers: authHeaders() })
       const j = await resp.json().catch(() => ({}))
       if (!resp.ok) { setMsg(j.error ?? "Não foi possível remover."); return }
       setMsg(`Removido: ${r.paisNome} volta ao prazo do passo.`); await carregar()
