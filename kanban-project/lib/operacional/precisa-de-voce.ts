@@ -40,6 +40,7 @@ import { resolverMacroWorkflowDoProcesso } from '@/src/lib/motor/resolver-macro-
 import { proximaFaseDoCaminho } from '@/src/lib/motor/phase-advance-helpers'
 import { resolveWorkflowRuntime } from '@/src/lib/workflow-runtime'
 import { labelDaFasePorPhaseKey, FASES } from '@/src/lib/process-stage/fases-catalog'
+import { SUBTAREFAS_DE_RECEBIMENTO, SUBTAREFAS_DE_VALIDACAO } from './documento-estado'
 import {
   ROTULO_DO_TIPO, TIPOS_DO_PAINEL, ESCALAR_APOS_PADRAO, bloqueioPedeDecisao, certidoes, contagemPorTipo, diasDeCalendario,
   identidadeDaCertidao, planoDoSemDono, quantoMoverDaCarga, textosDaBloqueada, textosDaCarga, textosDaDivergencia, textosDaEscalada,
@@ -1069,7 +1070,11 @@ export async function decisoesDoDia(
 // ─── A RESPOSTA DO ENDPOINT, MONTADA EM UM LUGAR ────────────────────────────
 
 /** O que aconteceu ONTEM por país (rótulo do país; '' = sem país) — o texto do Briefing soma o que a tela está mostrando (Todos ou um país). */
-export interface OntemPorPais { fechadas: Record<string, number>; protocolados: Record<string, number> }
+/**
+ * `tarefasConcluidas` = TAREFAS (qualquer fase — «registro localizado» na Genealogia é tarefa concluída, não certidão em mãos); `recebidas` e `validadas` = CERTIDÕES
+ * (documentos distintos) cujo passo de recebimento / de conferência e validação foi concluído ontem — a mesma leitura de `etapaDaCertidao`.
+ */
+export interface OntemPorPais { tarefasConcluidas: Record<string, number>; recebidas: Record<string, number>; validadas: Record<string, number>; protocolados: Record<string, number> }
 
 export interface RespostaPrecisaDeVoce {
   itens: ItemPrecisaDeVoceTorre[]
@@ -1087,7 +1092,7 @@ export interface RespostaPrecisaDeVoce {
 async function ontemDoBriefing(agora: Date, db: Db): Promise<OntemPorPais> {
   const ontem = diaOperacional(new Date(agora.getTime() - 86_400_000))
   const janela = janelaDoDiaOperacionalDe(ontem)
-  const [fechadas, protocolados] = await Promise.all([
+  const [fechadas, protocolados, passosDeCertidao] = await Promise.all([
     db.tarefa.findMany({
       where: {
         statusTarefa: { in: ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI'] }, dataConclusao: { gte: janela.inicio, lt: janela.fim },
@@ -1102,6 +1107,14 @@ async function ontemDoBriefing(agora: Date, db: Db): Promise<OntemPorPais> {
       },
       select: { processoId: true, processo: { select: { paisCanonico: { select: { countryLabel: true } } } } },
     }),
+    db.subtaskExecution.findMany({
+      where: {
+        supersededAt: null, status: 'CONCLUIDO', completedAt: { gte: janela.inicio, lt: janela.fim },
+        subtaskKey: { in: [...SUBTAREFAS_DE_RECEBIMENTO, ...SUBTAREFAS_DE_VALIDACAO] },
+        stepInstance: { documentoId: { not: null }, processo: ONDE_PROCESSO_NA_TORRE },
+      },
+      select: { subtaskKey: true, stepInstance: { select: { documentoId: true, processo: { select: { paisCanonico: { select: { countryLabel: true } } } } } } },
+    }),
   ])
   const somar = (m: Record<string, number>, pais: string | null | undefined) => { const k = pais ?? ''; m[k] = (m[k] ?? 0) + 1 }
   const porFechadas: Record<string, number> = {}
@@ -1109,7 +1122,18 @@ async function ontemDoBriefing(agora: Date, db: Db): Promise<OntemPorPais> {
   const porProtocolados: Record<string, number> = {}
   const vistos = new Set<number>()
   for (const l of protocolados) { if (vistos.has(l.processoId)) continue; vistos.add(l.processoId); somar(porProtocolados, l.processo?.paisCanonico?.countryLabel) }
-  return { fechadas: porFechadas, protocolados: porProtocolados }
+  const porRecebidas: Record<string, number> = {}, porValidadas: Record<string, number> = {}
+  const docRec = new Set<number>(), docVal = new Set<number>()
+  for (const e of passosDeCertidao) {
+    const doc = e.stepInstance.documentoId
+    if (doc == null) continue
+    const recebimento = (SUBTAREFAS_DE_RECEBIMENTO as readonly string[]).includes(e.subtaskKey)
+    const vistos2 = recebimento ? docRec : docVal
+    if (vistos2.has(doc)) continue
+    vistos2.add(doc)
+    somar(recebimento ? porRecebidas : porValidadas, e.stepInstance.processo?.paisCanonico?.countryLabel)
+  }
+  return { tarefasConcluidas: porFechadas, recebidas: porRecebidas, validadas: porValidadas, protocolados: porProtocolados }
 }
 
 /**

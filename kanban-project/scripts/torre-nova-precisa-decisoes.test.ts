@@ -249,9 +249,9 @@ async function main() {
     ok("ordenada por score, maior primeiro", r.itens.every((it, i) => i === 0 || r.itens[i - 1].score >= it.score))
     const soma2 = (m: Record<string, number>) => Object.values(m).reduce((x, y) => x + y, 0)
     ok("a resposta traz o nome de quem lê e o que aconteceu ONTEM por país (o texto do Briefing é montado na tela, com os conjuntos dos cartões)",
-      r.nome === "Marco Rovatti" && !("briefing" in r) && typeof r.ontem.fechadas === "object" && typeof r.ontem.protocolados === "object")
-    const texto = briefingDoDia(r.itens, new Date(), { nome: r.nome, ativos: 5, noRitmo: 3, fechadasOntem: soma2(r.ontem.fechadas), protocoladosOntem: soma2(r.ontem.protocolados), vencemHoje: 1 })
-    ok("o Briefing saúda pelo nome e cita as decisões e os números do dia", /^(Bom dia|Boa tarde|Boa noite), Marco\./.test(texto) && /\d+ (decisões esperam|decisão espera) você/.test(texto) && /5 processos ativos, 3 no ritmo/.test(texto) && /Ontem a equipe fechou/.test(texto) && /Hoje vence 1 prazo/.test(texto), texto)
+      r.nome === "Marco Rovatti" && !("briefing" in r) && typeof r.ontem.tarefasConcluidas === "object" && typeof r.ontem.recebidas === "object" && typeof r.ontem.protocolados === "object")
+    const texto = briefingDoDia(r.itens, new Date(), { nome: r.nome, ativos: 5, noRitmo: 3, tarefasConcluidasOntem: soma2(r.ontem.tarefasConcluidas), certidoesRecebidasOntem: soma2(r.ontem.recebidas), certidoesValidadasOntem: soma2(r.ontem.validadas), protocoladosOntem: soma2(r.ontem.protocolados), vencemHoje: 1 })
+    ok("o Briefing saúda pelo nome e cita as decisões e os números do dia", /^(Bom dia|Boa tarde|Boa noite), Marco\./.test(texto) && /\d+ (decisões esperam|decisão espera) você/.test(texto) && /5 processos ativos, 3 no ritmo/.test(texto) && /Ontem a equipe concluiu/.test(texto) && /Hoje vence 1 prazo/.test(texto), texto)
     ok("o Briefing não inventa o que o sistema não mede (gargalo da semana)", !/Gargalo/i.test(texto))
     const itensTarefa = await itensPrecisaDeVoce({})
     ok("a leitura por TAREFA (Radar, regra r1) continua existindo: itens SEM_DONO por tarefa com tarefaId", itensTarefa.some((i) => i.tipo === "SEM_DONO" && i.tarefaId != null))
