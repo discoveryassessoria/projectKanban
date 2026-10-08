@@ -123,7 +123,7 @@ const proibidos = /ningu[ée]m|com o cart[óo]rio|sem dono"|'Sem dono'/i
 const achados = ARQUIVOS.filter((f) => proibidos.test(semComentarios(ler(f))))
 ok("nenhum 'ninguém', 'Com o cartório' ou 'Sem dono' visível nos arquivos da frente", achados.length === 0, achados.join(", "))
 const tela = ler("src/components/torre/TorrePrecisaDeVoce.tsx")
-ok("os textos exatos da seção: título, apoio e botão", /Precisa de você · \{todos\.length\}/.test(tela) && tela.includes("Itens que só o Marco pode decidir ou destravar.") && tela.includes("▶ Revisar uma por uma"))
+ok("os textos exatos da seção: título, apoio e botão", /Precisa de você · \{textoDasDecisoes\(contarDecisoes\(todos\)\)\}/.test(tela) && tela.includes("Itens que só o Marco pode decidir ou destravar.") && tela.includes("▶ Revisar uma por uma"))
 ok("as colunas: Família · Tipo · Fase · Tarefa · Quantidade · Ação (sem 'Sugestão do sistema' e sem 'O que está acontecendo')", tela.includes("<div>Família</div><div>Tipo</div><div>Fase</div><div>Tarefa</div><div>Quantidade</div><div>Ação</div>") && !tela.includes("Sugestão do sistema") && !tela.includes("O que está acontecendo") && !tela.includes("it.sugestao") && !tela.includes("it.detalhe"))
 ok("o rodapé com filtro e sem filtro", tela.includes('Mostrando só "${ROTULO_TIPO[tipo]}" · ordenadas do maior risco para o menor') && tela.includes("ordenadas do maior risco para o menor"))
 ok("a assinatura estável: embutido? e onRevisar? opcionais; itens/carregando/erro/irParaAba obrigatórios", /embutido\?: boolean/.test(tela) && /onRevisar\?: \(\) => void/.test(tela) && /itens: ItemPrecisa\[\] \| null\n\s+carregando: boolean\n\s+erro: string \| null\n\s+irParaAba/.test(tela))

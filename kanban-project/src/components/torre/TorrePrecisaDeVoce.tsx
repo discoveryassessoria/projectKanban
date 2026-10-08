@@ -11,6 +11,7 @@
 // O que a seção tem (inventário §1.2): título "Precisa de você · N" e o texto de apoio; "▶ Revisar uma por uma"; os 6 cartões-filtro por tipo
 // (número · nome · regra; clicar liga o filtro, clicar de novo desliga, um por vez); a tabela Família · Tipo · Fase · Tarefa · Quantidade ·
 // Ação (dois botões por linha; a família é link ao Detalhe do Processo; cada informação aparece uma vez); e o rodapé com a ordem e o "Desfazer".
+import { contarDecisoes, textoDasDecisoes } from "@/lib/operacional/torre-contagens"
 import { useMemo, useState } from "react"
 import Link from "next/link"
 import {
@@ -72,7 +73,7 @@ export function TorrePrecisaDeVoce({ itens, carregando, erro, irParaAba, embutid
   return (
     <div className="pdv tor" data-pdv={embutido ? "embutido" : "aba"}>
       <div className="pdv-topo">
-        <div className="pdv-titulo">Precisa de você · {todos.length}</div>
+        <div className="pdv-titulo">Precisa de você · {textoDasDecisoes(contarDecisoes(todos))}</div>
         <div className="pdv-texto">Itens que só o Marco pode decidir ou destravar.</div>
         <button type="button" className="pdv-revisar" onClick={abrirRevisao} disabled={todos.length === 0}>▶ Revisar uma por uma</button>
       </div>

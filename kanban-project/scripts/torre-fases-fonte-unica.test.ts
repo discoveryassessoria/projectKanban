@@ -58,7 +58,7 @@ async function main() {
   ok("fasesDoRadar lê lerFasesDaTorre (e não o catálogo por ordemPadrao)", /lerFasesDaTorre\(\)/.test(ler("lib/operacional/torre-processos.ts")) && !/ordemPadrao: 'asc'/.test(ler("lib/operacional/torre-processos.ts")))
   ok("a poda por aba (colunasDoRadar «terminal em todo macro») acabou: sem poda", /return todas/.test(ler("lib/operacional/torre-processos.ts")))
   ok("o funil usa a terminal da lista única (ehFaseTerminal), sem a sua constante", /ehFaseTerminal/.test(ler("lib/operacional/torre-funil.ts")) && !/ORDEM_DA_ULTIMA_FASE/.test(ler("lib/operacional/torre-funil.ts")))
-  ok("Kanban, filtro de Tarefas, metas e Terceiros ordenam pela ordem real", /ordenarPelaOrdemReal/.test(ler("src/app/api/kanban-config/route.ts")) && /ordenarPelaOrdemReal/.test(ler("lib/operacional/torre-filtros.ts")) && /ordenarPelaOrdemReal/.test(ler("src/app/api/torre/metas/route.ts")) && /ordenarPelaOrdemReal/.test(ler("src/components/torre/TerceirosRegua.tsx")))
+  ok("Kanban, filtro de Tarefas, metas ordenam pela ordem real e Terceiros lê as fases do funil (lista única)", /ordenarPelaOrdemReal/.test(ler("src/app/api/kanban-config/route.ts")) && /ordenarPelaOrdemReal/.test(ler("lib/operacional/torre-filtros.ts")) && /ordenarPelaOrdemReal/.test(ler("src/app/api/torre/metas/route.ts")) && /funil\.fases/.test(ler("src/components/torre/TerceirosRegua.tsx")))
   ok("o rodapé «As 5 palavras» usa a lista única", /textoDasFasesNasPalavras/.test(ler("lib/operacional/torre-funil-puro.ts")))
   ok("o vigia compara as fases das abas (regra n)", /compararFases/.test(ler("lib/operacional/torre-coerencia-abas.ts")))
 

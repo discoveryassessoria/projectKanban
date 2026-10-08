@@ -15,7 +15,7 @@ import {
   passaNoFiltro, passosDaFase, rodapeDeProcessos, saudeDaFase, textoNaFase, tomDosDias, escolherFaseInicial,
   type FiltroDeProcessos, type OrdemDeProcessos,
 } from "@/lib/operacional/torre-fase"
-import { ROTULO_DA_SITUACAO } from "@/lib/operacional/torre-risco"
+import { ROTULO_DO_NIVEL } from "@/lib/operacional/torre-risco"
 import type { ColunaDoRadar, ProcessoDaTorre } from "./tipos-processos"
 import { api, useTorre } from "./torre-base"
 import { memoriaDeProcessos } from "./torre-fase-memoria"
@@ -200,7 +200,7 @@ export function TorreProcessos({ processos, carregando, erro }: { processos: Pro
                     <div className="tor-pf-celula" title={p.motivoDoRisco}>{acao?.texto ?? "—"}</div>
                     <div className={`tor-pf-celula${acao && acao.responsaveis.donos.length === 0 ? " sem" : ""}`} title={acao ? `${acao.responsaveis.abertas} tarefa(s) aberta(s) do processo` : undefined}>{acao ? acao.responsaveis.texto : "—"}</div>
                     <div className={`tor-pf-celula${acao?.prazo.tom === "vermelho" ? " vermelho" : acao?.prazo.tom === "ambar" ? " ambar" : ""}`}>{acao?.prazo.texto ?? "—"}</div>
-                    <div><span className={`tor-pf-pilula ${p.situacao}`} title={p.motivoDoRisco}>{ROTULO_DA_SITUACAO[p.situacao]}</span></div>
+                    <div><span className={`tor-pf-pilula ${p.situacao}`} title={p.motivoDoRisco}>{ROTULO_DO_NIVEL[p.nivelDeRisco]}</span></div>
                     <div className="tor-pf-acoes">
                       <Link href={`/torre/processo/${p.processoId}`} className="tor-pf-foco">Foco</Link>
                       {podeRelatorio && (

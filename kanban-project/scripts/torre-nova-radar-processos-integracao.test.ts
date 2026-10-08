@@ -111,7 +111,7 @@ async function main() {
     const r0 = await processosDaTorre()
     const linha = (r: typeof r0, id: number) => r.processos.find((p) => p.processoId === id)!
     const pA = linha(r0, A.processoId), pB = linha(r0, B.processoId), pC = linha(r0, Cc.processoId), pD = linha(r0, D.processoId), pB2 = linha(r0, B2.processoId)
-    ok("A (atrasada + sem dono): crítico, 'Sem dono', balde vermelho, pontuação 7", pA.nivelDeRisco === "critico" && pA.situacao === "sd" && pA.semDono && pA.risco === "critico" && pA.scoreMaximo >= 6, `${pA.nivelDeRisco}/${pA.situacao}/${pA.scoreMaximo}`)
+    ok("A (atrasada + sem dono): crítico (situação Parado), com o atributo sem dono, balde vermelho, pontuação 7", pA.nivelDeRisco === "critico" && pA.situacao === "pa" && pA.semDono && pA.risco === "critico" && pA.scoreMaximo >= 6, `${pA.nivelDeRisco}/${pA.situacao}/${pA.scoreMaximo}`)
     ok("B (com dono, prazo longe): no ritmo, 'No ritmo', balde ok", pB.nivelDeRisco === "no_ritmo" && pB.situacao === "ok" && pB.risco === "ok" && !pB.semDono, `${pB.nivelDeRisco}/${pB.motivoDoRisco}`)
     ok("C (prazo amanhã): atenção pela regra 'perto do prazo'", pC.nivelDeRisco === "atencao" && pC.situacao === "at" && /prazo hoje ou amanhã/.test(pC.motivoDoRisco), `${pC.nivelDeRisco}: ${pC.motivoDoRisco}`)
     ok("D (bola com terceiro há 20 d, cobrança vencida): PARADO — e o Radar o pinta de vermelho (balde 'critico')", pD.nivelDeRisco === "parado" && pD.situacao === "pa" && pD.risco === "critico" && pD.bola.rotulo !== "Equipe", `${pD.nivelDeRisco}: ${pD.motivoDoRisco} · bola ${pD.bola.rotulo} ${pD.bola.dias}`)

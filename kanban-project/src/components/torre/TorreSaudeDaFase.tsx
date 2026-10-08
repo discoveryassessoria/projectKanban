@@ -13,13 +13,13 @@ export function TorreSaudeDaFase({ s }: { s: SaudeDaFase }) {
       <div className="tor-pf-numeros">
         <div className="tor-pf-numero"><b className="ok">{milhar(s.ok)}</b><span>no ritmo</span></div>
         <div className="tor-pf-numero"><b className="at">{milhar(s.atencao)}</b><span>atenção</span></div>
-        <div className="tor-pf-numero"><b className="pa">{milhar(s.parados)}</b><span>parados ou sem dono</span></div>
+        <div className="tor-pf-numero"><b className="pa">{milhar(s.parados)}</b><span>parados ou críticos</span></div>
         <div className="tor-pf-numero">
           <b className={s.acimaDaMeta ? "pa" : "ok"} title={s.tempoMedioDias == null ? "Nenhuma permanência completa registrada nesta fase" : "Média das permanências completas registradas no histórico de fases"}>{tempo}</b>
           <span>tempo médio real · meta {s.metaDias != null ? diasPorExtenso(s.metaDias) : "—"}</span>
         </div>
       </div>
-      <div className="tor-pf-barra" role="img" aria-label={`${s.ok} no ritmo, ${s.atencao} em atenção, ${s.parados} parados ou sem dono`}>
+      <div className="tor-pf-barra" role="img" aria-label={`${s.ok} no ritmo, ${s.atencao} em atenção, ${s.parados} parados ou críticos`}>
         <i className="ok" style={{ width: `${s.barra.ok}%` }} /><i className="at" style={{ width: `${s.barra.atencao}%` }} /><i className="pa" style={{ width: `${s.barra.parados}%` }} />
       </div>
       <div className="tor-pf-texto">{s.semana}</div>

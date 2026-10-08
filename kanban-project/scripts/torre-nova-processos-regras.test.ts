@@ -50,13 +50,13 @@ const EMISSAO = [
 const nomes = (xs: typeof EMISSAO) => xs.map((p) => p.familiaNome)
 
 secao("SITUAÇÃO DA LINHA e os 4 FILTROS (T194, T195)")
-ok("rótulos: Todos · Precisam de alguém · Atenção · Parados ou sem dono", FILTROS_DE_PROCESSOS.map((f) => f.rotulo).join(" · ") === "Todos · Precisam de alguém · Atenção · Parados ou sem dono")
-ok("situações: crítico/parado com dono → 'pa'; sem dono → 'sd'; atenção → 'at'; no ritmo → 'ok'", EMISSAO.map((p) => p.situacao).join() === "pa,pa,sd,sd,at,at,ok,ok,ok,ok,ok,ok")
+ok("rótulos: Todos · Precisam de alguém · Atenção · Parados ou críticos", FILTROS_DE_PROCESSOS.map((f) => f.rotulo).join(" · ") === "Todos · Precisam de alguém · Atenção · Parados ou críticos")
+ok("situações = o risco: crítico/parado → 'pa' (com ou sem dono); atenção → 'at'; no ritmo → 'ok'", EMISSAO.map((p) => p.situacao).join() === "pa,pa,pa,at,at,at,ok,ok,ok,ok,ok,ok")
 const base = aplicarPaisRespBusca(EMISSAO, PARAMETROS_INICIAIS)
 const c = contagensDosFiltros(base)
-ok("contagens (protótipo, escala 12): todos 12 · precisam 6 · atenção 2 · parados ou sem dono 4", c.todos === 12 && c.precisam === 6 && c.atencao === 2 && c.parados === 4, JSON.stringify(c))
+ok("contagens (protótipo, escala 12): todos 12 · precisam 6 · atenção 3 · parados ou críticos 3", c.todos === 12 && c.precisam === 6 && c.atencao === 3 && c.parados === 3, JSON.stringify(c))
 ok("Precisam de alguém = situação ≠ No ritmo (6: Bertolucci, Ferreira Lopes, Salvarani, Antão, Rossetto, Gallo Pereira)", nomes(EMISSAO.filter((p) => passaNoFiltro(p, "precisam"))).join() === "Bertolucci,Ferreira Lopes,Salvarani,Antão,Rossetto,Gallo Pereira")
-ok("Atenção = só Atenção (2) · Parados ou sem dono = pa + sd (4)", nomes(EMISSAO.filter((p) => passaNoFiltro(p, "atencao"))).join() === "Rossetto,Gallo Pereira" && nomes(EMISSAO.filter((p) => passaNoFiltro(p, "parados"))).join() === "Bertolucci,Ferreira Lopes,Salvarani,Antão")
+ok("Atenção = só Atenção (3) · Parados ou críticos = pa (3)", nomes(EMISSAO.filter((p) => passaNoFiltro(p, "atencao"))).join() === "Antão,Rossetto,Gallo Pereira" && nomes(EMISSAO.filter((p) => passaNoFiltro(p, "parados"))).join() === "Bertolucci,Ferreira Lopes,Salvarani")
 
 secao("PAÍS, RESPONSÁVEL e BUSCA — combinam em E (T196, T197, T172, T221)")
 const par = (o: Partial<typeof PARAMETROS_INICIAIS>) => aplicarPaisRespBusca(EMISSAO, { ...PARAMETROS_INICIAIS, ...o })
@@ -72,7 +72,7 @@ ok("linha SEM próxima ação não é 'Sem responsável' (é '—')", !aplicarPa
 
 secao("AS 4 ORDENS (T198, T199)")
 ok("rótulos: mais atrasado primeiro · Prazo mais próximo · Entrou na fase há mais tempo · Família A–Z", ORDENS_DE_PROCESSOS.map((o) => o.rotulo).join(" | ") === "Ordenar: mais atrasado primeiro | Prazo mais próximo | Entrou na fase há mais tempo | Família A–Z")
-ok("mais atrasado: Parado → Sem dono → Atenção → No ritmo, desempate pelo prazo", nomes(ordenarProcessos(EMISSAO, "atrasado")).join() === "Bertolucci,Ferreira Lopes,Salvarani,Antão,Rossetto,Gallo Pereira,Navarro Ruiz,Moretti Campos,Zanella,Schneider,Lombardi,Albuquerque Dias", nomes(ordenarProcessos(EMISSAO, "atrasado")).join())
+ok("mais atrasado: Parado → Atenção → No ritmo, desempate pelo prazo", nomes(ordenarProcessos(EMISSAO, "atrasado")).join() === "Bertolucci,Salvarani,Ferreira Lopes,Rossetto,Gallo Pereira,Antão,Navarro Ruiz,Moretti Campos,Zanella,Schneider,Lombardi,Albuquerque Dias", nomes(ordenarProcessos(EMISSAO, "atrasado")).join())
 ok("prazo mais próximo (ontem < hoje < amanhã < dd/mm; empate pelo nome)", nomes(ordenarProcessos(EMISSAO, "prazo")).slice(0, 5).join() === "Bertolucci,Rossetto,Salvarani,Ferreira Lopes,Navarro Ruiz")
 ok("entrou na fase há mais tempo (dias, maior primeiro)", nomes(ordenarProcessos(EMISSAO, "tempo")).slice(0, 4).join() === "Bertolucci,Ferreira Lopes,Gallo Pereira,Rossetto" && nomes(ordenarProcessos(EMISSAO, "tempo")).at(-1) === "Antão")
 ok("Família A–Z (pt-BR)", nomes(ordenarProcessos(EMISSAO, "az")).slice(0, 3).join() === "Albuquerque Dias,Antão,Bertolucci")
@@ -99,8 +99,8 @@ ok("a fase inicial é a de MAIOR volume (no protótipo, Emissão); sem processo 
 
 secao("SAÚDE DA FASE (T178–T187)")
 const s = saudeDaFase(EMISSAO, { tempoMedioDias: 34, metaDias: 30, fluxo: { entraram: 14, sairam: [{ para: "analise", n: 11 }] }, rotuloDaFase: (k) => (k === "analise" ? "Análise" : k) })
-ok("números: no ritmo 6 · atenção 2 · parados 4 (pa + sd) = total 12", s.ok === 6 && s.atencao === 2 && s.parados === 4 && s.total === 12 && s.ok + s.atencao + s.parados === s.total)
-ok("barra: valor/total em %, 1 casa (50 · 16,7 · 33,3)", s.barra.ok === 50 && s.barra.atencao === 16.7 && s.barra.parados === 33.3)
+ok("números: no ritmo 6 · atenção 3 · parados 3 (pa) = total 12", s.ok === 6 && s.atencao === 3 && s.parados === 3 && s.total === 12 && s.ok + s.atencao + s.parados === s.total)
+ok("barra: valor/total em %, 1 casa (50 · 25 · 25)", s.barra.ok === 50 && s.barra.atencao === 25 && s.barra.parados === 25)
 ok("tempo médio 34 d acima da meta 30 d → vermelho; abaixo ou sem meta → verde", s.acimaDaMeta === true && saudeDaFase(EMISSAO, { tempoMedioDias: 12, metaDias: 15, fluxo: null, rotuloDaFase: String }).acimaDaMeta === false && saudeDaFase(EMISSAO, { tempoMedioDias: 99, metaDias: null, fluxo: null, rotuloDaFase: String }).acimaDaMeta === false)
 ok("frase da semana (Emissão): 'Entraram 14 esta semana · saíram 11 para Análise. Se o ritmo continuar, a fase cresce 3 processos/semana.'", s.semana === "Entraram 14 esta semana · saíram 11 para Análise. Se o ritmo continuar, a fase cresce 3 processos/semana.", s.semana)
 ok("frase (Genealogia): 'Entraram 12 esta semana · saíram 14 para Emissão.' (sem 'cresce' quando saem mais)", fraseDaSemana({ entraram: 12, sairam: [{ para: "emissao", n: 14 }] }, (k) => (k === "emissao" ? "Emissão" : k)) === "Entraram 12 esta semana · saíram 14 para Emissão.")

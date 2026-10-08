@@ -13,7 +13,7 @@ import { exigirTorre } from '@/src/lib/torre-acesso'
 import { temPermissao } from '@/src/lib/permissoes'
 import { parseFiltrosGerenciais } from '@/lib/operacional/parse-filtros-gerenciais'
 import { listarTarefasDaTorre } from '@/src/services/torre-tarefas'
-import { processosCriticos, anotarRisco } from '@/lib/operacional/torre-processos'
+import { processosCriticosEmCache, anotarRisco } from '@/lib/operacional/torre-processos'
 
 export async function GET(request: NextRequest) {
   const { usuario, erro } = await exigirTorre(request, 'tarefas.ver')
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   if (sp.get('faseMacroKey')) semPagina.faseMacroKey = sp.get('faseMacroKey')
   const processoId = sp.get('processoId') ?? sp.get('processo')
   if (processoId) semPagina.processoId = Number(processoId)
-  const [r, criticos] = await Promise.all([listarTarefasDaTorre(semPagina), processosCriticos()])
+  const [r, criticos] = await Promise.all([listarTarefasDaTorre(semPagina), processosCriticosEmCache()])
   const pode = (p: Parameters<typeof temPermissao>[1]) => temPermissao(usuario.permissoes, p)
   return NextResponse.json({
     ...r,

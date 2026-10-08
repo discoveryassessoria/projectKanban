@@ -1,6 +1,7 @@
 "use client"
 // src/components/torre/EquipeTabela.tsx — a tabela "Quem está carregando o quê" + o rodapé de sugestão (Torre nova, aba Equipe).
 // Pinta o que /api/torre/equipe devolve; nenhuma conta aqui (as regras de texto/cor vivem em equipe-visual.ts).
+import Link from "next/link"
 import {
   COLUNAS_DA_TABELA, atrasadasEmAlerta, barraDaCarga, filaVisual, pedacosDaSugestao, textoDaCarga, textoDoPapel,
 } from "./equipe-visual"
@@ -59,7 +60,7 @@ function LinhaSemResponsavel({ dados, acoes }: { dados: DadosDaEquipe; acoes: Ac
         <span className="eqp-sub">—</span>
       </div>
       <div className="eqp-carga">
-        <span className="eqp-carga-txt">{sr.ativas} sem dono</span>
+        <Link href="/torre?aba=tarefas&kpi=ninguem" prefetch={false} className="eqp-carga-txt" title="O número de «Sem responsável» é o do cartão da Visão geral; este link abre a mesma lista na aba Tarefas">ver as sem responsável</Link>
         <div className="eqp-barra" aria-hidden="true">{sr.ativas > 0 && <i className="verm" style={{ width: "100%" }} />}</div>
       </div>
       <div className="eqp-n">{sr.ativas}</div>
