@@ -4711,6 +4711,29 @@ model RegraTemporalOrgao {
   @@index([orgaoProtocoloId])
 }
 
+/// PRAZO DO PASSO POR PAÍS DO REGISTRO (08/10/2026) — "nasceu na Itália, 30 dias; casou e morreu no Brasil, 1 dia".
+///
+/// É CADASTRO (Gerenciamento), nunca código: o passo tem o prazo padrão (`slaDays`, o do exterior) e esta tabela
+/// ENCURTA/ALTERA o prazo para os países que o administrador listar. Identidade por `stepKey` (mesmo padrão de
+/// `RegraTemporalOrgao`) × `paisChave` (nome do país normalizado: minúsculo, sem acento; Brasil = "brasil").
+///
+/// Quem decide é UM só lugar: `lib/operacional/prazo-por-pais.ts::resolverSlaDoPasso`. O país que vale é o do EVENTO da
+/// certidão na árvore (nascimento → `Pessoa.pais_nasc`; casamento → `Uniao.pais`; óbito → `Pessoa.pais_obito`). Sem país
+/// cadastrado a regra não se aplica e vale o prazo do passo — nunca um palpite.
+model RegraTemporalPais {
+  id           Int      @id @default(autoincrement())
+  stepKey      String   @db.VarChar(80)
+  paisChave    String   @db.VarChar(80)
+  paisNome     String   @db.VarChar(120)
+  slaDays      Int
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@unique([stepKey, paisChave])
+  @@index([stepKey])
+}
+
 /// Funções que uma organização exerce. Uma organização = UM registro, N funções.
 enum FuncaoOrganizacao {
   ORGAO

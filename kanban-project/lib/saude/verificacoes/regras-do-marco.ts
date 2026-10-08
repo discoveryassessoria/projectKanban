@@ -27,7 +27,7 @@ import { mesmoLugar } from '@/src/lib/genealogia/sincronizacao-registral'
 import { compararCertidoesDaFamilia } from '@/lib/operacional/ordem-certidoes'
 import { SUBTAREFA_PEDIDO_ENVIADO, SUBTAREFA_CONFIRMACAO, SUBTAREFA_CERTIDAO_RECEBIDA, SUBTAREFA_CONFERENCIA } from '@/lib/operacional/emissao-recebimento'
 
-export type RegraDoMarco = 'a' | 'c' | 'e' | 'f' | 'g' | 'i' | 'j' | 'l' | 'm' | 'n' | 'o' | 'p' | 'q' | 'r' | 's' | 't'
+export type RegraDoMarco = 'a' | 'c' | 'e' | 'f' | 'g' | 'i' | 'j' | 'l' | 'm' | 'n' | 'o' | 'p' | 'q' | 'r' | 's' | 't' | 'u'
 
 /** O detalhe do processo lido UMA vez por rodada (as regras e, i e o script leem o mesmo). */
 type Detalhe = Awaited<ReturnType<typeof import('@/lib/operacional/torre-foco')['detalheDoProcesso']>>
@@ -60,6 +60,7 @@ export const TITULO_DA_REGRA: Record<RegraDoMarco, string> = {
   j: 'Subtarefa da Emissão fora de ordem ou com selo «Disponível» sendo que depende de outra',
   m: 'Local do óbito da certidão diferente (ou ausente) na árvore',
   n: 'Abas da Torre dizendo coisas diferentes (responsável, fases, risco ou contagens)',
+  u: 'Passo com prazo por país do registro: prazo da certidão diferente do que o país do evento manda (ou evento sem país cadastrado na árvore)',
   t: 'Lista de províncias da Itália/Espanha fora da regra (região, comunidade ou inglês) ou cidade real que não carrega sob a sua província',
   s: 'Cartório ligado fora da regra da Localidade (órgão que não é registro civil, ou de outro país que o do registro)',
   r: 'Passo 3 (Receber certidão) concluído com o passo 2 (confirmação do pedido) por concluir — a janela do passo 2 não pode ser a do passo 3',
@@ -489,13 +490,45 @@ export async function detectarRegraT(): Promise<ViolacaoDoMarco[]> {
   return out
 }
 
+// ── u ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/** Prazo POR PAÍS DO REGISTRO (cadastro `RegraTemporalPais`, resolvido só por `lib/operacional/prazo-por-pais.ts`): para cada passo ABERTO que tem regra
+ *  cadastrada, o `slaDays` da instância precisa ser o que o país do evento manda; e a certidão cujo evento não tem país na árvore é listada (cai no prazo largo). */
+export async function detectarRegraU(): Promise<ViolacaoDoMarco[]> {
+  const { slaDoPassoDaNecessidade, categoriaDoItem, paisDoEvento, chaveDoPais } = await import('@/lib/operacional/prazo-por-pais')
+  const out: ViolacaoDoMarco[] = []
+  const chaves = (await prisma.regraTemporalPais.findMany({ where: { ativo: true }, select: { stepKey: true }, distinct: ['stepKey'] })).map((r) => r.stepKey)
+  if (chaves.length === 0) return out
+  const passos = await prisma.phaseWorkflowStepInstance.findMany({
+    where: { stepKey: { in: chaves }, necessidadeId: { not: null }, status: { notIn: LOCALIZAR_RESOLVIDO as never[] } },
+    select: {
+      id: true, stepKey: true, slaDays: true, necessidadeId: true, processoId: true, stepDefinitionId: true,
+      necessidade: { select: { itemCatalogo: { select: { code: true, name: true } }, pessoa: { select: { nome: true, sobrenome: true, pais_nasc: true, pais_obito: true } }, uniao: { select: { pais: true } } } },
+      processo: { select: { nome: true } },
+    },
+  })
+  const defs = new Map((await prisma.phaseInternalWorkflowStep.findMany({ where: { id: { in: passos.map((p) => p.stepDefinitionId).filter((x): x is number => x != null) } }, select: { id: true, slaDays: true } })).map((d) => [d.id, d.slaDays]))
+  for (const p of passos) {
+    const n = p.necessidade
+    const item = n?.itemCatalogo
+    const categoria = item ? categoriaDoItem(item) : null
+    const pais = n ? paisDoEvento(categoria, n) : null
+    const certidao = item?.name ?? null
+    const pessoa = nomeDe(n?.pessoa)
+    const base = { regra: 'u' as const, processoId: p.processoId, familia: p.processo?.nome ?? '—', certidao, pessoa, entidade: 'PhaseWorkflowStepInstance', registroId: p.id }
+    if (chaveDoPais(pais) == null) { out.push({ ...base, detalhe: `o evento desta certidão não tem país cadastrado na árvore — vale o prazo largo do passo (${p.slaDays ?? 'sem prazo'} dia(s))` }); continue }
+    const esperado = (await slaDoPassoDaNecessidade(prisma, { stepKey: p.stepKey, necessidadeId: p.necessidadeId, slaDoPasso: p.stepDefinitionId != null ? defs.get(p.stepDefinitionId) ?? p.slaDays : p.slaDays })).slaDays
+    if ((esperado ?? null) !== (p.slaDays ?? null)) out.push({ ...base, detalhe: `país do evento: ${pais} — o cadastro manda ${esperado ?? 'sem prazo'} dia(s) e o passo está com ${p.slaDays ?? 'sem prazo'}` })
+  }
+  return out
+}
+
 export async function detectarRegrasDoMarco(opts: { profundo?: boolean } = {}): Promise<{ violacoes: ViolacaoDoMarco[]; porRegra: Record<RegraDoMarco, number> }> {
   limparMemoDeDetalhes()
   const todas = [
     ...(await detectarRegraA()), ...(await detectarRegraC()), ...(await detectarRegraE(opts)),
-    ...(await detectarRegraF()), ...(await detectarRegraG()), ...(opts.profundo ? await detectarRegraI() : []), ...(await detectarRegraJ()), ...(await detectarRegraL()), ...(await detectarRegraM()), ...(await detectarRegraN()), ...(await detectarRegraO()), ...(await detectarRegraP()), ...(await detectarRegraQ()), ...(await detectarRegraR()), ...(await detectarRegraS()), ...(await detectarRegraT()),
+    ...(await detectarRegraF()), ...(await detectarRegraG()), ...(opts.profundo ? await detectarRegraI() : []), ...(await detectarRegraJ()), ...(await detectarRegraL()), ...(await detectarRegraM()), ...(await detectarRegraN()), ...(await detectarRegraO()), ...(await detectarRegraP()), ...(await detectarRegraQ()), ...(await detectarRegraR()), ...(await detectarRegraS()), ...(await detectarRegraT()), ...(await detectarRegraU()),
   ]
-  const porRegra = { a: 0, c: 0, e: 0, f: 0, g: 0, i: 0, j: 0, l: 0, m: 0, n: 0, o: 0, p: 0, q: 0, r: 0, s: 0, t: 0 } as Record<RegraDoMarco, number>
+  const porRegra = { a: 0, c: 0, e: 0, f: 0, g: 0, i: 0, j: 0, l: 0, m: 0, n: 0, o: 0, p: 0, q: 0, r: 0, s: 0, t: 0, u: 0 } as Record<RegraDoMarco, number>
   for (const v of todas) porRegra[v.regra]++
   return { violacoes: todas, porRegra }
 }

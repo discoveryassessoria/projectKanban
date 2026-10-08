@@ -23,6 +23,7 @@
 // A tela também NÃO decide se a configuração é válida: ela mostra o que o servidor
 // recusou. A validação mora na publicação, que tem a configuração inteira.
 
+import PrazoPorPaisDoPasso from "./PrazoPorPaisDoPasso"
 import { useEffect, useState } from "react"
 import { PRAZO_HERDADO, temPrazoProprio } from "@/lib/operacional/tempo-operacional"
 import EditorDePecasDoPasso, { type PecasDoPasso, type Efeito } from "./EditorDePecasDoPasso"
@@ -353,6 +354,7 @@ export default function ConfiguracaoDoPassoModal({
                   </p>
                 </div>
               </div>
+              <PrazoPorPaisDoPasso stepKey={f.key} prazoPadrao={temPrazoProprio(f.slaDays) ? Number(f.slaDays) : null} />
               <div>
                 <label className={lbl}>Responsável padrão</label>
                 <input className={inp} value={f.owner ?? ""} placeholder="equipe, papel ou pessoa"
