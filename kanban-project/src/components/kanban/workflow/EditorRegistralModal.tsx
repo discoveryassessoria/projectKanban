@@ -10,7 +10,8 @@
 
 "use client"
 
-import { rotuloDaDivisao, exigeCartorioVinculado } from "@/lib/localidade/regra-localidade"
+import { exigeCartorioVinculado } from "@/lib/localidade/regra-localidade"
+import { useLocalidade } from "@/lib/localidade/use-localidade"
 import { useState, useEffect, useCallback } from "react"
 import { useApi } from "@/src/lib/dados"
 import { useFecharComEsc } from "@/src/lib/ui/escape-stack"
@@ -293,43 +294,12 @@ function ConteudoModal({
   //    `CatalogoPais` — ver comentário do model `Pais` em schema.prisma).
   //    Documento sem país gravado ainda (legado) segue tratado como Brasil,
   //    pra não quebrar o fluxo de quem nunca tocou este campo.
-  const paisesReq = useApi<{ paises?: { id: number; codigo: string; nome: string }[] }>(isOpen ? "/api/geografia/paises" : null)
-  const paisesDisponiveis = paisesReq.dados?.paises ?? []
-  const paisSelecionado = paisesDisponiveis.find((p) => p.nome === form.pais_registro) ?? null
-  const paisCodigo = paisSelecionado?.codigo ?? (form.pais_registro ? null : "BR")
-  const ehBrasil = paisCodigo === "BR"
-
-  // -- FORA DO BRASIL (regra única `lib/localidade/regra-localidade.ts`): PROVÍNCIA e CIDADE carregam sozinhas da base geográfica do servidor
-  //    (`/api/localidades/*`, sem chave nem limite). Cidade que a base não conhece = texto livre; a lista só ajuda, nunca trava.
-  const provinciasReq = useApi<{ provincias?: { codigo: string; nome: string }[] }>(!ehBrasil && paisCodigo ? `/api/localidades/provincias?pais=${paisCodigo}` : null)
-  const provinciasDoMundo = provinciasReq.dados?.provincias ?? []
-  const cidadesMundoReq = useApi<{ cidades?: { nome: string; provincia: string | null }[] }>(
-    !ehBrasil && paisCodigo ? `/api/localidades/cidades?pais=${paisCodigo}${form.estado_registro ? `&provincia=${encodeURIComponent(form.estado_registro)}` : ""}&q=${encodeURIComponent(form.cidade_registro)}` : null,
-  )
-  const cidadesDoMundo = cidadesMundoReq.dados?.cidades ?? []
-  const rotuloDivisao = rotuloDaDivisao(form.pais_registro)
-
-  // -- Estado → Cidade em cascata, direto do IBGE (fonte pública oficial, sem
-  //    chave/custo). "Cartório" continua texto livre — nem todo cartório tem
-  //    cadastro prévio — mas passa a sugerir (via <datalist>) os já cadastrados
-  //    na cidade escolhida, reaproveitando o cadastro de Órgãos existente.
-  const [ufs, setUfs] = useState<{ sigla: string; nome: string }[]>([])
-  const [municipios, setMunicipios] = useState<string[]>([])
-  useEffect(() => {
-    fetch("https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((lista: Array<{ sigla: string; nome: string }>) => setUfs(Array.isArray(lista) ? lista : []))
-      .catch(() => setUfs([]))
-  }, [])
-  useEffect(() => {
-    const uf = ufs.find((u) => u.nome === form.estado_registro)?.sigla
-    if (!uf) { setMunicipios([]); return }
-    fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios?orderBy=nome`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((lista: Array<{ nome: string }>) => setMunicipios(Array.isArray(lista) ? lista.map((m) => m.nome) : []))
-      .catch(() => setMunicipios([]))
-  }, [form.estado_registro, ufs])
-  const ufSigla = ufs.find((u) => u.nome === form.estado_registro)?.sigla ?? null
+  const loc = useLocalidade({ ativo: isOpen, pais: form.pais_registro, estadoOuProvincia: form.estado_registro, cidade: form.cidade_registro })
+  const { ehBrasil, ufs, municipios, ufSigla, rotuloDivisao } = loc
+  const paisesDisponiveis = loc.paises
+  const paisSelecionado = loc.paisSelecionado
+  const provinciasDoMundo = loc.provincias
+  const cidadesDoMundo = loc.cidadesSugeridas
   // BASE NACIONAL DE CARTÓRIOS (Registro Civil, sincronizada — ver
   // CartorioSyncService/16-09-2026): sempre disponível, sem apikey, sem
   // depender de nenhum serviço externo em tempo real — busca é na base LOCAL.
