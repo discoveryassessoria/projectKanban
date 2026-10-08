@@ -3,6 +3,7 @@
 //   PUT     { phaseKey, paisId?: number|null, metaDias, ativo? } — cria ou atualiza a meta do par (fase, país).
 //   DELETE  ?id=  — exclui a meta.
 // A régua é a da tela de Saúde do sistema (`usuarios.gerenciar`). Toda escrita grava histórico (LogAuditoria).
+import { ordenarPelaOrdemReal } from '@/lib/operacional/torre-fases'
 import { type NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { exigirGerenciamento } from '@/src/lib/torre-acesso'
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
     prisma.catalogoFase.findMany({ where: { ativo: true }, orderBy: [{ ordemPadrao: 'asc' }, { id: 'asc' }], select: { phaseKey: true, label: true } }),
     prisma.catalogoPais.findMany({ where: { ativo: true }, orderBy: { countryLabel: 'asc' }, select: { id: true, countryLabel: true, flag: true } }),
   ])
-  return NextResponse.json({ metas, fases: fases.map((f) => ({ phaseKey: f.phaseKey, label: rotuloOficialDaFase(f.phaseKey, f.label) })), paises })
+  return NextResponse.json({ metas, fases: ordenarPelaOrdemReal(fases, (f) => f.phaseKey).map((f) => ({ phaseKey: f.phaseKey, label: rotuloOficialDaFase(f.phaseKey, f.label) })), paises })
 }
 
 export async function PUT(request: NextRequest) {

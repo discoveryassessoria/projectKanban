@@ -14,6 +14,7 @@
 //   · "Gargalo da semana" — a fase que mais estourou a meta (média ÷ meta); sem nenhuma estourada, a fase com mais parados.
 // O prazo NUNCA pausa por terceiro e a meta NUNCA vira prazo: este módulo só LÊ e apresenta.
 // ============================================================================
+import { textoDasFasesNasPalavras } from './torre-fases'
 import { nomeDoPasso } from './torre-filtros'
 import { ehGrave, type NivelDeRisco } from './torre-risco'
 
@@ -260,5 +261,5 @@ export function hrefDaFase(faseKey: string, manter: { pais?: string | null; q?: 
 
 /** "etapa do processo (Genealogia → Protocolado)" — o intervalo vem das fases do cadastro (nunca literal); sem funil ainda, só a definição. */
 export function textoDaFaseNasPalavras(linhas: Array<{ label: string }>): string {
-  return linhas.length >= 2 ? `etapa do processo (${linhas[0].label} → ${linhas[linhas.length - 1].label})` : 'etapa do processo'
+  return textoDasFasesNasPalavras(linhas)
 }

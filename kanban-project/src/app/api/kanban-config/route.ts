@@ -8,6 +8,7 @@
 // Gated por processos.ver (quem vê o kanban precisa disso; a rota de
 // gerenciamento é só admin, por isso esta existe).
 
+import { ordenarPelaOrdemReal } from '@/lib/operacional/torre-fases'
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
@@ -79,7 +80,8 @@ export async function GET(request: Request) {
       const vistas = new Set(atuais.map((f) => f.phaseKey))
       // Coluna do board = a fase do Workflow Macro, com o rótulo OFICIAL ("Aguardando fechamento" é a PRIMEIRA coluna, pela ordem do macro).
       for (const f of wf.fases) { if (!vistas.has(f.phaseKey)) { vistas.add(f.phaseKey); atuais.push({ ...f, label: rotuloOficialDaFase(f.phaseKey, f.label) }) } }
-      fasesPorTipo.set(wf.tipoProcessoId, atuais)
+      // A ORDEM É A REAL DO PROCESSO (lista única de fases): Aguardando fechamento (antessala) → Genealogia → … → Protocolado → Finalizado — nunca a de um macro isolado.
+      fasesPorTipo.set(wf.tipoProcessoId, ordenarPelaOrdemReal(atuais, (f) => f.phaseKey))
     }
 
     const tiposOut = tipos.map(({ pais, modalidadesHabilitadas, ...t }) => ({

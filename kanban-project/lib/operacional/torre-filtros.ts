@@ -19,6 +19,7 @@
 // SÓ casa quem TEM o registro (registro antigo sem valor nunca entra em "Hoje/Esta semana/Há mais de 30 dias/Intervalo"); "Ainda não
 // iniciou" é o estado real NAO_INICIADA. A dimensão antiga "Quando" (criada/atribuída) segue válida na URL e em visão salva.
 // ============================================================================
+import { ordenarPelaOrdemReal } from './torre-fases'
 import { ordenarLinhasDeCertidao } from './ordem-certidoes'
 import { diasAtePrazo } from './torre-kpis'
 import { diaOperacional } from './tempo-operacional'
@@ -472,7 +473,7 @@ export function opcoesDosFiltros(linhas: LinhaParaFiltro[]): OpcoesDosFiltros {
   }
   const ord = (s: Iterable<string>) => [...s].sort((a, b) => a.localeCompare(b, 'pt-BR'))
   const pares = (m: Map<string, string>) => [...m.entries()].map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
-  return { familias: ord(familias), pessoas: pares(pessoas), status: ord(status), fases: ord(fases), passos: ord(passos), orgaos: pares(orgaos) }
+  return { familias: ord(familias), pessoas: pares(pessoas), status: ord(status), fases: ordenarPelaOrdemReal([...fases], (f) => f), passos: ord(passos), orgaos: pares(orgaos) }
 }
 
 /** Sugestões do campo Família: só famílias COM tarefa aberta (as da lista base), que contêm o que foi digitado. */

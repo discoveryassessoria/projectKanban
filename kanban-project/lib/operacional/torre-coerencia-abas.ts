@@ -3,7 +3,8 @@
 // O VIGIA DAS ABAS DA TORRE (07/10/2026 — CLAUDE.md §41, regra n). Cada dado que a Torre mostra vem de UMA função no servidor; as abas só desenham. Este módulo LÊ o que
 // cada aba vai desenhar — a partir das MESMAS linhas — e acusa qualquer divergência entre elas. SOMENTE LEITURA.
 //   • responsável: Processos (donos por processo) × Equipe (carga por pessoa) × Tarefas (linhas abertas por dono) — mesmo número por pessoa e por «sem responsável».
-// (Os itens seguintes do mandato acrescentam fases, risco e contagens aqui, no mesmo comparador.)
+//   • fases: Visão geral (funil) × Radar × Processos × Tarefas (filtro) × Kanban × rodapé «As 5 palavras» — a MESMA lista, na ordem real do processo.
+// (O item seguinte do mandato acrescenta risco e contagens aqui, no mesmo comparador.)
 // Tarefa aberta, vencida ou sem responsável NUNCA é erro: é estado. O que se acusa é a ABA dizer outra coisa.
 // ============================================================================
 
@@ -63,14 +64,39 @@ export function compararResponsaveis(args: { processos: ProcessoMinimo[]; linhas
   return out
 }
 
+export interface ListaDeFasesDaAba { aba: string; chaves: string[]; /** `true` = a aba mostra TODAS as fases (tem de ser igual à lista única); `false` = um subconjunto, na mesma ordem. */ completa: boolean }
+
+/** Fases: cada aba desenha a lista única (ou um subconjunto dela, na mesma ordem). PURA. */
+export function compararFases(unica: string[], abas: ListaDeFasesDaAba[]): DivergenciaEntreAbas[] {
+  const out: DivergenciaEntreAbas[] = []
+  for (const a of abas) {
+    if (a.completa) {
+      if (a.chaves.join('>') !== unica.join('>')) out.push({ assunto: 'fases', abas: a.aba, chave: 'lista de fases', detalhe: `${a.aba} lista ${a.chaves.length} fase(s) [${a.chaves.join(' → ')}]; a lista única tem ${unica.length} [${unica.join(' → ')}]` })
+      continue
+    }
+    let i = 0
+    for (const k of a.chaves) { const j = unica.indexOf(k, i); if (j < 0) { out.push({ assunto: 'fases', abas: a.aba, chave: k, detalhe: `${a.aba} mostra a fase «${k}», que não está na lista única (ou está fora da ordem real)` }); break } i = j + 1 }
+  }
+  return out
+}
+
 /** Lê o que as abas desenham, a partir das MESMAS linhas, e compara. SOMENTE LEITURA (só SELECT). */
 export async function compararAbasDaTorre(agora = new Date()): Promise<DivergenciaEntreAbas[]> {
   const { listarTarefasDaTorre } = await import('@/src/services/torre-tarefas')
   const { processosDaTorre } = await import('./torre-processos')
   const { quadroDaEquipe } = await import('./torre-equipe')
+  const { lerFasesDaTorre } = await import('./torre-fases-leitura')
+  const { funilDaTorre } = await import('./torre-funil')
+  const { opcoesDosFiltros } = await import('./torre-filtros')
   const { linhas } = await listarTarefasDaTorre({}, agora)
-  const [{ processos }, equipe] = await Promise.all([processosDaTorre(agora, linhas), quadroDaEquipe(linhas, agora)])
+  const [{ processos, colunas }, equipe, unica, funil] = await Promise.all([processosDaTorre(agora, linhas), quadroDaEquipe(linhas, agora), lerFasesDaTorre(), funilDaTorre(agora)])
+  const chavesUnicas = unica.map((f) => f.key)
   return [
+    ...compararFases(chavesUnicas, [
+      { aba: 'Visão geral (funil)', chaves: funil.fases.map((f) => f.key), completa: true },
+      { aba: 'Radar e Processos (colunas)', chaves: colunas.map((c) => c.key), completa: true },
+      { aba: 'Tarefas (filtro de fase)', chaves: opcoesDosFiltros(linhas as never).fases, completa: false },
+    ]),
     ...compararResponsaveis({
       processos: processos.map((p) => ({ processoId: p.processoId, familiaNome: p.familiaNome, proximaAcao: p.proximaAcao })),
       linhas: linhas.map((l) => ({ processoId: l.processoId ?? null, responsavelId: l.responsavelId, responsavelNome: l.responsavelNome, estadoOperacao: l.estadoOperacao })),
