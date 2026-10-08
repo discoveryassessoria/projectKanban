@@ -253,6 +253,7 @@
     "scripts/casamento-dono-unico.test.ts",
     "scripts/dispensa-sempre-com-autor.test.ts",
     "scripts/sincronizacao-automatica-genealogia.test.ts",
+    "scripts/localidade-regra-unica.test.ts",
     "scripts/passo2-abre-confirmacao-passo3-recebimento.test.ts",
     "scripts/prazo-reancoragem-troca-de-fase.test.ts",
     "scripts/cobranca-so-com-pedido-enviado.test.ts",

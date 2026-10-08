@@ -215,11 +215,26 @@ export const UFS_BR: ReadonlyArray<{ uf: string; nome: string }> = [
   { uf: "SP", nome: "São Paulo" }, { uf: "SE", nome: "Sergipe" }, { uf: "TO", nome: "Tocantins" },
 ]
 
+/** O código ISO do país pelo NOME digitado/escolhido (a base mundial `/api/geografia/paises`). `null` = país desconhecido → campos de texto livre. */
+function useCodigoDoPais(nome: string, ativo: boolean): string | null {
+  const base = useApi<{ paises?: Array<{ codigo: string; nome: string }> }>(ativo ? "/api/geografia/paises" : null)
+  const n = normalizarBusca(nome)
+  return base.dados?.paises?.find((p) => normalizarBusca(p.nome) === n)?.codigo ?? null
+}
+
 export function CampoEstadoNascimento({
   value, onChange, pais, inputClass, placeholder = "Ex: Veneto, Catalunha...",
 }: { value: string; onChange: (v: string) => void; pais: string; inputClass: string; placeholder?: string }) {
-  if (!paisEhBrasil(pais)) {
-    return <input type="text" value={value} onChange={(e) => onChange(e.target.value)} className={inputClass} placeholder={placeholder} />
+  const brasil = paisEhBrasil(pais)
+  // FORA DO BRASIL é PROVÍNCIA (regra única da Localidade): a lista carrega sozinha da base do servidor; texto livre sempre vale.
+  const codigo = useCodigoDoPais(pais, !brasil && pais.trim() !== "")
+  const provReq = useApi<{ provincias?: Array<{ nome: string }> }>(!brasil && codigo ? `/api/localidades/provincias?pais=${codigo}` : null)
+  const itens = useMemo<ItemSugestao[]>(() => {
+    const t = normalizarBusca(value)
+    return (provReq.dados?.provincias ?? []).filter((p) => !t || normalizarBusca(p.nome).includes(t)).slice(0, 60).map((p) => ({ valor: p.nome }))
+  }, [provReq.dados, value])
+  if (!brasil) {
+    return <CampoSugestao value={value} onChange={onChange} itens={itens} inputClass={inputClass} placeholder={placeholder} rotuloTextoLivre />
   }
   const atual = value.trim()
   // Valor já gravado que não é uma UF (ex.: texto livre de antes) atravessa intacto como opção própria.
@@ -260,12 +275,18 @@ export function CampoCidadeNascimento({
     return () => { vivo = false }
   }, [pedir, brasil])
 
+  // FORA DO BRASIL: cidades da base geográfica do servidor (por país e província); cidade que a base não conhece é texto livre.
+  const codigoPais = useCodigoDoPais(pais, !brasil && pais.trim() !== "")
+  const cidadesReq = useApi<{ cidades?: Array<{ nome: string; provincia: string | null }> }>(
+    !brasil && codigoPais && pedir ? `/api/localidades/cidades?pais=${codigoPais}${uf ? `&provincia=${encodeURIComponent(uf)}` : ""}&q=${encodeURIComponent(baseDaCidade(value))}` : null,
+  )
   const itens = useMemo<ItemSugestao[]>(() => {
-    if (!brasil || !lista) return []
+    if (!brasil) return (cidadesReq.dados?.cidades ?? []).slice(0, 40).map((c) => ({ valor: c.nome, detalhe: uf ? undefined : c.provincia ?? undefined }))
+    if (!lista) return []
     const ufEscolhida = (uf ?? "").trim().toUpperCase()
     const base = ufEscolhida ? lista.filter((m) => m.uf === ufEscolhida) : lista
     return sugerirMunicipios(base, baseDaCidade(value)).map((m) => ({ valor: m.nome, detalhe: ufEscolhida ? undefined : m.uf }))
-  }, [brasil, lista, value, uf])
+  }, [brasil, lista, value, uf, cidadesReq.dados])
 
   return (
     <div>

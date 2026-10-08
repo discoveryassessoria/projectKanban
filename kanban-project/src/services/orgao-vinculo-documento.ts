@@ -11,6 +11,7 @@
 // bloqueio de duplicidade (nome normalizado igual na mesma cidade/UF) e a
 // lista "órgãos a mapear" (texto livre legado sem `orgaoId`).
 // ============================================================================
+import { modoDoCartorio, TIPO_DE_CARTORIO_NA_LISTA } from "@/lib/localidade/regra-localidade"
 import type { Prisma, PrismaClient } from "@prisma/client"
 import { chaveDeNome, similaridade } from "@/src/services/organizacao-identidade"
 
@@ -51,7 +52,13 @@ export interface OrgaoBusca {
  * nunca foi ligada a esta busca — "santos" sempre voltava vazio, para QUALQUER
  * cartório brasileiro, não só Santos.
  */
-export async function buscarOrgaos(db: DB, q: string, opts: { uf?: string; cidade?: string; limit?: number } = {}): Promise<OrgaoBusca[]> {
+/** Órgão do Brasil que é CARTÓRIO: o cadastro guarda o Brasil sem país (`paisId` nulo) — `CatalogoPais` só tem os países de cidadania ofertada — e o tipo é a marca confiável. */
+const FILTRO_CARTORIO_DO_BRASIL = { paisId: null, type: { equals: TIPO_DE_CARTORIO_NA_LISTA, mode: "insensitive" as const } }
+
+export async function buscarOrgaos(db: DB, q: string, opts: { uf?: string; cidade?: string; limit?: number; pais?: string } = {}): Promise<OrgaoBusca[]> {
+  // REGRA ÚNICA DA LOCALIDADE (`lib/localidade/regra-localidade.ts`): lista de cartórios SÓ para o Brasil. Qualquer outro país digita o nome (texto livre) — sem lista, sem base
+  // nacional. E no Brasil só entra o que é CARTÓRIO de verdade (`type = cartorio`): banco, arquivo, igreja, transportadora e todo «outro» ficam de fora, sem lista de exceções.
+  if (modoDoCartorio(opts.pais) !== 'LISTA_DO_BRASIL') return []
   const termos = norm(q).split(" ").filter(Boolean)
   const uf = ufDe(opts.uf)
   const cidade = (opts.cidade ?? "").trim()
@@ -88,6 +95,7 @@ export async function buscarOrgaos(db: DB, q: string, opts: { uf?: string; cidad
   const rows = await db.orgaoProtocolo.findMany({
     where: {
       ativo: true,
+      ...FILTRO_CARTORIO_DO_BRASIL,
       ...(uf ? { state: { equals: uf, mode: "insensitive" as const } } : {}),
       ...(filtroOrgao.length ? { AND: filtroOrgao } : {}),
     },
@@ -102,7 +110,7 @@ export async function buscarOrgaos(db: DB, q: string, opts: { uf?: string; cidad
   let base = rows
   if (rows.length === 0 && termos.length > 0) {
     const todos = await db.orgaoProtocolo.findMany({
-      where: { ativo: true, ...(uf ? { state: { equals: uf, mode: "insensitive" as const } } : {}) },
+      where: { ativo: true, ...FILTRO_CARTORIO_DO_BRASIL, ...(uf ? { state: { equals: uf, mode: "insensitive" as const } } : {}) },
       select: { id: true, name: true, nomeFantasia: true, type: true, city: true, state: true, pais: { select: { countryLabel: true } } },
       take: 5000,
     })

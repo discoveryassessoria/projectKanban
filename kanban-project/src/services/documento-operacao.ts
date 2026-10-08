@@ -6,6 +6,7 @@
 // leem/escrevem AQUI — não falam com o legado direto. Reusa o completion-engine
 // (não recalcula regra — regras 9/10).
 
+import { faltaCartorioVinculado } from "@/src/services/localidade/cartorio-vinculado"
 import { prazoOperacional } from "@/lib/operacional/tempo-operacional"
 import { prisma } from "@/lib/prisma"
 import type { StepInstanceStatus, FaseCode, Prisma, WorkflowEventoTipo } from "@prisma/client"
@@ -937,12 +938,11 @@ export async function atualizarPassoV2(
   if (!carregado.ok) return carregado
   const p = carregado.passo
 
-  // "Localizar registro" só CONCLUI com o órgão do documento VINCULADO ao cadastro (Documento.orgaoId) — em qualquer país, não só no Brasil. Texto
-  // livre no campo cartório não basta: sem vínculo, o órgão não aparece na Operação nem na Torre. Só vale para a CONCLUSÃO (salvar rascunho passa);
+  // "Localizar registro" só CONCLUI, NO BRASIL, com o cartório do documento VINCULADO ao cadastro (Documento.orgaoId). Fora do Brasil o cartório é TEXTO LIVRE (só o nome digitado) e
+  // não se obriga cadastro (`exigeCartorioVinculado`, lib/localidade/regra-localidade.ts — decisão do Marco, 08/10/2026). Só vale para a CONCLUSÃO (salvar rascunho passa);
   // registros já concluídos sem vínculo NÃO são reabertos por esta regra (só passam por ela se alguém tentar concluir de novo).
   if (p.stepKey === "localizar_registro" && typeof patch.status === "string" && mapLegacyStepStatus(patch.status) === "CONCLUIDO" && p.status !== "CONCLUIDO") {
-    const doc = await prisma.documento.findUnique({ where: { id: documentoId }, select: { orgaoId: true } })
-    if (doc && doc.orgaoId == null) return { ok: false, error: "VALIDATION_ERROR:ORGAO_NAO_VINCULADO", status: 422 }
+    if (await faltaCartorioVinculado(documentoId)) return { ok: false, error: "VALIDATION_ERROR:ORGAO_NAO_VINCULADO", status: 422 }
   }
 
   const now = new Date()

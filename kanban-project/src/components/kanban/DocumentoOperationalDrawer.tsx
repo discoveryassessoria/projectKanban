@@ -3,6 +3,7 @@
 "use client"
 
 
+import { rotuloDaDivisao } from "@/lib/localidade/regra-localidade"
 import { formatarDataPura, formatarDataHoraBrasilia, formatarDiaBrasilia } from "@/src/lib/datas-br"
 import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react"
 import { useApi } from "@/src/lib/dados"
@@ -971,9 +972,9 @@ function TabRegistry({ doc, tipoLabel, onSaved }: { doc: Documento; tipoLabel: s
         <Section title="Localidade">
           <GridFields fields={[
             ["País", doc.pais_registro],
-            ["Estado/Província", doc.estado_registro],
+            [rotuloDaDivisao(doc.pais_registro), doc.estado_registro],
             ["Cidade", doc.cidade_registro],
-            ["Cartório (texto livre)", doc.cartorio],
+            ["Cartório", doc.cartorio],
           ]}/>
         </Section>
         <Section title="Órgão emissor (cadastro)">

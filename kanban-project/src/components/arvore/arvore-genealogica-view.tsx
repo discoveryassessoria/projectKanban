@@ -2,6 +2,7 @@
 
 "use client"
 
+import { rotuloDaDivisao } from "@/lib/localidade/regra-localidade"
 import { colunasDoLocalDeObito, textoDoLocalDeObito } from "@/src/lib/genealogia/local-obito"
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useApi, invalidar } from '@/src/lib/dados'
@@ -2261,7 +2262,7 @@ function AddPersonModal({
                 <CampoPaisNascimento value={paisNasc} onChange={setPaisNasc} inputClass={inputClass} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Estado de Nascimento</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{rotuloDaDivisao(paisNasc)} de Nascimento</label>
                 <CampoEstadoNascimento value={estadoNasc} onChange={setEstadoNasc} pais={paisNasc} inputClass={inputClass} />
               </div>
               <div>
@@ -2916,7 +2917,7 @@ function EditPersonModal({
                 <TravaDoRegistro travado={travadosPessoa.has("PESSOA.pais_nasc")}><CampoPaisNascimento value={paisNasc} onChange={setPaisNasc} inputClass={inputClass} /></TravaDoRegistro>
               </div>
               <div data-campo="estado_nasc">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Estado de Nascimento</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{rotuloDaDivisao(paisNasc)} de Nascimento</label>
                 <TravaDoRegistro travado={travadosPessoa.has("PESSOA.estado_nasc")}><CampoEstadoNascimento value={estadoNasc} onChange={setEstadoNasc} pais={paisNasc} inputClass={inputClass} /></TravaDoRegistro>
               </div>
               <div data-campo="cidade_nasc">

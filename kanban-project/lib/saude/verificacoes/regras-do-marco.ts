@@ -27,7 +27,7 @@ import { mesmoLugar } from '@/src/lib/genealogia/sincronizacao-registral'
 import { compararCertidoesDaFamilia } from '@/lib/operacional/ordem-certidoes'
 import { SUBTAREFA_PEDIDO_ENVIADO, SUBTAREFA_CONFIRMACAO, SUBTAREFA_CERTIDAO_RECEBIDA, SUBTAREFA_CONFERENCIA } from '@/lib/operacional/emissao-recebimento'
 
-export type RegraDoMarco = 'a' | 'c' | 'e' | 'f' | 'g' | 'i' | 'j' | 'l' | 'm' | 'n' | 'o' | 'p' | 'q' | 'r'
+export type RegraDoMarco = 'a' | 'c' | 'e' | 'f' | 'g' | 'i' | 'j' | 'l' | 'm' | 'n' | 'o' | 'p' | 'q' | 'r' | 's'
 
 /** O detalhe do processo lido UMA vez por rodada (as regras e, i e o script leem o mesmo). */
 type Detalhe = Awaited<ReturnType<typeof import('@/lib/operacional/torre-foco')['detalheDoProcesso']>>
@@ -60,6 +60,7 @@ export const TITULO_DA_REGRA: Record<RegraDoMarco, string> = {
   j: 'Subtarefa da Emissão fora de ordem ou com selo «Disponível» sendo que depende de outra',
   m: 'Local do óbito da certidão diferente (ou ausente) na árvore',
   n: 'Abas da Torre dizendo coisas diferentes (responsável, fases, risco ou contagens)',
+  s: 'Cartório ligado fora da regra da Localidade (órgão que não é registro civil, ou de outro país que o do registro)',
   r: 'Passo 3 (Receber certidão) concluído com o passo 2 (confirmação do pedido) por concluir — a janela do passo 2 não pode ser a do passo 3',
   q: 'Árvore difere da Genealogia (dado da Genealogia que a árvore ainda não acompanhou)',
   p: 'Necessidade dispensada sem registro de quem dispensou (a partir de 08/10/2026)',
@@ -444,13 +445,36 @@ export async function detectarRegraR(): Promise<ViolacaoDoMarco[]> {
   return out
 }
 
+// ── s ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/** SÓ LEITURA. Documento cujo cartório ligado (`orgaoId`) viola a regra da Localidade (`lib/localidade/regra-localidade.ts`): órgão que NÃO é registro civil (banco, arquivo, igreja… = «outro»),
+ *  registro do Brasil ligado a órgão de outro país, ou registro de fora do Brasil ligado a órgão do Brasil / sem país. */
+export async function detectarRegraS(): Promise<ViolacaoDoMarco[]> {
+  const { ehPaisBrasil, ehOrgaoDeRegistroCivil } = await import('@/lib/localidade/regra-localidade')
+  const docs = await prisma.documento.findMany({
+    where: { orgaoId: { not: null } },
+    select: { id: true, pais_registro: true, cartorio: true, cidade_registro: true, orgao: { select: { id: true, name: true, type: true, pais: { select: { countryLabel: true } } } }, documentType: { select: { name: true } }, pessoa: { select: { nome: true, sobrenome: true, arvore: { select: { processos: { select: { id: true, nome: true }, take: 1 } } } } } },
+  })
+  const out: ViolacaoDoMarco[] = []
+  for (const d of docs) {
+    if (!d.orgao) continue
+    const br = ehPaisBrasil(d.pais_registro), orgaoBr = d.orgao.pais == null
+    const motivos: string[] = []
+    if (!ehOrgaoDeRegistroCivil(d.orgao.type)) motivos.push(`o órgão «${d.orgao.name}» é do tipo «${d.orgao.type ?? 'sem tipo'}», não é cartório`)
+    if (d.pais_registro == null || d.pais_registro.trim() === '') motivos.push(`o registro está sem país, mas há cartório ligado (${d.orgao.name})`)
+    else if (!br && orgaoBr) motivos.push(`registro de ${d.pais_registro} ligado a «${d.orgao.name}», órgão sem país (base do Brasil)`)
+    else if (br && !orgaoBr) motivos.push(`registro do Brasil ligado a «${d.orgao.name}», órgão de ${d.orgao.pais?.countryLabel}`)
+    if (motivos.length) { const pr = d.pessoa.arvore?.processos[0]; out.push({ regra: 's', processoId: pr?.id ?? null, familia: pr?.nome ?? '—', certidao: d.documentType?.name ?? null, pessoa: nomeDe(d.pessoa), detalhe: motivos.join('; '), entidade: 'Documento', registroId: d.id }) }
+  }
+  return out
+}
+
 export async function detectarRegrasDoMarco(opts: { profundo?: boolean } = {}): Promise<{ violacoes: ViolacaoDoMarco[]; porRegra: Record<RegraDoMarco, number> }> {
   limparMemoDeDetalhes()
   const todas = [
     ...(await detectarRegraA()), ...(await detectarRegraC()), ...(await detectarRegraE(opts)),
-    ...(await detectarRegraF()), ...(await detectarRegraG()), ...(opts.profundo ? await detectarRegraI() : []), ...(await detectarRegraJ()), ...(await detectarRegraL()), ...(await detectarRegraM()), ...(await detectarRegraN()), ...(await detectarRegraO()), ...(await detectarRegraP()), ...(await detectarRegraQ()), ...(await detectarRegraR()),
+    ...(await detectarRegraF()), ...(await detectarRegraG()), ...(opts.profundo ? await detectarRegraI() : []), ...(await detectarRegraJ()), ...(await detectarRegraL()), ...(await detectarRegraM()), ...(await detectarRegraN()), ...(await detectarRegraO()), ...(await detectarRegraP()), ...(await detectarRegraQ()), ...(await detectarRegraR()), ...(await detectarRegraS()),
   ]
-  const porRegra = { a: 0, c: 0, e: 0, f: 0, g: 0, i: 0, j: 0, l: 0, m: 0, n: 0, o: 0, p: 0, q: 0, r: 0 } as Record<RegraDoMarco, number>
+  const porRegra = { a: 0, c: 0, e: 0, f: 0, g: 0, i: 0, j: 0, l: 0, m: 0, n: 0, o: 0, p: 0, q: 0, r: 0, s: 0 } as Record<RegraDoMarco, number>
   for (const v of todas) porRegra[v.regra]++
   return { violacoes: todas, porRegra }
 }

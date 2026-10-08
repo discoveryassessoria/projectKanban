@@ -13,6 +13,8 @@
 // Valor vazio no registro nunca apaga a árvore.
 // ============================================================================
 
+import { ehPaisBrasil } from "../../../lib/localidade/regra-localidade"
+
 export type EventoRegistral = "NASCIMENTO" | "CASAMENTO" | "OBITO"
 export type AlvoDaSincronizacao = "PESSOA" | "UNIAO"
 export type OrigemNoRegistro = "data_evento" | "cidade_registro" | "estado_registro" | "pais_registro" | "data_registro" | "cartorio" | "livro" | "folha" | "termo"
@@ -240,4 +242,10 @@ export function suspeitaNoValorDoRegistro(campo: CampoSincronizavel, valor: stri
 /** Datas do MESMO registro que se contradizem (o registro não pode ser lavrado antes do fato). */
 export function registroAnteriorAoEvento(dataEvento: string | null, dataRegistro: string | null): boolean {
   return dataEvento != null && dataRegistro != null && dataRegistro < dataEvento
+}
+
+/** O campo com o RÓTULO certo para o país do registro: «estado do nascimento» só no Brasil; fora dele «província do nascimento» (regra única da Localidade). */
+export function campoParaPais(campo: CampoSincronizavel, pais: string | null | undefined): CampoSincronizavel {
+  if (!/^estado\b/.test(campo.rotulo) || ehPaisBrasil(pais)) return campo
+  return { ...campo, rotulo: campo.rotulo.replace(/^estado/, "província") }
 }
