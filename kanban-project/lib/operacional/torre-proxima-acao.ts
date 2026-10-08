@@ -20,6 +20,7 @@
 // ============================================================================
 import { diaMesDoPrazo } from '@/src/lib/tarefa/texto-prazo'
 import { diasEntreDiasOperacionais } from './tempo-operacional'
+import { responsaveisDoProcesso, type ResponsaveisDoProcesso } from './responsavel-canonico'
 
 /** O que da LINHA de tarefa decide a próxima ação (subconjunto de `LinhaDaTorre`). */
 export interface LinhaParaProximaAcao {
@@ -57,6 +58,8 @@ export interface ProximaAcao {
   dataPrazo: string | null
   /** Quantas tarefas abertas da fase pedem o mesmo (inclui a escolhida). */
   quantas: number
+  /** QUEM tem as tarefas abertas do processo (leitura única de responsável: `responsavel-canonico.ts`). `responsavelNome` acima é só o da tarefa que manda. */
+  responsaveis: ResponsaveisDoProcesso
 }
 
 const RANK_DO_TIPO: Record<TipoDaProximaAcao, number> = { cobrar: 1, distribuir: 2, desbloquear: 3, iniciar: 5, executar: 6, aguardar: 7 }
@@ -145,7 +148,7 @@ export function proximaAcaoDoProcesso(
     default:
       texto = n > 1 ? `Dar andamento a ${n} ${substantivo(mesmas, n)}` : `Dar andamento: ${l.titulo}`
   }
-  return { tipo, urgencia: urgenciaDaTarefa(l), texto, tarefaId: l.taskId, responsavelId: l.responsavelId, responsavelNome: l.responsavelNome, dataPrazo: l.dataPrazo, quantas: n }
+  return { tipo, urgencia: urgenciaDaTarefa(l), texto, tarefaId: l.taskId, responsavelId: l.responsavelId, responsavelNome: l.responsavelNome, dataPrazo: l.dataPrazo, quantas: n, responsaveis: responsaveisDoProcesso(abertas) }
 }
 
 // ─── O PRAZO NA TABELA: "ontem" · "hoje" · "amanhã" · "dd/mm" ──────────────────────────────────────────────────────────────

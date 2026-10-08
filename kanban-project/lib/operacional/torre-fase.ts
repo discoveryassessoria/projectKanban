@@ -15,6 +15,7 @@
 //     30 e 24: 24 = 80% de 30 — aqui o corte acompanha a meta de cada fase); sem meta, sem cor;
 //   • paginação REAL (12 por página).
 // ============================================================================
+import { processoTemDono, processoTemSemDono, type ResponsaveisDoProcesso } from './responsavel-canonico'
 import { diasPorExtenso } from './tempo-extenso'
 import type { ProcessoDaTorre, ColunaDoRadar, PassoDoProcesso } from './torre-processos'
 import { PESO_DA_SITUACAO } from './torre-risco'
@@ -81,11 +82,11 @@ export const escolherFaseInicial = (botoes: BotaoDeFase[]): string | null =>
 
 // ─── LINHA DA TABELA ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
-/** O responsável DA LINHA = o da tarefa que manda na próxima ação; `null` = sem responsável; `undefined` = sem próxima ação. */
-export const responsavelDaLinha = (p: ProcessoDaTorre): string | null | undefined => (p.proximaAcao ? p.proximaAcao.responsavelNome : undefined)
+/** Quem tem tarefa aberta no processo (leitura única: `responsavel-canonico.ts`); `undefined` = sem próxima ação. */
+export const responsaveisDaLinha = (p: ProcessoDaTorre): ResponsaveisDoProcesso | undefined => p.proximaAcao?.responsaveis
 
 /** O texto da busca: família + próxima ação + responsável (+ código). */
-export const textoDeBusca = (p: ProcessoDaTorre): string => semAcento(`${p.familiaNome} ${p.codigo ?? ''} ${p.proximaAcao?.texto ?? ''} ${p.proximaAcao?.responsavelNome ?? ''}`)
+export const textoDeBusca = (p: ProcessoDaTorre): string => semAcento(`${p.familiaNome} ${p.codigo ?? ''} ${p.proximaAcao?.texto ?? ''} ${p.proximaAcao?.responsaveis.donos.map((d) => d.nome).join(' ') ?? ''}`)
 
 // ─── FILTRAR · ORDENAR · PAGINAR ──────────────────────────────────────────────────────────────────────────────────────────
 
@@ -106,7 +107,7 @@ export function aplicarPaisRespBusca(linhas: ProcessoDaTorre[], par: Pick<Parame
   const q = semAcento(par.busca.trim())
   return linhas.filter((p) =>
     (par.pais === TODOS_OS_PAISES || p.pais === par.pais)
-    && (par.resp === TODOS_OS_RESPONSAVEIS || (par.resp === SEM_RESPONSAVEL ? responsavelDaLinha(p) === null : responsavelDaLinha(p) === par.resp))
+    && (par.resp === TODOS_OS_RESPONSAVEIS || (par.resp === SEM_RESPONSAVEL ? (responsaveisDaLinha(p) ? processoTemSemDono(responsaveisDaLinha(p)!) : false) : (responsaveisDaLinha(p) ? processoTemDono(responsaveisDaLinha(p)!, par.resp) : false)))
     && (!q || textoDeBusca(p).includes(q)))
 }
 
@@ -163,8 +164,8 @@ export const opcoesDePais = (linhas: Array<{ pais: string | null }>): string[] =
   [TODOS_OS_PAISES, ...[...new Set(linhas.map((p) => p.pais).filter((x): x is string => !!x))].sort((a, b) => a.localeCompare(b, 'pt-BR'))]
 /** As opções do select Responsável: "Todos os responsáveis" + quem aparece como responsável + "Sem responsável" (se houver). */
 export function opcoesDeResponsavel(linhas: ProcessoDaTorre[]): string[] {
-  const nomes = [...new Set(linhas.map(responsavelDaLinha).filter((x): x is string => !!x))].sort((a, b) => a.localeCompare(b, 'pt-BR'))
-  return [TODOS_OS_RESPONSAVEIS, ...nomes, ...(linhas.some((p) => responsavelDaLinha(p) === null) ? [SEM_RESPONSAVEL] : [])]
+  const nomes = [...new Set(linhas.flatMap((p) => responsaveisDaLinha(p)?.donos.map((d) => d.nome) ?? []))].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  return [TODOS_OS_RESPONSAVEIS, ...nomes, ...(linhas.some((p) => { const r = responsaveisDaLinha(p); return !!r && processoTemSemDono(r) }) ? [SEM_RESPONSAVEL] : [])]
 }
 
 // ─── SAÚDE DA FASE ────────────────────────────────────────────────────────────────────────────────────────────────────────
