@@ -21,9 +21,6 @@ import { usePermissoes } from "@/src/hooks/use-permissoes"
 import type { SubtarefaProjetada } from "./useConfiguracaoDaEtapa"
 import { authHeaders, jsonHeaders } from "@/src/lib/financeiro/http"
 import { RegistrarContatoModal, type DadosDeContato } from "@/src/components/operacao/RegistrarContatoModal"
-import { RegistrarRecebimentoModal } from "@/src/components/operacao/RegistrarRecebimentoModal"
-import { SUBTAREFA_CONFIRMACAO } from "@/lib/operacional/emissao-recebimento"
-import { janelaDaSubtarefa } from "@/lib/operacional/janela-do-passo"
 
 // ============================================================
 // HELPER — pega userId logado do localStorage (mesmo padrão do
@@ -500,7 +497,6 @@ function StepOuSubtarefas({
   tarefaId: number | null
   documentoId: number
 }) {
-  const [recebimentoAberto, setRecebimentoAberto] = useState(false)
   // SEM FETCH PRÓPRIO — `step.subtarefas` já chega pronto na MESMA resposta
   // de `/api/documentos/[id]/workflow` (ver montarWorkflowV2). Antes disto
   // havia uma segunda chamada aqui (`useConfiguracaoDaEtapa`), e a corrida
@@ -524,24 +520,11 @@ function StepOuSubtarefas({
     )
   }
 
-  // CADA PASSO ABRE A JANELA DO PRÓPRIO PASSO (`janelaDaSubtarefa`, lib/operacional/janela-do-passo.ts): o passo 2 (Receber confirmação do pedido) abre a Central
-  // com a tela de confirmação do pedido; SÓ o passo 3 (Receber certidão) abre «Registrar recebimento» — e só depois do passo 2 concluído. O servidor confere quem pode.
-  const confirmacaoConcluida = subtarefas.some((x) => x.key === SUBTAREFA_CONFIRMACAO && x.concluida)
-  const podeRegistrarAqui = tarefaId != null && confirmacaoConcluida && (podeIniciar || isAdmin)
-
   return (
     <div ref={refDoAtual} className="space-y-1.5">
-      {recebimentoAberto && tarefaId != null && (
-        <RegistrarRecebimentoModal
-          tarefaId={tarefaId} documentoId={documentoId}
-          onFechar={() => setRecebimentoAberto(false)}
-          onRegistrado={() => { setRecebimentoAberto(false); onRecarregar() }}
-        />
-      )}
       {subtarefas.map((s, i) => (
         <SubtarefaRow
           key={s.key}
-          onRegistrarRecebimento={podeRegistrarAqui && janelaDaSubtarefa(s.key) === "REGISTRAR_RECEBIMENTO" && !s.concluida ? () => setRecebimentoAberto(true) : undefined}
           subtarefa={s}
           ordem={i + 1}
           onOpenCentral={onOpenCentral}
@@ -569,7 +552,7 @@ const SUBTAREFA_STATUS_LABEL: Record<string, string> = {
 }
 
 function SubtarefaRow({
-  subtarefa, ordem, onOpenCentral, podeIniciar, tarefaResponsavelNome, isAdmin, stepInstanceId, onRecarregar, onRegistrarRecebimento,
+  subtarefa, ordem, onOpenCentral, podeIniciar, tarefaResponsavelNome, isAdmin, stepInstanceId, onRecarregar,
 }: {
   subtarefa: {
     key: string; label: string; descricao: string | null; concluida: boolean; disponivel: boolean
@@ -583,8 +566,6 @@ function SubtarefaRow({
   isAdmin: boolean
   stepInstanceId: number
   onRecarregar: () => void
-  /** Presente só no passo 2, com o pedido já enviado e o recebimento ainda não registrado. */
-  onRegistrarRecebimento?: () => void
 }) {
   const s = subtarefa
   // MODO CONCLUÍDA — compacto, mesmo padrão visual do StepCard concluído, mas
@@ -699,17 +680,7 @@ function SubtarefaRow({
             </>
           )}
         </div>
-        {onRegistrarRecebimento ? (
-          // «REGISTRAR RECEBIMENTO» é a janela do PASSO 3 (Receber certidão): data do recebimento + anexo opcional. O passo 2 abre a Central (confirmação do pedido).
-          <button
-            onClick={onRegistrarRecebimento}
-            data-testid="registrar-recebimento-passo"
-            title="Abre «Registrar recebimento»: conclui «Receber certidão» e libera a conferência"
-            className="px-2.5 py-1.5 text-[10.5px] font-semibold bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-[var(--action-primary-ink)] rounded transition-colors whitespace-nowrap"
-          >
-            Registrar recebimento →
-          </button>
-        ) : podeAgir ? (
+        {podeAgir ? (
           <button
             onClick={() => onOpenCentral(s.key)}
             className="px-2.5 py-1.5 text-[10.5px] font-semibold bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-[var(--action-primary-ink)] rounded transition-colors whitespace-nowrap"

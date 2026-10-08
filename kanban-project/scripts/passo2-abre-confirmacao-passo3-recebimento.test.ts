@@ -12,18 +12,16 @@ const arquivos = (dir: string): string[] => readdirSync(dir).flatMap((f) => { co
 const comentarios = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")
 
 console.log("\n1) A janela de cada passo (regra única)")
-ok("passo 1, 2 e 4 abrem a Central da etapa", ["enviar_requerimento_cartorio", "receber_confirmacao_pedido", "conferir_validar_certidao"].every((k) => janelaDaSubtarefa(k) === "CENTRAL_DA_ETAPA"))
-ok("SÓ o passo 3 abre «Registrar recebimento»", janelaDaSubtarefa("receber_certidao") === "REGISTRAR_RECEBIMENTO")
+ok("os 4 passos abrem a Central da etapa, que mostra o editor do PRÓPRIO passo (2 confirmação do pedido, 3 recebimento, 4 conferir e validar)", ["enviar_requerimento_cartorio", "receber_confirmacao_pedido", "receber_certidao", "conferir_validar_certidao"].every((k) => janelaDaSubtarefa(k) === "CENTRAL_DA_ETAPA"))
 const S = (c: string, d: string, r: string) => ({ enviar_requerimento_cartorio: c, receber_confirmacao_pedido: d, receber_certidao: r })
 ok("«Registrar recebimento» só com o passo 2 concluído e o 3 por concluir", podeAbrirRegistrarRecebimento(S("CONCLUIDO", "CONCLUIDO", "DISPONIVEL")) && !podeAbrirRegistrarRecebimento(S("CONCLUIDO", "AGUARDANDO_EXTERNO", "BLOQUEADO")) && !podeAbrirRegistrarRecebimento(S("CONCLUIDO", "CONCLUIDO", "CONCLUIDO")) && !podeAbrirRegistrarRecebimento(null))
 
 console.log("\n2) Pontos de entrada: nenhum abre a janela do passo 3 a partir do passo 2")
 const todos = [...arquivos("src"), ...arquivos("lib")]
 const usam = todos.filter((f) => { const c = comentarios(ler(f)); return /<RegistrarRecebimentoModal|\/registrar-recebimento`/.test(c) && !/RegistrarRecebimentoModal\.tsx$|registrar-recebimento\/route\.ts$/.test(f) })
-ok("a janela «Registrar recebimento» só é aberta pelo WorkflowTab (o componente que todas as telas usam)", JSON.stringify(usam) === JSON.stringify(["src/components/kanban/workflow/WorkflowTab.tsx"]), usam.join(", "))
+ok("nenhuma tela abre o modal «Registrar recebimento» (a janela do passo 3 é a Central)", todos.filter((f) => /<RegistrarRecebimentoModal/.test(comentarios(ler(f))) && !/RegistrarRecebimentoModal\.tsx$/.test(f)).length === 0)
 const wf = comentarios(ler("src/components/kanban/workflow/WorkflowTab.tsx"))
-ok("o WorkflowTab decide pela regra única (janelaDaSubtarefa) e nunca pela chave do passo 2", /janelaDaSubtarefa\(s\.key\) === "REGISTRAR_RECEBIMENTO"/.test(wf) && !/SUBTAREFA_CONFIRMACAO[^\n]*setRecebimentoAberto|setRecebimentoAberto[^\n]*SUBTAREFA_CONFIRMACAO/.test(wf))
-ok("o passo 2 abre a Central (onOpenCentral) — a tela de confirmação do pedido", /onClick=\{\(\) => onOpenCentral\(s\.key\)\}/.test(wf))
+ok("os passos 2, 3 e 4 abrem a Central (onOpenCentral) — cada um o seu editor", /onClick=\{\(\) => onOpenCentral\(s\.key\)\}/.test(wf))
 const hospedeiros = todos.filter((f) => /<WorkflowTab\b/.test(comentarios(ler(f))))
 ok("o WorkflowTab é montado num lugar só (a gaveta da certidão)", hospedeiros.length === 1 && /DocumentoOperationalDrawer\.tsx$/.test(hospedeiros[0]), hospedeiros.join(", "))
 const gavetaUsadaPor = todos.filter((f) => /DocumentoOperationalDrawer/.test(comentarios(ler(f))) && !/DocumentoOperationalDrawer\.tsx$/.test(f)).sort()
