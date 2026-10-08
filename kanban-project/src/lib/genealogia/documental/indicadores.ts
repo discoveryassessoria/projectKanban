@@ -93,7 +93,8 @@ export function indicadorVazio(): IndicadorDocumental {
 }
 
 function classificar(i: IndicadorDocumental): SituacaoDocumental {
-  if (i.necessarias === 0) return "sem_exigencia"
+  // Só necessidades DISPENSADAS (pessoa sem necessidade de documento) = sem exigência — nunca «100% do dossiê».
+  if (i.necessarias === 0 || i.dispensadas >= i.necessarias) return "sem_exigencia"
   if (i.naoLocalizadas > 0) return "bloqueado"
   if (i.pendentes > 0) return "pendente"
   if (i.emAtendimento > 0) return "em_andamento"
@@ -131,7 +132,7 @@ function fechar(i: IndicadorDocumental): IndicadorDocumental {
   // exigência não se aplica. Tratá-la como pendência faria o dossiê nunca
   // fechar e a árvore contradizer o módulo dono da regra.
   const resolvidas = i.atendidas + i.dispensadas
-  i.progresso = i.necessarias > 0 ? Math.round((resolvidas / i.necessarias) * 100) : null
+  i.progresso = i.necessarias > 0 && i.dispensadas < i.necessarias ? Math.round((resolvidas / i.necessarias) * 100) : null
   i.situacao = classificar(i)
   return i
 }

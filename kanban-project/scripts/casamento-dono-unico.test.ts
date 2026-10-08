@@ -33,6 +33,10 @@ async function main() {
   const ind = indicadorDaPessoa(proj2, 2, [])
   ok("registro localizado + certidão NÃO validada = em atendimento (não 100%); sem documento operacional segue atendida", ind.atendidas === 1 && ind.emAtendimento === 1 && ind.progresso === 50, JSON.stringify(ind))
 
+  const soDispensada = projetarIndicadores([nec({ id: 20, pessoaId: 9, status: "DISPENSADA" })])
+  const indD = indicadorDaPessoa(soDispensada, 9, [])
+  ok("pessoa com SÓ necessidade dispensada = «sem exigência» (não «100% do dossiê»)", indD.progresso === null && indD.situacao === "sem_exigencia", JSON.stringify(indD))
+
   console.log("\n3) Banco: reapontar muda SÓ o titular")
   const c = await montarCenario("CASDONO")
   try {

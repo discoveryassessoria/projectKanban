@@ -272,7 +272,7 @@ export function ResumoOperacional({
 
       {indicadores && !fila.antesDaGenealogia && (
         <p className="mt-1.5 text-[11px] tabular-nums text-[var(--text-secondary)]" data-indicadores-pessoa>
-          {indicadores.documental.necessarias > 0
+          {indicadores.documental.necessarias > indicadores.documental.dispensadas
             ? `Documentos ${indicadores.documental.atendidas + indicadores.documental.dispensadas} de ${indicadores.documental.necessarias}`
             : "Sem exigência documental"}
           {` · ${indicadores.divergencias} divergência(s) do motor`}
