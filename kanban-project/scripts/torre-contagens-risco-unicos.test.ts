@@ -54,5 +54,12 @@ console.log("\n4) Nenhuma aba reconta por conta própria")
 ok("botoesDeFase usa contarPorFase", /contarPorFase/.test(ler("lib/operacional/torre-fase.ts")))
 ok("vigia registrado na suíte crítica", /torre-contagens-risco-unicos/.test(ler("scripts/ci/suite-critica.json")))
 
+console.log("\n5) Briefing: tarefa concluída ≠ certidão recebida/validada")
+import { briefingDoDia, textoDasCertidoesDeOntem } from "../lib/operacional/precisa-de-voce-decisoes"
+ok("0 e 0 → «nenhuma certidão foi recebida ou validada»", textoDasCertidoesDeOntem(0, 0) === "nenhuma certidão foi recebida ou validada")
+ok("3 recebidas e 1 validada", textoDasCertidoesDeOntem(3, 1) === "3 certidões recebidas e 1 validada")
+const b = briefingDoDia([{ tipo: "SEM_DONO", contexto: {} } as never], new Date(), { tarefasConcluidasOntem: 44, certidoesRecebidasOntem: 0, certidoesValidadasOntem: 0 })
+ok("44 tarefas NÃO viram «44 certidões»", /Ontem a equipe concluiu 44 tarefas e nenhuma certidão foi recebida ou validada\./.test(b) && !/44 certidões/.test(b), b)
+
 console.log(`\n${n - falhou}/${n} verificações`)
 if (falhou > 0) process.exit(1)

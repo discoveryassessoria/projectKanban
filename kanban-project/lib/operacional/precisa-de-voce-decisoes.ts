@@ -343,9 +343,22 @@ export interface ExtrasDoBriefing {
   nome?: string | null
   ativos?: number
   noRitmo?: number
-  fechadasOntem?: number
+  /** Tarefas concluídas ontem (qualquer fase). NÃO são certidões. */
+  tarefasConcluidasOntem?: number
+  /** Certidões RECEBIDAS ontem (passo de recebimento concluído). */
+  certidoesRecebidasOntem?: number
+  /** Certidões VALIDADAS ontem (conferir e validar concluído). */
+  certidoesValidadasOntem?: number
   protocoladosOntem?: number
   vencemHoje?: number
+}
+
+/** Recebimento e validação de certidões ontem — separado das tarefas concluídas. «nenhuma certidão foi recebida ou validada» quando os dois são zero. */
+export function textoDasCertidoesDeOntem(recebidas: number, validadas: number): string {
+  if (recebidas === 0 && validadas === 0) return 'nenhuma certidão foi recebida ou validada'
+  const r = recebidas > 0 ? `${recebidas} ${recebidas === 1 ? 'certidão recebida' : 'certidões recebidas'}` : null
+  const v = validadas > 0 ? `${validadas} ${validadas === 1 ? 'validada' : 'validadas'}` : null
+  return [r, v].filter(Boolean).join(' e ')
 }
 
 const juntar = (partes: string[]): string => (partes.length <= 1 ? partes[0] ?? '' : `${partes.slice(0, -1).join(', ')} e ${partes[partes.length - 1]}`)
@@ -363,11 +376,12 @@ export function briefingDoDia(itens: ItemParaBriefing[], agora = new Date(), ext
 
   const frases: string[] = [abertura]
   if (extras.ativos != null) frases.push(`${pl(extras.ativos, 'processo ativo', 'processos ativos')}${extras.noRitmo != null ? `, ${extras.noRitmo} no ritmo` : ''}.`)
-  if (extras.fechadasOntem != null || extras.protocoladosOntem != null) {
+  if (extras.tarefasConcluidasOntem != null || extras.certidoesRecebidasOntem != null || extras.certidoesValidadasOntem != null || extras.protocoladosOntem != null) {
     const partes: string[] = []
-    if (extras.fechadasOntem != null) partes.push(`a equipe fechou ${certidoes(extras.fechadasOntem)}`)
+    if (extras.tarefasConcluidasOntem != null) partes.push(`a equipe concluiu ${pl(extras.tarefasConcluidasOntem, 'tarefa', 'tarefas')}`)
+    if (extras.certidoesRecebidasOntem != null || extras.certidoesValidadasOntem != null) partes.push(textoDasCertidoesDeOntem(extras.certidoesRecebidasOntem ?? 0, extras.certidoesValidadasOntem ?? 0))
     if (extras.protocoladosOntem != null) partes.push(`${pl(extras.protocoladosOntem, 'processo foi protocolado', 'processos foram protocolados')}`)
-    frases.push(`Ontem ${partes.join(' e ')}.`)
+    frases.push(`Ontem ${juntar(partes)}.`)
   }
   if (extras.vencemHoje != null) frases.push(extras.vencemHoje === 1 ? 'Hoje vence 1 prazo.' : `Hoje vencem ${extras.vencemHoje} prazos.`)
 

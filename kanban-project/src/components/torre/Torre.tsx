@@ -279,7 +279,7 @@ export function Torre() {
     return briefingDoDia(itens, agora, {
       nome: precisa.nome,
       ...(procs ? { ativos: processosPais.length, noRitmo: processosPais.filter((p) => classeDoFunil(p.risco) === "ritmo").length } : {}),
-      fechadasOntem: somar(precisa.ontem.fechadas), protocoladosOntem: somar(precisa.ontem.protocolados),
+      tarefasConcluidasOntem: somar(precisa.ontem.tarefasConcluidas), certidoesRecebidasOntem: somar(precisa.ontem.recebidas), certidoesValidadasOntem: somar(precisa.ontem.validadas), protocoladosOntem: somar(precisa.ontem.protocolados),
       vencemHoje: numeroDoKpi("hoje", linhasPais, agora),
     })
   }, [precisa, itensPrecisaPais, procs, processosPais, linhasPais, filtrandoPais, paisRotulo, agora])

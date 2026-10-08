@@ -72,9 +72,9 @@ async function main() {
   ok("com itens: cita quantas decisões esperam a pessoa", /2 decisões esperam você/.test(texto), texto)
   ok("com itens: cita Sem responsável (vocabulário oficial — nunca 'sem dono')", /1 processo com certidões sem responsável/.test(texto) && !/sem dono/i.test(texto), texto)
   ok("com itens: cita escalada", /1 cobrança escalada sem resposta/.test(texto), texto)
-  const comNome = briefingDoDia(itensFicticios, agora, { nome: "Marco Rovatti", ativos: 500, noRitmo: 453, fechadasOntem: 38, protocoladosOntem: 6, vencemHoje: 38 })
-  ok("com os números do dia: 'Bom dia, Marco. 500 processos ativos, 453 no ritmo. Ontem a equipe fechou 38 certidões e 6 processos foram protocolados. Hoje vencem 38 prazos.'",
-    /^Bom dia, Marco\. 500 processos ativos, 453 no ritmo\. Ontem a equipe fechou 38 certidões e 6 processos foram protocolados\. Hoje vencem 38 prazos\. 2 decisões esperam você: /.test(comNome), comNome)
+  const comNome = briefingDoDia(itensFicticios, agora, { nome: "Marco Rovatti", ativos: 500, noRitmo: 453, tarefasConcluidasOntem: 44, certidoesRecebidasOntem: 0, certidoesValidadasOntem: 0, protocoladosOntem: 6, vencemHoje: 38 })
+  ok("com os números do dia: 'Bom dia, Marco. 500 processos ativos, 453 no ritmo. Ontem a equipe concluiu 44 tarefas, nenhuma certidão foi recebida ou validada e 6 processos foram protocolados. Hoje vencem 38 prazos.'",
+    /^Bom dia, Marco\. 500 processos ativos, 453 no ritmo\. Ontem a equipe concluiu 44 tarefas, nenhuma certidão foi recebida ou validada e 6 processos foram protocolados\. Hoje vencem 38 prazos\. 2 decisões esperam você: /.test(comNome), comNome)
   ok("sem os números do dia, a frase correspondente simplesmente não aparece (nada inventado)", !/Ontem|processos ativos|Hoje vencem/.test(texto), texto)
 
   secao("SUGESTÃO — apto → menos ativas → empate 30 dias")
