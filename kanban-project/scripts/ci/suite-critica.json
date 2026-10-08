@@ -249,6 +249,7 @@
     "scripts/atribuicao-so-na-pagina-do-processo.test.ts",
     "scripts/torre-abas-coerentes.test.ts",
     "scripts/torre-contagens-risco-unicos.test.ts",
+    "scripts/prazo-nunca-antes-da-entrada.test.ts",
     "scripts/torre-fases-fonte-unica.test.ts",
     "scripts/planilha-dados-do-registro-ilaine.test.ts",
     "scripts/regras-inegociaveis-do-marco.test.ts",

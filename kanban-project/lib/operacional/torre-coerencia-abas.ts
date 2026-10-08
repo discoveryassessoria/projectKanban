@@ -144,8 +144,10 @@ export async function compararAbasDaTorre(agora = new Date()): Promise<Divergenc
     emRiscoDoCartao: contarTotais(processos.map(paraContagem)).graves,
     emRiscoDaTarefas: criticos.size,
   }, (ps, fs) => contarPorFase(ps, fs), tot)
+  const prazos = await prazosAntesDaEntrada()
   return [
     ...contagens,
+    ...prazos,
     ...compararFases(chavesUnicas, [
       { aba: 'Visão geral (funil)', chaves: funil.fases.map((f) => f.key), completa: true },
       { aba: 'Radar e Processos (colunas)', chaves: colunas.map((c) => c.key), completa: true },
@@ -158,4 +160,24 @@ export async function compararAbasDaTorre(agora = new Date()): Promise<Divergenc
       semResponsavelDaEquipe: equipe.semResponsavel.ativas,
     }),
   ]
+}
+
+/** Prazo de tarefa aberta, na fase atual do processo, anterior à entrada nela (Item 4). SOMENTE LEITURA. */
+export async function prazosAntesDaEntrada(): Promise<DivergenciaEntreAbas[]> {
+  const { prisma } = await import('@/lib/prisma')
+  const abertas = await prisma.tarefa.findMany({
+    where: { dataPrazo: { not: null }, statusTarefa: { notIn: ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI', 'CANCELADA', 'SUPERSEDIDA'] }, processo: { dataConclusao: null } },
+    select: { id: true, titulo: true, processoId: true, faseMacroKey: true, dataPrazo: true, processo: { select: { nome: true, faseAtualKey: true } } },
+  })
+  const naFase = abertas.filter((t) => t.processoId != null && t.faseMacroKey != null && t.faseMacroKey === t.processo?.faseAtualKey)
+  const ids = [...new Set(naFase.map((t) => t.processoId as number))]
+  const logs = await prisma.phaseAdvanceLog.findMany({ where: { processoId: { in: ids }, resultado: { in: ['MOVIDO', 'AVANCADO', 'FORCADO'] } }, select: { processoId: true, fasePretendida: true, criadoEm: true } })
+  const entrada = new Map<string, Date>()
+  for (const l of logs) { const k = `${l.processoId}|${l.fasePretendida}`; const a = entrada.get(k); if (!a || l.criadoEm > a) entrada.set(k, l.criadoEm) }
+  const out: DivergenciaEntreAbas[] = []
+  for (const t of naFase) {
+    const e = entrada.get(`${t.processoId}|${t.faseMacroKey}`)
+    if (e && t.dataPrazo && t.dataPrazo < e) out.push({ assunto: 'prazo', abas: 'Processos / Tarefas', chave: `${t.processo?.nome ?? t.processoId} · tarefa ${t.id}`, detalhe: `prazo ${t.dataPrazo.toISOString().slice(0, 10)} é anterior à entrada na fase (${e.toISOString().slice(0, 10)}) — «${t.titulo}»` })
+  }
+  return out
 }
