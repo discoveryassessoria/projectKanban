@@ -30,7 +30,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!data) return NextResponse.json({ ok: false, codigo: 'DATA_INVALIDA', mensagem: 'A data de recebimento é inválida ou está no futuro.' }, { status: 422 })
     return NextResponse.json({
       ok: true, previa: true,
-      pergunta: `Registrar que a certidão foi recebida em ${diaMes(data)}? Isso conclui "Receber confirmação do pedido" e "Receber certidão", libera "Conferir e validar certidão" para você e tira a certidão de Aguardando.`,
+      pergunta: `Registrar que a certidão foi recebida em ${diaMes(data)}? Isso conclui "Receber certidão", libera "Conferir e validar certidão" para você e tira a certidão de Aguardando.`,
     })
   }
 

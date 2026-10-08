@@ -22,7 +22,8 @@ import type { SubtarefaProjetada } from "./useConfiguracaoDaEtapa"
 import { authHeaders, jsonHeaders } from "@/src/lib/financeiro/http"
 import { RegistrarContatoModal, type DadosDeContato } from "@/src/components/operacao/RegistrarContatoModal"
 import { RegistrarRecebimentoModal } from "@/src/components/operacao/RegistrarRecebimentoModal"
-import { SUBTAREFA_PEDIDO_ENVIADO, SUBTAREFA_CONFIRMACAO, SUBTAREFA_CERTIDAO_RECEBIDA } from "@/lib/operacional/emissao-recebimento"
+import { SUBTAREFA_CONFIRMACAO } from "@/lib/operacional/emissao-recebimento"
+import { janelaDaSubtarefa } from "@/lib/operacional/janela-do-passo"
 
 // ============================================================
 // HELPER — pega userId logado do localStorage (mesmo padrão do
@@ -523,10 +524,10 @@ function StepOuSubtarefas({
     )
   }
 
-  // PEDIDO ENVIADO E RECEBIMENTO AINDA NÃO REGISTRADO: o botão «Registrar recebimento» aparece no passo 2. O servidor confere quem pode.
-  const pedidoEnviado = subtarefas.some((x) => x.key === SUBTAREFA_PEDIDO_ENVIADO && x.concluida)
-  const recebimentoAberto_ = subtarefas.some((x) => x.key === SUBTAREFA_CERTIDAO_RECEBIDA && !x.concluida)
-  const podeRegistrarAqui = tarefaId != null && pedidoEnviado && recebimentoAberto_ && (podeIniciar || isAdmin)
+  // CADA PASSO ABRE A JANELA DO PRÓPRIO PASSO (`janelaDaSubtarefa`, lib/operacional/janela-do-passo.ts): o passo 2 (Receber confirmação do pedido) abre a Central
+  // com a tela de confirmação do pedido; SÓ o passo 3 (Receber certidão) abre «Registrar recebimento» — e só depois do passo 2 concluído. O servidor confere quem pode.
+  const confirmacaoConcluida = subtarefas.some((x) => x.key === SUBTAREFA_CONFIRMACAO && x.concluida)
+  const podeRegistrarAqui = tarefaId != null && confirmacaoConcluida && (podeIniciar || isAdmin)
 
   return (
     <div ref={refDoAtual} className="space-y-1.5">
@@ -540,7 +541,7 @@ function StepOuSubtarefas({
       {subtarefas.map((s, i) => (
         <SubtarefaRow
           key={s.key}
-          onRegistrarRecebimento={podeRegistrarAqui && s.key === SUBTAREFA_CONFIRMACAO && !s.concluida ? () => setRecebimentoAberto(true) : undefined}
+          onRegistrarRecebimento={podeRegistrarAqui && janelaDaSubtarefa(s.key) === "REGISTRAR_RECEBIMENTO" && !s.concluida ? () => setRecebimentoAberto(true) : undefined}
           subtarefa={s}
           ordem={i + 1}
           onOpenCentral={onOpenCentral}
@@ -699,15 +700,14 @@ function SubtarefaRow({
           )}
         </div>
         {onRegistrarRecebimento ? (
-          // FLUXO ÚNICO DO RECEBIMENTO: no passo 2 («Receber confirmação do pedido») o ÚNICO botão é «Iniciar →», e ele abre «Registrar recebimento»
-          // (data, anexo opcional, confirmação) — que conclui os passos 2 e 3 e libera o 4 com quem registrou como responsável.
+          // «REGISTRAR RECEBIMENTO» é a janela do PASSO 3 (Receber certidão): data do recebimento + anexo opcional. O passo 2 abre a Central (confirmação do pedido).
           <button
             onClick={onRegistrarRecebimento}
-            data-testid="iniciar-registrar-recebimento"
-            title="Abre «Registrar recebimento»: conclui «Receber confirmação do pedido» e «Receber certidão» e libera a conferência"
+            data-testid="registrar-recebimento-passo"
+            title="Abre «Registrar recebimento»: conclui «Receber certidão» e libera a conferência"
             className="px-2.5 py-1.5 text-[10.5px] font-semibold bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-[var(--action-primary-ink)] rounded transition-colors whitespace-nowrap"
           >
-            Iniciar →
+            Registrar recebimento →
           </button>
         ) : podeAgir ? (
           <button

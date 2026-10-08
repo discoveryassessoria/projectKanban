@@ -1,8 +1,8 @@
 "use client"
 // src/components/operacao/RegistrarRecebimentoModal.tsx
 // ============================================================================
-// REGISTRAR RECEBIMENTO (Operação, 07/10/2026) — a certidão chegou do cartório. UM modal, usado pela linha da aba Aguardando e pela gaveta
-// da certidão (passo 2): data de recebimento (sugere hoje; pode ser de meses atrás), anexo OPCIONAL, e confirmação com o texto do que vai
+// REGISTRAR RECEBIMENTO (Operação, 07/10/2026) — a certidão chegou do cartório. A janela do PASSO 3 («Receber certidão»), aberta pela gaveta da
+// certidão (WorkflowTab, `janelaDaSubtarefa`) — o passo 2 abre a tela de confirmação do pedido: data de recebimento (sugere hoje; pode ser de meses atrás), anexo OPCIONAL, e confirmação com o texto do que vai
 // mudar. Só grava depois do «Confirmar». Nada exige anexo: a equipe lança pedidos antigos que não têm comprovante guardado.
 //   POST /api/operacao/tarefas/{id}/registrar-recebimento  (sem `confirmado` = prévia; com `confirmado: true` = grava)
 // ============================================================================

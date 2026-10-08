@@ -27,7 +27,7 @@ import { mesmoLugar } from '@/src/lib/genealogia/sincronizacao-registral'
 import { compararCertidoesDaFamilia } from '@/lib/operacional/ordem-certidoes'
 import { SUBTAREFA_PEDIDO_ENVIADO, SUBTAREFA_CONFIRMACAO, SUBTAREFA_CERTIDAO_RECEBIDA, SUBTAREFA_CONFERENCIA } from '@/lib/operacional/emissao-recebimento'
 
-export type RegraDoMarco = 'a' | 'c' | 'e' | 'f' | 'g' | 'i' | 'j' | 'l' | 'm' | 'n' | 'o' | 'p' | 'q'
+export type RegraDoMarco = 'a' | 'c' | 'e' | 'f' | 'g' | 'i' | 'j' | 'l' | 'm' | 'n' | 'o' | 'p' | 'q' | 'r'
 
 /** O detalhe do processo lido UMA vez por rodada (as regras e, i e o script leem o mesmo). */
 type Detalhe = Awaited<ReturnType<typeof import('@/lib/operacional/torre-foco')['detalheDoProcesso']>>
@@ -60,6 +60,7 @@ export const TITULO_DA_REGRA: Record<RegraDoMarco, string> = {
   j: 'Subtarefa da Emissão fora de ordem ou com selo «Disponível» sendo que depende de outra',
   m: 'Local do óbito da certidão diferente (ou ausente) na árvore',
   n: 'Abas da Torre dizendo coisas diferentes (responsável, fases, risco ou contagens)',
+  r: 'Passo 3 (Receber certidão) concluído com o passo 2 (confirmação do pedido) por concluir — a janela do passo 2 não pode ser a do passo 3',
   q: 'Árvore difere da Genealogia (dado da Genealogia que a árvore ainda não acompanhou)',
   p: 'Necessidade dispensada sem registro de quem dispensou (a partir de 08/10/2026)',
   o: 'Documentos por pessoa: casamento fora do dono, dispensada com exigência, ou painel × aba Documentos × árvore × Torre divergentes',
@@ -428,13 +429,28 @@ export async function detectarRegraQ(): Promise<ViolacaoDoMarco[]> {
   return rel.aplicar.map((l) => ({ regra: 'q' as const, processoId: l.processoId, familia: l.familia, certidao: l.certidao, pessoa: l.pessoa, detalhe: `${l.campo}: árvore «${l.arvoreTexto}» × Genealogia «${l.genealogiaTexto}»`, entidade: l.alvo === 'UNIAO' ? 'Uniao' : 'Pessoa', registroId: l.alvoId }))
 }
 
+// ── r ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+export async function detectarRegraR(): Promise<ViolacaoDoMarco[]> {
+  const execs = await prisma.subtaskExecution.findMany({
+    where: { supersededAt: null, subtaskKey: { in: ['receber_confirmacao_pedido', 'receber_certidao'] } },
+    select: { stepInstanceId: true, subtaskKey: true, status: true, stepInstance: { select: { documentoId: true, processoId: true, processo: { select: { nome: true } }, documento: { select: { documentType: { select: { name: true } }, pessoa: { select: { nome: true, sobrenome: true } } } } } } },
+  })
+  const por = new Map<number, { conf?: string; cert?: string; e: (typeof execs)[number] }>()
+  for (const x of execs) { const o = por.get(x.stepInstanceId) ?? { e: x }; if (x.subtaskKey === 'receber_certidao') o.cert = x.status; else o.conf = x.status; por.set(x.stepInstanceId, o) }
+  const out: ViolacaoDoMarco[] = []
+  for (const [id, o] of por) {
+    if (o.cert === 'CONCLUIDO' && o.conf !== 'CONCLUIDO') out.push({ regra: 'r', processoId: o.e.stepInstance.processoId ?? null, familia: o.e.stepInstance.processo?.nome ?? '—', certidao: o.e.stepInstance.documento?.documentType?.name ?? null, pessoa: nomeDe(o.e.stepInstance.documento?.pessoa), detalhe: 'recebimento (passo 3) concluído sem a confirmação do pedido (passo 2) concluída', entidade: 'PhaseWorkflowStepInstance', registroId: id })
+  }
+  return out
+}
+
 export async function detectarRegrasDoMarco(opts: { profundo?: boolean } = {}): Promise<{ violacoes: ViolacaoDoMarco[]; porRegra: Record<RegraDoMarco, number> }> {
   limparMemoDeDetalhes()
   const todas = [
     ...(await detectarRegraA()), ...(await detectarRegraC()), ...(await detectarRegraE(opts)),
-    ...(await detectarRegraF()), ...(await detectarRegraG()), ...(opts.profundo ? await detectarRegraI() : []), ...(await detectarRegraJ()), ...(await detectarRegraL()), ...(await detectarRegraM()), ...(await detectarRegraN()), ...(await detectarRegraO()), ...(await detectarRegraP()), ...(await detectarRegraQ()),
+    ...(await detectarRegraF()), ...(await detectarRegraG()), ...(opts.profundo ? await detectarRegraI() : []), ...(await detectarRegraJ()), ...(await detectarRegraL()), ...(await detectarRegraM()), ...(await detectarRegraN()), ...(await detectarRegraO()), ...(await detectarRegraP()), ...(await detectarRegraQ()), ...(await detectarRegraR()),
   ]
-  const porRegra = { a: 0, c: 0, e: 0, f: 0, g: 0, i: 0, j: 0, l: 0, m: 0, n: 0, o: 0, p: 0, q: 0 } as Record<RegraDoMarco, number>
+  const porRegra = { a: 0, c: 0, e: 0, f: 0, g: 0, i: 0, j: 0, l: 0, m: 0, n: 0, o: 0, p: 0, q: 0, r: 0 } as Record<RegraDoMarco, number>
   for (const v of todas) porRegra[v.regra]++
   return { violacoes: todas, porRegra }
 }

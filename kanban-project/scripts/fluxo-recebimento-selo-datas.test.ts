@@ -41,7 +41,7 @@ async function main() {
   ok("nenhum «Confirmado ✓» / «Recebi ✓» / concluirLabelDe em lugar nenhum", !tudo.some(([, c]) => /Confirmado ✓|Recebi ✓|concluirLabelDe/.test(c)))
   ok("nenhum botão «Registrar recebimento» fora do modal (nem na linha, nem na gaveta)", !tudo.some(([f, c]) => !/RegistrarRecebimentoModal\.tsx$/.test(f) && />\s*Registrar recebimento\s*</.test(c)))
   const wf = semComentarios(ler("src/components/kanban/workflow/WorkflowTab.tsx"))
-  ok("no passo 2 o botão é «Iniciar →» e ele abre o modal (onRegistrarRecebimento)", /data-testid="iniciar-registrar-recebimento"[\s\S]{0,400}Iniciar →/.test(wf) && /onClick=\{onRegistrarRecebimento\}/.test(wf))
+  ok("no passo 3 o botão é «Registrar recebimento →» e ele abre o modal (onRegistrarRecebimento); o passo 2 abre a Central", /data-testid="registrar-recebimento-passo"[\s\S]{0,400}Registrar recebimento →/.test(wf) && /onClick=\{onRegistrarRecebimento\}/.test(wf) && /onClick=\{\(\) => onOpenCentral\(s\.key\)\}/.test(wf))
   const quemChamaARota = tudo.filter(([f, c]) => /\/registrar-recebimento`/.test(c) && !/registrar-recebimento\/route\.ts$/.test(f)).map(([f]) => f)
   ok("a rota de recebimento só é chamada pelo modal (e o modal só abre pelo «Iniciar →» do passo 2)", JSON.stringify(quemChamaARota) === JSON.stringify(["src/components/operacao/RegistrarRecebimentoModal.tsx"]) && tudo.filter(([f, c]) => /<RegistrarRecebimentoModal/.test(c)).map(([f]) => f).join() === "src/components/kanban/workflow/WorkflowTab.tsx", quemChamaARota.join(", "))
   const chamadores = tudo.filter(([f, c]) => /concluirSubtarefaCorrentePeloPasso\(/.test(c) && !/subtarefas-da-etapa\.ts$/.test(f)).map(([f]) => f).sort()
@@ -49,7 +49,7 @@ async function main() {
   const ini = semComentarios(ler("src/services/iniciar-envio.ts"))
   ok("o «Iniciar» (lote e por linha) conclui UMA subtarefa por tarefa (sem laço)", (ini.match(/concluirSubtarefaCorrentePeloPasso\(/g) ?? []).length === 1 && !/for \(const [^)]*\) \{[^}]*concluirSubtarefaCorrentePeloPasso/.test(ini))
   const rec = semComentarios(ler("src/services/registrar-recebimento.ts"))
-  ok("só o recebimento conclui mais de um passo (as subtarefas 2 e 3), e só em ordem", /for \(const key of \[SUBTAREFA_CONFIRMACAO, SUBTAREFA_CERTIDAO_RECEBIDA\]\)/.test(rec) && /subtarefaKeyEsperada: key/.test(rec))
+  ok("o recebimento conclui SÓ o passo 3 (o 2 é a tela de confirmação do pedido) e só depois do 2", !/for \(const key of \[SUBTAREFA_CONFIRMACAO/.test(rec) && /subtarefaKeyEsperada: SUBTAREFA_CERTIDAO_RECEBIDA/.test(rec) && /CONFIRMACAO_PENDENTE/.test(rec))
 
   secao("2) O selo nunca mente; o servidor recusa fora de ordem")
   const c = await montarCenario(MARCA, {

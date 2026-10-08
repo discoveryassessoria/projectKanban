@@ -45,7 +45,8 @@ import { materializarExecucaoDaFase } from "@/src/services/materializar-fase"
 import { reconciliarMotorDeFases } from "@/src/lib/motor/reconciliar-motor-fases"
 import { aplicarHonorariosCidadaniaItaliana } from "@/src/lib/motor/executor"
 
-export const OPCOES_TX_ARVORE = { maxWait: 20_000, timeout: 60_000 } as const
+// `TIMEOUT_TX_ARVORE_MS` só existe para operação em LOTE rodada da máquina de quem opera (a latência até o banco é bem maior que a da Vercel); em produção fica o padrão.
+export const OPCOES_TX_ARVORE = { maxWait: 20_000, timeout: Number(process.env.TIMEOUT_TX_ARVORE_MS) > 0 ? Number(process.env.TIMEOUT_TX_ARVORE_MS) : 60_000 } as const
 
 export interface AutorDaMudanca { id: number | null; nome: string | null }
 
