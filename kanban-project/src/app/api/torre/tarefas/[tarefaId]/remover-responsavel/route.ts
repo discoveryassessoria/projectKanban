@@ -3,6 +3,7 @@
 // registra "removeu o responsável (X → ninguém)" com origem manual e o sino avisa quem perdeu a tarefa (nunca o autor).
 // CONFIRMAÇÃO EXPLÍCITA: 1ª chamada devolve a prévia (428, nada gravado); a 2ª exige `confirmado` + `assinatura` (+ `confirmarAndamento` se já iniciada).
 // Permissão: `tarefas.editar` (a de atribuir) — a mesma do "Delegar".
+import { respostaAtribuicaoSoNaPagina, veioDaPaginaDoProcesso } from '@/lib/operacional/atribuicao-origem'
 import { type NextRequest, NextResponse } from 'next/server'
 import { extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { temPermissao } from '@/src/lib/permissoes'
@@ -16,6 +17,8 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ tarefa
   const tarefaId = Number((await ctx.params).tarefaId)
   if (!Number.isInteger(tarefaId) || tarefaId <= 0) return NextResponse.json({ error: 'tarefa inválida' }, { status: 400 })
   const b = await request.json().catch(() => ({}))
+  // ATRIBUIÇÃO SÓ NA PÁGINA DO PROCESSO (a gaveta não remove mais; a página usa o lote da Torre).
+  if (!veioDaPaginaDoProcesso(b)) return NextResponse.json(respostaAtribuicaoSoNaPagina(), { status: 422 })
   const previa = await previaDeRemoverResponsavel([tarefaId])
   if (!previa) return NextResponse.json({ ok: false, error: 'Esta tarefa não tem responsável para remover.' }, { status: 422 })
   const { confirmado, assinatura } = confirmacaoDoCorpo(b)

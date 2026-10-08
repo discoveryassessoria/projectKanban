@@ -674,44 +674,9 @@ export function ProcessoCentralOperacional({
     void abrirOperacao(doc.documentoId ?? 0, doc.necessidadeId)
   }, [abrirOperacao])
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // GESTÃO DE RESPONSABILIDADE, AQUI DENTRO — pelas MESMAS portas da Operação.
-  //
-  // O gestor que está olhando o processo e vê uma certidão sem dono não deve
-  // precisar sair para a Operação, procurar a tarefa numa lista de todos os
-  // processos, atribuir e voltar. O PROCESSO é o contexto de gestão individual;
-  // a Operação é a visão transversal. As duas superfícies, a MESMA tarefa.
-  //
-  // Aqui havia uma rota própria (`genealogia/delegar`) que gravava
-  // `responsavelId` no passo e na tarefa com `updateMany` cru — sem auditoria,
-  // sem notificação, sem trava otimista e sem guarda de tarefa encerrada. Era
-  // uma segunda porta de responsabilidade, e ela ficou sem consumidor. Saiu.
-  //
-  // Atribuir/transferir e devolver à fila são comandos do domínio, e o comando
-  // é um só: `POST /api/tarefas/{id}/comando`. Esta tela não decide nada sobre
-  // responsabilidade — nem sequer se pode: a permissão é conferida no servidor.
-  // ────────────────────────────────────────────────────────────────────────────
-  // QUEM PODE RECEBER TRABALHO — a MESMA lista que a Operação oferece.
-  //
-  // Não é "todo mundo do cadastro": é quem tem permissão de EXECUTAR tarefa,
-  // resolvida pelo sistema real de perfis. Atribuir a quem não pode executar
-  // cria uma tarefa que nasce travada — aparece na fila de alguém que não
-  // consegue movê-la, e o bloqueio só é descoberto quando o prazo já correu.
-  //
-  // UMA consulta para a tela inteira, não uma por linha: com quinhentos
-  // documentos, um seletor por linha seria quinhentas listas de gente no DOM
-  // para no máximo uma ser usada. O seletor em si abre sob demanda.
+  // ATRIBUIÇÃO SÓ NA PÁGINA DO PROCESSO (07/10/2026): este painel mostra o responsável atual e o atalho; atribuir/retirar moram em /torre/processo/[id].
+  // A lista de pessoas continua aqui só para CRIAR tarefa (operação antecipada / tarefa transversal), que nasce com responsável — não é atribuição de tarefa existente.
   const [atribuiveis, setAtribuiveis] = useState<Array<{ id: number; nome: string }>>([])
-  // LOOP DE PRODUÇÃO (27/09/2026, achado real): `pode` (usePermissoes) não é
-  // memoizado — é uma arrow function nova a cada chamada do hook, ou seja, a
-  // cada render deste componente. Um efeito com `[pode]` nas deps refazia o
-  // fetch em TODO render; o `setAtribuiveis` do próprio fetch já É um render,
-  // então o efeito nunca parava — mais de 18.500 chamadas a
-  // /api/operacao/atribuiveis em ~2min, sozinho, sem nenhum clique, até
-  // esgotar o pool do Postgres (mesma causa da lentidão de 5-35s no
-  // operational-projection: as conexões estavam presas aqui). A permissão em
-  // si (`podeEditarTarefas`, um booleano primitivo) só muda quando o dado real
-  // muda — nunca por identidade de função.
   const podeEditarTarefas = pode("tarefas.editar")
   useEffect(() => {
     if (!podeEditarTarefas) return
@@ -720,59 +685,6 @@ export function ProcessoCentralOperacional({
       .then((d: { funcionarios?: Array<{ id: number; nome: string }> }) => setAtribuiveis(d.funcionarios ?? []))
       .catch(() => setAtribuiveis([]))
   }, [podeEditarTarefas])
-
-  const [salvandoResp, setSalvandoResp] = useState<number | null>(null)
-  const comandarTarefa = useCallback(
-    async (taskId: number, corpo: Record<string, unknown>) => {
-      setSalvandoResp(taskId)
-      setErroOperacao(null)
-      try {
-        const enviar = (c: Record<string, unknown>) => fetch(`/api/tarefas/${taskId}/comando`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-          },
-          body: JSON.stringify(c),
-        })
-        let r = await enviar(corpo)
-        let j = await r.json().catch(() => ({}))
-        // Tirar o responsável de uma tarefa EM ANDAMENTO pede confirmação explícita (o servidor recusa sem ela).
-        if (r.status === 428 && j?.codigo === "CONFIRMACAO_NECESSARIA" && window.confirm(j.error)) {
-          r = await enviar({ ...corpo, confirmarTarefaEmAndamento: true })
-          j = await r.json().catch(() => ({}))
-        }
-        if (!r.ok) {
-          setErroOperacao(
-            r.status === 409
-              ? "Esta tarefa foi alterada por outra pessoa. A tela foi atualizada."
-              : j?.error || `Não foi possível concluir a ação (HTTP ${r.status}).`,
-          )
-          carregar(true)
-          return
-        }
-        // A CENTRAL E A OPERAÇÃO LEEM A MESMA TAREFA: recarregar aqui basta para
-        // esta tela; a outra lê do servidor na próxima vez que abrir ou
-        // recarregar. Não há cópia a sincronizar porque não há cópia.
-        carregar(true)
-      } catch {
-        setErroOperacao("Falha de rede. Tente novamente.")
-      } finally {
-        setSalvandoResp(null)
-      }
-    },
-    [carregar],
-  )
-
-  const atribuirResponsavel = useCallback(
-    (taskId: number, responsavelId: number) => comandarTarefa(taskId, { acao: "atribuir", responsavelId }),
-    [comandarTarefa],
-  )
-  /** Devolver à fila é a porta canônica de "retirar responsável" — não um update. */
-  const retirarResponsavel = useCallback(
-    (taskId: number) => comandarTarefa(taskId, { acao: "devolver_a_fila" }),
-    [comandarTarefa],
-  )
 
   /**
    * "Reabrir" uma certidão CANCELADA — a porta `/reabrir-certidao` (mesma tarefa; documento, exigência e etapas voltam
@@ -1231,10 +1143,7 @@ export function ProcessoCentralOperacional({
             // GESTÃO CONTEXTUAL — só para quem já pode distribuir trabalho. A
             // permissão é conferida DE NOVO no servidor: esconder o botão é
             // desenho, não controle de acesso.
-            onAtribuirResponsavel={pode("tarefas.editar") ? atribuirResponsavel : undefined}
-            onRetirarResponsavel={pode("tarefas.editar") ? retirarResponsavel : undefined}
-            usuarios={atribuiveis}
-            salvandoResponsavel={salvandoResp}
+            processoIdParaAtribuir={pode("tarefas.editar") ? processo.id : undefined}
             onReabrirCertidao={pode("tarefas.editar") ? reabrirCertidao : undefined}
             documentoDestacadoId={alvo?.documentoId ?? null}
             readOnly={readOnly}

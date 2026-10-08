@@ -39,6 +39,7 @@
 
 "use client"
 
+import { AtalhoAbrirProcessoParaAtribuir } from "@/src/components/torre/AtalhoAbrirProcessoParaAtribuir"
 import { textoDaLinha } from "@/src/lib/process-stage/central-operacional-core"
 import { useState, useRef, useEffect, useMemo } from "react"
 import { AlertTriangle, Ban, CheckCircle2, ChevronDown, ChevronRight, Clock, FileText, Layers, Search, Star, Users } from "lucide-react"
@@ -118,12 +119,8 @@ export interface PainelDaFaseProps {
    * ver de quem é o trabalho, e não ganha o poder de distribuí-lo por estar
    * olhando o processo.
    */
-  onAtribuirResponsavel?: (taskId: number, responsavelId: number) => void | Promise<void>
-  onRetirarResponsavel?: (taskId: number) => void | Promise<void>
-  /** Quem pode receber trabalho. Carregada UMA vez pelo container, nunca por linha. */
-  usuarios?: Array<{ id: number; nome: string }>
-  /** taskId em gravação — trava só a linha que está mudando. */
-  salvandoResponsavel?: number | null
+  /** ATRIBUIÇÃO SÓ NA PÁGINA DO PROCESSO (07/10/2026): quando informado, a coluna Responsável mostra o responsável ATUAL e o atalho «Abrir processo para atribuir». Nunca atribui aqui. */
+  processoIdParaAtribuir?: number | null
   /** "Reabrir" da certidão cancelada (porta canônica). Ausente ⇒ a linha cancelada só oferece "Ver motivo". */
   onReabrirCertidao?: (tarefaId: number, motivo: string) => Promise<string | null>
   /** Consulta de fase passada: mesmo layout, sem ações de mutação. */
@@ -159,10 +156,7 @@ export function PainelDaFase({
   indice,
   chaveExpansao,
   onAbrirDetalhes,
-  onAtribuirResponsavel,
-  onRetirarResponsavel,
-  usuarios,
-  salvandoResponsavel = null,
+  processoIdParaAtribuir = null,
   onReabrirCertidao,
   readOnly = false,
   documentoDestacadoId = null,
@@ -314,7 +308,7 @@ export function PainelDaFase({
           indice={indice}
           chaveExpansao={chaveExpansao}
           onAbrirDetalhes={onAbrirDetalhes}
-          gestao={{ onAtribuirResponsavel, onRetirarResponsavel, usuarios, salvandoResponsavel, reabrirCertidao: onReabrirCertidao }}
+          gestao={{ processoIdParaAtribuir, reabrirCertidao: onReabrirCertidao }}
           readOnly={readOnly}
           documentoDestacadoId={documentoDestacadoId}
           recorte={recorte}
@@ -464,10 +458,8 @@ export function ordenarDocumentos(docs: DocumentoDoIndice[]): DocumentoDoIndice[
  * quem está gravando a linha pisca duas vezes.
  */
 export interface GestaoDeResponsavel {
-  onAtribuirResponsavel?: (taskId: number, responsavelId: number) => void | Promise<void>
-  onRetirarResponsavel?: (taskId: number) => void | Promise<void>
-  usuarios?: Array<{ id: number; nome: string }>
-  salvandoResponsavel?: number | null
+  /** Só leitura do responsável + atalho para o processo (a atribuição mora na página do processo). */
+  processoIdParaAtribuir?: number | null
   /**
    * "Reabrir" de uma certidão CANCELADA — a porta canônica (`/reabrir-certidao`), só para quem tem a permissão da porta.
    * Devolve a mensagem de erro (ou null quando reabriu). Ausente ⇒ a linha não oferece o botão.
@@ -1172,70 +1164,22 @@ function CelulaResponsavel({
   gestao?: GestaoDeResponsavel
   readOnly: boolean
 }) {
-  const [editando, setEditando] = useState(false)
   const f = doc.naFase
   const taskId = f.taskId
-  const salvando = gestao?.salvandoResponsavel != null && gestao.salvandoResponsavel === taskId
-  // SEM TAREFA NÃO HÁ A QUEM ATRIBUIR — e isso é dito, não escondido atrás de um
-  // botão que não faria nada. Documento concluído também não se redistribui.
-  // CANCELADA/SUPERSEDIDA também não se redistribui — a operação acabou, e
-  // reatribuir responsável por um trabalho encerrado por cancelamento não faz
-  // sentido operacional (mesma régua de CONCLUIDA).
+  // Encerrada (concluída/cancelada/não exigida) não se redistribui.
   const encerrada = f.estado === "CONCLUIDA" || f.estado === "CANCELADA" || f.estado === "SUPERSEDIDA" || f.estado === "NAO_EXIGIDA"
-  const podeGerir =
-    !readOnly
-    && taskId != null
-    && !encerrada
-    && !!gestao?.onAtribuirResponsavel
-    && (gestao?.usuarios?.length ?? 0) > 0
-
   const nome = f.responsavelNome
     ? <span className="text-white/80 truncate">{f.responsavelNome}</span>
     : encerrada
       ? <span className="text-[var(--text-muted)]">—</span>
       : <span className="text-[var(--accent-text)]">Sem responsável</span>
-
-  if (!podeGerir) return <div className="min-w-0 text-[11.5px] truncate">{nome}</div>
-
-  if (editando) {
-    return (
-      <div className="min-w-0 text-[11.5px]">
-        <select
-          autoFocus
-          aria-label="Responsável pela tarefa"
-          disabled={salvando}
-          defaultValue={f.responsavelId ?? ""}
-          onChange={async (e) => {
-            const v = e.target.value
-            setEditando(false)
-            if (v === "") await gestao!.onRetirarResponsavel?.(taskId!)
-            else await gestao!.onAtribuirResponsavel!(taskId!, Number(v))
-          }}
-          onBlur={() => setEditando(false)}
-          className="w-full rounded border border-[var(--border-default)] bg-[var(--app-background)] px-1.5 py-1 text-[11.5px] text-white/85 focus:outline-none focus:border-[var(--border-default)] disabled:opacity-50"
-        >
-          <option value="" className="bg-[var(--surface-secondary)]">
-            {f.responsavelId != null ? "— retirar responsável —" : "— selecione —"}
-          </option>
-          {gestao!.usuarios!.map((u) => (
-            <option key={u.id} value={u.id} className="bg-[var(--surface-secondary)]">{u.nome}</option>
-          ))}
-        </select>
-      </div>
-    )
-  }
-
+  // ATRIBUIÇÃO SÓ NA PÁGINA DO PROCESSO: aqui se vê o responsável atual e, para quem pode atribuir, o atalho para o processo.
+  const mostraAtalho = !readOnly && taskId != null && !encerrada && gestao?.processoIdParaAtribuir != null
+  if (!mostraAtalho) return <div className="min-w-0 text-[11.5px] truncate">{nome}</div>
   return (
     <div className="min-w-0 text-[11.5px]">
       <div className="truncate">{nome}</div>
-      <button
-        type="button"
-        disabled={salvando}
-        onClick={() => setEditando(true)}
-        className="text-[10.5px] text-[var(--text-secondary)] hover:text-[var(--text-secondary)] hover:underline disabled:opacity-40"
-      >
-        {salvando ? "salvando…" : f.responsavelId != null ? "alterar" : "atribuir"}
-      </button>
+      <AtalhoAbrirProcessoParaAtribuir processoId={gestao!.processoIdParaAtribuir} className="text-[10.5px]" />
     </div>
   )
 }

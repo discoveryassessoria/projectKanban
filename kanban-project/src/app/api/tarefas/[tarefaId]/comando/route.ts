@@ -13,6 +13,7 @@
 // A UI futura não tem outro caminho — e é isso que impede a tela de alterar
 // tarefa, etapa, responsável ou prazo por fora do motor.
 // ============================================================================
+import { respostaAtribuicaoSoNaPagina, veioDaPaginaDoProcesso } from '@/lib/operacional/atribuicao-origem'
 import { type NextRequest, NextResponse } from 'next/server'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { negarSeNaoForDonoDaTarefaPorId } from '@/src/lib/tarefa-acesso'
@@ -98,6 +99,11 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ tarefa
       { error: `ação desconhecida: "${acao}"`, acoes: Object.keys(PERMISSAO) },
       { status: 400 },
     )
+  }
+
+  // ATRIBUIÇÃO SÓ NA PÁGINA DO PROCESSO: atribuir, transferir e devolver à fila só valem quando a chamada vem de /torre/processo/[id] (`origem`).
+  if (['atribuir', 'transferir', 'devolver_a_fila'].includes(acao) && !veioDaPaginaDoProcesso(body)) {
+    return NextResponse.json(respostaAtribuicaoSoNaPagina(), { status: 422 })
   }
 
   // A permissão é conferida no BACKEND, sempre — esconder o botão na tela não é

@@ -58,9 +58,9 @@ async function main() {
   secao("B5) «Atribuir» da fila ligado (sem botão morto)")
   const v3 = src("src/components/operacao/operacao-v3.tsx")
   ok("não há mais «ação ainda não ligada»", !/ainda não ligada/.test(v3) && !/onNaoLigado/.test(v3))
-  ok("usa a porta canônica de comando (atribuir|transferir)", /\/api\/tarefas\/\$\{l\.taskId\}\/comando/.test(v3) && /"atribuir" : "transferir"/.test(v3))
-  ok("mesma permissão da Torre/Visão global: tarefas.editar", /podePermissao\("tarefas\.editar"\)/.test(v3) && /podeAtribuir && <button[^>]*onClick=\{onAtribuir\}>Atribuir/.test(v3))
-  ok("abre o seletor de responsável do kit", /<SeletorResponsavel/.test(v3))
+  ok("«Atribuir» leva à página do processo (atribuição só lá; sem botão morto)", /\/torre\/processo\/\$\{\[\.\.\.processos\]\[0\]\}/.test(v3) && !/\/api\/tarefas\/\$\{l\.taskId\}\/comando/.test(v3))
+  ok("mesma permissão da Torre/Visão global: tarefas.editar", /podePermissao\("tarefas\.editar"\)/.test(v3) && /podeAtribuir && <button[^>]*onClick=\{onAtribuir\}[^>]*>Atribuir no processo/.test(v3))
+  ok("não abre mais seletor de responsável (a atribuição mora na página do processo)", !/<SeletorResponsavel/.test(v3))
 
   secao("B6) Aguardando e Acompanhamento agrupam por pessoa")
   ok("helper por pessoa dentro da família usado nas duas abas", /const porPessoaSeAtivo/.test(abas) && /porPessoaSeAtivo\(grupo\.linhas, !!onVerFamilia\)/.test(abas) && /porPessoaSeAtivo\(g\.linhas, true\)/.test(abas))

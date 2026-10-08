@@ -12,6 +12,7 @@
 // `workflow.avancar`; forçar/encerrar fase pede `workflow.forcarAvanco`; atribuir/redistribuir/reconciliar/trocar canal pedem `tarefas.editar`;
 // desbloquear pede `tarefas.bloquear`. A API confere sempre; esconder o botão na tela é só sugestão.
 // ============================================================================
+import { respostaAtribuicaoSoNaPagina, veioDaPaginaDoProcesso } from '@/lib/operacional/atribuicao-origem'
 import { confirmacaoDoCorpo, pedirConfirmacao } from '@/src/lib/torre-confirmacao'
 import { type NextRequest, NextResponse } from 'next/server'
 import { exigirTorre } from '@/src/lib/torre-acesso'
@@ -36,6 +37,9 @@ export async function POST(request: NextRequest) {
   const b = await request.clone().json().catch(() => ({}))
   const acao = String(b?.acao ?? '') as Acao
   if (!ACOES.includes(acao)) return NextResponse.json({ error: `acao inválida; use uma de ${ACOES.join(', ')}` }, { status: 400 })
+
+  // ATRIBUIÇÃO SÓ NA PÁGINA DO PROCESSO: o item «Sem responsável» do Precisa de você leva ao processo; atribuir (sugerido ou escolhido) só com a origem da página.
+  if ((acao === 'ATRIBUIR_SUGERIDO' || acao === 'ATRIBUIR_ESCOLHIDO') && !veioDaPaginaDoProcesso(b)) return NextResponse.json(respostaAtribuicaoSoNaPagina(), { status: 422 })
 
   const { usuario, erro } = await exigirTorre(request, PERMISSAO_DA_ACAO[acao])
   if (erro) return erro

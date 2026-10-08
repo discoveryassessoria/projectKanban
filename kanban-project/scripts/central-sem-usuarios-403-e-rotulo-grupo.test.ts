@@ -29,7 +29,7 @@ for (const f of nomes) {
 }
 const central = semComentarios(ler(nomes[0]))
 ok(/\/api\/operacao\/atribuiveis/.test(central) && /if \(!podeEditarTarefas\) return/.test(central), "Central usa atribuíveis só com tarefas.editar")
-for (const f of nomes.slice(1)) {
+for (const f of nomes.slice(2)) {
   const s = semComentarios(ler(f))
   ok(/pode\("tarefas\.editar"\) \? "\/api\/operacao\/atribuiveis" : null/.test(s), `${f.split("/").pop()}: atribuíveis condicionado à permissão (sem chamada sem permissão)`)
 }

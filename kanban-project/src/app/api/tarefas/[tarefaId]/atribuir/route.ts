@@ -10,6 +10,7 @@
 //   POST   { responsavelId, motivo?, lockVersion? }   atribui ou transfere
 //   PATCH  { acao: "iniciar" }                        inicia a tarefa
 // ============================================================================
+import { respostaAtribuicaoSoNaPagina, veioDaPaginaDoProcesso } from '@/lib/operacional/atribuicao-origem'
 import { type NextRequest, NextResponse } from 'next/server'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { atribuirTarefa, iniciarTarefa } from '@/lib/operacional/tarefa-comandos'
@@ -30,6 +31,8 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ tarefa
   }
 
   const body = await request.json().catch(() => ({}))
+  // ATRIBUIÇÃO SÓ NA PÁGINA DO PROCESSO (a gaveta e as telas antigas não atribuem mais).
+  if (!veioDaPaginaDoProcesso(body)) return NextResponse.json(respostaAtribuicaoSoNaPagina(), { status: 422 })
   const responsavelId = Number(body?.responsavelId)
   if (!Number.isInteger(responsavelId) || responsavelId <= 0) {
     return NextResponse.json({ error: 'responsavelId é obrigatório' }, { status: 400 })
