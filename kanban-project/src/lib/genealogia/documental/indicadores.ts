@@ -35,6 +35,10 @@ export interface NecessidadeOficial {
   ciclo?: number
   itemCatalogo?: { id: number; code?: string | null; name?: string | null } | null
   _count?: { documentos?: number } | null
+  /** Só união: o DONO da certidão (cônjuge da linha reta que a mantém — `titularDaUniao`). Quem não é o dono não herda esta necessidade. */
+  donoId?: number | null
+  /** Etapa REAL da certidão (`etapaDaCertidao`): o dossiê só conta como atendida a certidão RECEBIDA e VALIDADA — registro localizado na Genealogia não basta. `null`/ausente = sem documento operacional. */
+  certidao?: { recebida: boolean; validada: boolean } | null
 }
 
 /**
@@ -104,7 +108,9 @@ function acumular(alvo: IndicadorDocumental, n: NecessidadeOficial): void {
   alvo.necessarias++
   switch (n.status) {
     case "ATENDIDA":
-      alvo.atendidas++
+      // «Atendida» na Genealogia = registro LOCALIZADO. Para o dossiê, certidão com documento operacional só conta quando foi recebida e validada (etapaDaCertidao).
+      if (n.certidao && !n.certidao.validada) alvo.emAtendimento++
+      else alvo.atendidas++
       break
     case "EM_ATENDIMENTO":
       alvo.emAtendimento++
@@ -133,6 +139,8 @@ function fechar(i: IndicadorDocumental): IndicadorDocumental {
 export interface ProjecaoDocumental {
   porPessoa: Map<number, IndicadorDocumental>
   porUniao: Map<number, IndicadorDocumental>
+  /** uniaoId → dono da certidão de casamento (quando o servidor informou). */
+  donoPorUniao: Map<number, number>
   /** Consolidado do processo inteiro. */
   total: IndicadorDocumental
 }
@@ -146,6 +154,7 @@ export function projetarIndicadores(
 ): ProjecaoDocumental {
   const porPessoa = new Map<number, IndicadorDocumental>()
   const porUniao = new Map<number, IndicadorDocumental>()
+  const donoPorUniao = new Map<number, number>()
   const total = indicadorVazio()
 
   for (const n of necessidades || []) {
@@ -166,6 +175,7 @@ export function projetarIndicadores(
         porUniao.set(n.uniaoId, alvo)
       }
       acumular(alvo, n)
+      if (n.donoId != null) donoPorUniao.set(n.uniaoId, n.donoId)
     }
   }
 
@@ -173,7 +183,7 @@ export function projetarIndicadores(
   porUniao.forEach(fechar)
   fechar(total)
 
-  return { porPessoa, porUniao, total }
+  return { porPessoa, porUniao, donoPorUniao, total }
 }
 
 /**
@@ -193,6 +203,8 @@ export function indicadorDaPessoa(
   for (const uid of uniaoIds) {
     const u = projecao.porUniao.get(uid)
     if (!u) continue
+    // A pessoa que NÃO é dono (dispensada ou do outro lado) não herda a necessidade da união.
+    if (!ehDonoDaUniao(projecao, uid, pessoaId)) continue
     soma.necessarias += u.necessarias
     soma.atendidas += u.atendidas
     soma.emAtendimento += u.emAtendimento
@@ -202,4 +214,10 @@ export function indicadorDaPessoa(
     soma.opcionais += u.opcionais
   }
   return fechar(soma)
+}
+
+/** A pessoa é o dono da certidão desta união? Sem informação do servidor, vale o comportamento anterior (ambos os cônjuges). */
+export function ehDonoDaUniao(projecao: Pick<ProjecaoDocumental, "donoPorUniao">, uniaoId: number, pessoaId: number): boolean {
+  const dono = projecao.donoPorUniao.get(uniaoId)
+  return dono == null || dono === pessoaId
 }

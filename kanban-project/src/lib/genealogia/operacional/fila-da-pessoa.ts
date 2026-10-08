@@ -249,7 +249,7 @@ export function montarFilaDaPessoa(e: EntradaFila): FilaDaPessoa {
   const itens: ItemFila[] = []
 
   const dela = e.necessidades.filter(
-    (n) => n.pessoaId === e.pessoaId || (n.pessoaId == null && n.uniaoId != null && uniaoIds.has(n.uniaoId)),
+    (n) => n.pessoaId === e.pessoaId || (n.pessoaId == null && n.uniaoId != null && uniaoIds.has(n.uniaoId) && (n.donoId == null || n.donoId === e.pessoaId)),
   )
 
   // Uniões da pessoa com mais de uma certidão de casamento precisam do cônjuge no nome.

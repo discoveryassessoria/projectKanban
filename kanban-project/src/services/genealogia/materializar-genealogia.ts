@@ -24,6 +24,7 @@ import type { Prisma } from "@prisma/client"
 import { garantirNecessidade, dispensarNecessidade, reativarNecessidade, MOTIVO_DOCUMENTO_DISPENSADO } from "@/src/services/necessidade-documental"
 import { transicionarPassoTx } from "@/src/services/task-step-sync"
 import { SELECT_UNIAO_PARA_TITULAR, titularDaUniao } from "@/src/services/genealogia/titular-uniao"
+import { reapontarDonoDoCasamento } from "@/src/services/genealogia/dono-casamento"
 import { randomUUID } from "crypto"
 import { garantirDocumentoDaNecessidade } from "@/src/services/genealogia/operacao-necessidade"
 import { recalcularNumerosLinhagemDaArvore } from "@/src/services/genealogia/numero-linhagem"
@@ -530,6 +531,8 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
   await contarTarefasAbertasDosFatos(finalizado, db)
   await reconciliarTarefas({ processoId, db })
   await reconciliarGenealogiaEEmissaoTx(db as Prisma.TransactionClient, processoId)
+  // O DONO da certidão de casamento é recalculado a cada reconciliação (mudança de linha reta ou de documentos exigidos passa por aqui).
+  await reapontarDonoDoCasamento(processoId, db, { motivo: "reconciliação: o dono da certidão de casamento é o cônjuge da linha reta que a mantém", autorId: opts.autor?.id ?? null })
   await auditarFatos(finalizado, processoId, db, opts)
 
   return finalizado
