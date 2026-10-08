@@ -17,14 +17,17 @@ export interface LinhaParaCobranca {
 
 /**
  * "PRECISA COBRAR" — o ÚNICO predicado: cartão "Cobranças a fazer", botão "Cobrar todos os vencidos", selo "N a cobrar" da aba
- * Terceiros, filtro "Cobranças vencidas" e a lista de pedidos. É verdade quando o acompanhamento do passo venceu OU a data de
- * cobrança é hoje/passou (dia operacional) — fora da Genealogia (lá o "terceiro" é o trabalho de localizar, não um cartório a
- * cobrar), sem tarefa encerrada, e a data só vale para pedido (tarefa AGUARDANDO).
+ * Terceiros, filtro "Cobrar hoje" e a lista de pedidos. COBRAR PRESSUPÕE PEDIDO: só é cobrável a certidão cujo pedido JÁ FOI ENVIADO ao terceiro e
+ * espera resposta (tarefa AGUARDANDO) — e cujo acompanhamento do passo venceu OU cuja data de cobrança é hoje/passou (dia operacional). Fora da
+ * Genealogia (lá o "terceiro" é o trabalho de localizar, não um cartório a cobrar) e sem tarefa encerrada.
+ * (08/10/2026: antes o «acompanhamento vencido» bastava, e certidão NÃO solicitada — passo «Enviar requerimento» ainda por fazer, 2 dias após nascer — contava como
+ * cobrança: 32 na Visão geral, 0 pedidos em Terceiros.)
  */
 export function ehCobravelVencido(l: LinhaParaCobranca, agora: Date = new Date()): boolean {
   if (l.faseMacroKey === 'genealogia' || l.estadoOperacao === 'CONCLUIDA') return false
+  if (l.estadoOperacao !== 'AGUARDANDO') return false
   if (l.acompanhamentoVencido) return true
-  if (l.estadoOperacao !== 'AGUARDANDO' || !l.cobrarEm) return false
+  if (!l.cobrarEm) return false
   const alvo = new Date(l.cobrarEm)
   return !Number.isNaN(alvo.getTime()) && diasEntreDiasOperacionais(alvo, agora) <= 0
 }

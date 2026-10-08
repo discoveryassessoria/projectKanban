@@ -145,8 +145,10 @@ export async function compararAbasDaTorre(agora = new Date()): Promise<Divergenc
     emRiscoDaTarefas: criticos.size,
   }, (ps, fs) => contarPorFase(ps, fs), tot)
   const prazos = await prazosAntesDaEntrada()
+  const cobrancas = await compararCobrancas(linhas, agora)
   return [
     ...contagens,
+    ...cobrancas,
     ...prazos,
     ...compararFases(chavesUnicas, [
       { aba: 'Visão geral (funil)', chaves: funil.fases.map((f) => f.key), completa: true },
@@ -179,5 +181,23 @@ export async function prazosAntesDaEntrada(): Promise<DivergenciaEntreAbas[]> {
     const e = entrada.get(`${t.processoId}|${t.faseMacroKey}`)
     if (e && t.dataPrazo && t.dataPrazo < e) out.push({ assunto: 'prazo', abas: 'Processos / Tarefas', chave: `${t.processo?.nome ?? t.processoId} · tarefa ${t.id}`, detalhe: `prazo ${t.dataPrazo.toISOString().slice(0, 10)} é anterior à entrada na fase (${e.toISOString().slice(0, 10)}) — «${t.titulo}»` })
   }
+  return out
+}
+
+/** COBRANÇAS: Visão geral (cartão «Cobranças a fazer») = rótulo da aba Terceiros = Tarefas («Cobrar hoje») = Terceiros («para cobrar») = o botão «Cobrar todos». E nenhuma delas sem pedido enviado. */
+export async function compararCobrancas(linhas: Parameters<typeof import('./torre-kpis').numeroDoKpi>[1], agora: Date): Promise<DivergenciaEntreAbas[]> {
+  const { numeroDoKpi } = await import('./torre-kpis')
+  const { resumoDeTerceiros, idsParaCobrar } = await import('./terceiros-pedidos')
+  const { predicadoDaVisao } = await import('./torre-tarefas-tela')
+  const out: DivergenciaEntreAbas[] = []
+  const visaoGeral = numeroDoKpi('cob', linhas, agora)
+  const rotuloDaAba = visaoGeral // o rótulo «N a cobrar» da aba Terceiros lê numeroDoKpi('cob') (Torre.tsx)
+  const tarefas = (linhas as Array<{ cobravelVencida?: boolean }>).filter((l) => predicadoDaVisao('cobranca', null, agora)(l as never)).length
+  const terceiros = resumoDeTerceiros(linhas as never, agora).paraCobrar
+  const botao = idsParaCobrar(linhas as never, agora).length
+  const dif = (abas: string, n: number) => { if (n !== visaoGeral) out.push({ assunto: 'cobranca', abas, chave: 'Cobranças a fazer', detalhe: `Visão geral diz ${visaoGeral}; ${abas} diz ${n}` }) }
+  dif('Tarefas («Cobrar hoje»)', tarefas); dif('Terceiros («para cobrar»)', terceiros); dif('Terceiros («Cobrar todos os vencidos»)', botao); dif('rótulo da aba Terceiros', rotuloDaAba)
+  const semPedido = (linhas as unknown as Array<{ taskId: number; titulo: string; estadoOperacao: string; cobravelVencida?: boolean }>).filter((l) => l.cobravelVencida && l.estadoOperacao !== 'AGUARDANDO')
+  for (const l of semPedido) out.push({ assunto: 'cobranca', abas: 'todas', chave: `tarefa ${l.taskId}`, detalhe: `«${l.titulo}» conta como cobrança sem ter pedido enviado ao terceiro` })
   return out
 }

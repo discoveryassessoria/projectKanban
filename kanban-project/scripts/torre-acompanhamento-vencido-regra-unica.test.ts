@@ -95,8 +95,9 @@ async function main() {
     const torre = await listarTarefasDaTorre({}, agora)
     const doTeste = torre.linhas.filter((l) => ids.includes(l.processoId as number))
     const kpi = kpisDasLinhas(doTeste)
-    ok("KPI 'cobranças vencidas' conta as 2 (vencida + hoje) — mesmas linhas da lista", kpi.cobrancasPendentes === 2 && doTeste.filter((l) => l.cobravelVencida).length === 2, `kpi=${kpi.cobrancasPendentes}`)
-    ok("a lista filtrada por acompanhamentoVencido bate com o KPI", doTeste.filter((l) => l.acompanhamentoVencido).length === kpi.cobrancasPendentes)
+    // 08/10/2026: «cobrar» pressupõe pedido enviado — tarefa «a iniciar» com acompanhamento vencido é «Acompanhar hoje», NUNCA cobrança.
+    ok("KPI 'cobranças a fazer' NÃO conta tarefa a iniciar (sem pedido enviado) — nem a lista cobrável", kpi.cobrancasPendentes === 0 && doTeste.filter((l) => l.cobravelVencida).length === 0, `kpi=${kpi.cobrancasPendentes}`)
+    ok("as 2 com acompanhamento vencido continuam na visão «Acompanhar hoje»", doTeste.filter((l) => l.acompanhamentoVencido).length === 2)
 
     // OPERAÇÃO: aba Acompanhamento (escopo de equipe, null) traz a vencida e a de hoje.
     const acomp = (await Promise.all(ids.map((processoId) => acompanhamentoDoUsuario(null, agora, undefined, { processoId })))).flat().map((l) => l.taskId)
