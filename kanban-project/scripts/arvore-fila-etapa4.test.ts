@@ -282,7 +282,7 @@ ok(/data-preencher/.test(detalhes) && /Não informado — preencher/.test(detalh
 ok(/onEditar=\{pode\('arvore\.editar'\)/.test(view) && /setCampoEdicaoInicial\(campo\)/.test(view) && /campoInicial=\{campoEdicaoInicial\}/.test(view), "o atalho abre a edição da pessoa já focando o campo (e só com permissão)")
 const campos = ["sexo", "data_nasc", "pais_nasc", "cidade_nasc", "nacionalidade", "data_obito", "local_obito", "data_casamento", "local_casamento"]
 for (const c of campos) {
-  ok(viewSrc.includes(`data-campo="${c}"`) && detalhes.includes(`"${c}"`), `campo '${c}': o formulário e a página falam do mesmo nome`)
+  ok((viewSrc.includes(`data-campo="${c}"`) || new RegExp(`dataCampo=\\{\\{[^}]*['"]${c}['"]`).test(viewSrc)) && detalhes.includes(`"${c}"`), `campo '${c}': o formulário e a página falam do mesmo nome`)
 }
 ok(/Data não informada — preencher/.test(detalhes) && /localDaUniao\(casamento\)/.test(detalhes), "data e local do casamento aparecem no vínculo do casal (ou o atalho de preencher)")
 

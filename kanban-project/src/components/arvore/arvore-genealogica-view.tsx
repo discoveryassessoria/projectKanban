@@ -2,8 +2,6 @@
 
 "use client"
 
-import { rotuloDaDivisao } from "@/lib/localidade/regra-localidade"
-import { colunasDoLocalDeObito, textoDoLocalDeObito } from "@/src/lib/genealogia/local-obito"
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useApi, invalidar } from '@/src/lib/dados'
 import { jsPDF } from "jspdf"
@@ -57,7 +55,8 @@ import { ImportarArvoreModal } from "./importar-arvore-modal"
 import { TreeOnboarding } from "./tree-onboarding"
 import { RequerenteSelector } from "./requerente-selector"
 import { DatePickerField } from "@/components/ui/date-picker-field"
-import { CampoCidadeNascimento, CampoEstadoNascimento, CampoNacionalidade, CampoPaisNascimento, SeloMaioridade, useNascimentoPessoa } from "./campos-nascimento"
+import { CampoNacionalidade, SeloMaioridade, useNascimentoPessoa } from "./campos-nascimento"
+import { CamposDeLocalidade } from "@/src/components/localidade/campos-de-localidade"
 import { maioridadeEhManual, marcadorRequerenteParaGravar } from "@/src/lib/documentos/maioridade"
 import { DocumentosExigidosCampo, TEXTO_PRECISA_DOCUMENTACAO } from "./documentos-exigidos-campo"
 import { CODIGOS_DOCUMENTOS_EXIGIVEIS, deveEnviarDocumentosExigidos, marcadosParaTela, rotuloDaLista, situacaoDosDocumentosMarcados, type CodigoDocumentoExigivel } from "@/src/lib/genealogia/documentos-exigidos"
@@ -1935,10 +1934,14 @@ function AddPersonModal({
     useNascimentoPessoa({ pais: '', cidade: '', nacionalidade: '' })
   const [isFalecido, setIsFalecido] = useState(false)
   const [dataObito, setDataObito] = useState('')
-  const [localObito, setLocalObito] = useState('')
+  const [paisObito, setPaisObito] = useState('')
+  const [estadoObito, setEstadoObito] = useState('')
+  const [cidadeObito, setCidadeObito] = useState('')
   const [isCasado, setIsCasado] = useState(type === 'conjuge')
   const [dataCasamento, setDataCasamento] = useState('')
-  const [localCasamento, setLocalCasamento] = useState('')
+  const [paisCasamento, setPaisCasamento] = useState('')
+  const [estadoCasamento, setEstadoCasamento] = useState('')
+  const [cidadeCasamento, setCidadeCasamento] = useState('')
   const [conjugeId, setConjugeId] = useState<number | string>('')
   const [comentario, setComentario] = useState('')
   const [saving, setSaving] = useState(false)
@@ -2040,7 +2043,7 @@ function AddPersonModal({
         vivo: !isFalecido,
         casado: isCasado,
         data_obito: isFalecido && dataObito ? new Date(dataObito).toISOString() : null,
-        ...(isFalecido && localObito ? colunasDoLocalDeObito(localObito) : { local_obito: null, estado_obito: null }), // colunas próprias do óbito; `local_emigracao` não é mais tocado por aqui
+        local_obito: isFalecido ? cidadeObito.trim() || null : null, estado_obito: isFalecido ? estadoObito.trim() || null : null, pais_obito: isFalecido ? paisObito.trim() || null : null, // colunas próprias do óbito; `local_emigracao` não é mais tocado por aqui
         comentario: comentario.trim() || null,
         requerente: requerente || 'nao',  // ✅ NOVO
         linhaReta: isLinhaReta,  // ✅ Central Operacional / Documentos
@@ -2096,7 +2099,7 @@ function AddPersonModal({
               pessoa1Id,
               pessoa2Id,
               data_inicio: dataCasamento ? new Date(dataCasamento).toISOString() : null,
-              local: localCasamento.trim() || null,
+              local: cidadeCasamento.trim() || null, estado: estadoCasamento.trim() || null, pais: paisCasamento.trim() || null,
               tipo: 'casamento'
             })
           })
@@ -2257,18 +2260,12 @@ function AddPersonModal({
                 <DatePickerField value={dataNasc} onChange={(value) => setDataNasc(value)} />
                 <SeloMaioridade nascimento={dataNasc} marcador={requerente} />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">País de Nascimento</label>
-                <CampoPaisNascimento value={paisNasc} onChange={setPaisNasc} inputClass={inputClass} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{rotuloDaDivisao(paisNasc)} de Nascimento</label>
-                <CampoEstadoNascimento value={estadoNasc} onChange={setEstadoNasc} pais={paisNasc} inputClass={inputClass} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cidade de Nascimento</label>
-                <CampoCidadeNascimento value={localNasc} onChange={setLocalNasc} pais={paisNasc} uf={estadoNasc} inputClass={inputClass} />
-              </div>
+              <CamposDeLocalidade
+                valor={{ pais: paisNasc, estado: estadoNasc, cidade: localNasc }}
+                onChange={(v) => { if (v.pais !== paisNasc) setPaisNasc(v.pais); setEstadoNasc(v.estado); setLocalNasc(v.cidade) }}
+                rotulos={{ pais: 'País de Nascimento', divisao: (r) => `${r} de Nascimento`, cidade: 'Cidade de Nascimento' }}
+                classeDoRotulo="block text-sm font-medium text-gray-700 mb-1" classeDoCampo={inputClass} idPrefixo="arv-add-nasc-" nomes={{ pais: 'pais_nasc', estado: 'estado_nasc', cidade: 'local_nasc' }}
+              />
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nacionalidade</label>
                 <CampoNacionalidade value={nacionalidade} onChange={setNacionalidade} inputClass={inputClass} />
@@ -2312,10 +2309,12 @@ function AddPersonModal({
                     <label className="block text-sm font-medium text-gray-700 mb-1">Data do Casamento</label>
                     <DatePickerField value={dataCasamento} onChange={(value) => setDataCasamento(value)} />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Local do Casamento</label>
-                    <input type="text" value={localCasamento} onChange={(e) => setLocalCasamento(e.target.value)} placeholder="Cidade, País" className={inputClass} />
-                  </div>
+                  <CamposDeLocalidade
+                    valor={{ pais: paisCasamento, estado: estadoCasamento, cidade: cidadeCasamento }}
+                    onChange={(v) => { setPaisCasamento(v.pais); setEstadoCasamento(v.estado); setCidadeCasamento(v.cidade) }}
+                    rotulos={{ pais: 'País do Casamento', divisao: (r) => `${r} do Casamento`, cidade: 'Cidade do Casamento' }}
+                    classeDoRotulo="block text-sm font-medium text-gray-700 mb-1" classeDoCampo={inputClass} idPrefixo="arv-add-cas-" nomes={{ pais: 'pais_casamento', estado: 'estado_casamento', cidade: 'local_casamento' }}
+                  />
                 </div>
               </div>
             )}
@@ -2328,10 +2327,12 @@ function AddPersonModal({
                     <label className="block text-sm font-medium text-gray-700 mb-1">Data de Falecimento</label>
                     <DatePickerField value={dataObito} onChange={(value) => setDataObito(value)} />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Local de Falecimento</label>
-                    <input type="text" value={localObito} onChange={(e) => setLocalObito(e.target.value)} placeholder="Cidade, País" className={inputClass} />
-                  </div>
+                  <CamposDeLocalidade
+                    valor={{ pais: paisObito, estado: estadoObito, cidade: cidadeObito }}
+                    onChange={(v) => { setPaisObito(v.pais); setEstadoObito(v.estado); setCidadeObito(v.cidade) }}
+                    rotulos={{ pais: 'País de Falecimento', divisao: (r) => `${r} de Falecimento`, cidade: 'Cidade de Falecimento' }}
+                    classeDoRotulo="block text-sm font-medium text-gray-700 mb-1" classeDoCampo={inputClass} idPrefixo="arv-add-obito-" nomes={{ pais: 'pais_obito', estado: 'estado_obito', cidade: 'local_obito' }}
+                  />
                 </div>
               </div>
             )}
@@ -2431,10 +2432,14 @@ function EditPersonModal({
     useNascimentoPessoa({ pais: pessoa.pais_nasc || '', estado: pessoa.estado_nasc || '', cidade: pessoa.local_nasc || '', nacionalidade: pessoa.nacionalidade || '' })
   const [isFalecido, setIsFalecido] = useState(pessoa.vivo === false || !!pessoa.data_obito)
   const [dataObito, setDataObito] = useState(pessoa.data_obito ? new Date(pessoa.data_obito).toISOString().split('T')[0] : '')
-  const [localObito, setLocalObito] = useState(textoDoLocalDeObito(pessoa))
+  const [paisObito, setPaisObito] = useState(pessoa.pais_obito || '')
+  const [estadoObito, setEstadoObito] = useState(pessoa.estado_obito || '')
+  const [cidadeObito, setCidadeObito] = useState(pessoa.local_obito || '')
   const [isCasado, setIsCasado] = useState(!!uniaoExistente)
   const [dataCasamento, setDataCasamento] = useState(uniaoExistente?.data_inicio ? new Date(uniaoExistente.data_inicio).toISOString().split('T')[0] : '')
-  const [localCasamento, setLocalCasamento] = useState(uniaoExistente?.local || '')
+  const [paisCasamento, setPaisCasamento] = useState(uniaoExistente?.pais || '')
+  const [estadoCasamento, setEstadoCasamento] = useState(uniaoExistente?.estado || '')
+  const [cidadeCasamento, setCidadeCasamento] = useState(uniaoExistente?.local || '')
   const [conjugeId, setConjugeId] = useState<number | string>(conjugeExistenteId || '')
   // Vínculo de PAI/MÃE editável — pra corrigir importação errada (ex.: pessoa
   // entrou com os pais da esposa) sem apagar ninguém: troca pra outra pessoa já
@@ -2699,7 +2704,7 @@ function EditPersonModal({
           vivo: !isFalecido,
           casado: isCasado,
           data_obito: isFalecido && dataObito ? new Date(dataObito).toISOString() : null,
-          ...(isFalecido && localObito ? colunasDoLocalDeObito(localObito) : { local_obito: null, estado_obito: null }), // colunas próprias do óbito; `local_emigracao` não é mais tocado por aqui
+          local_obito: isFalecido ? cidadeObito.trim() || null : null, estado_obito: isFalecido ? estadoObito.trim() || null : null, pais_obito: isFalecido ? paisObito.trim() || null : null, // colunas próprias do óbito; `local_emigracao` não é mais tocado por aqui
           comentario: comentario.trim() || null,
           // Com data de nascimento válida o marcador acompanha o cálculo (função única); sem data, vale o que foi declarado.
           requerente: marcadorRequerenteParaGravar(dataNasc || null, requerente || 'nao', new Date()),
@@ -2735,7 +2740,7 @@ function EditPersonModal({
                 pessoa1Id: pessoa.id,
                 pessoa2Id: Number(conjugeId),
                 data_inicio: dataCasamento ? new Date(dataCasamento).toISOString() : null,
-                local: localCasamento.trim() || null
+                local: cidadeCasamento.trim() || null, estado: estadoCasamento.trim() || null, pais: paisCasamento.trim() || null
               })
             })
             if (!(await uniaoOk(rUniao, 'Erro ao atualizar a união'))) return
@@ -2746,7 +2751,7 @@ function EditPersonModal({
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 data_inicio: dataCasamento ? new Date(dataCasamento).toISOString() : null,
-                local: localCasamento.trim() || null
+                local: cidadeCasamento.trim() || null, estado: estadoCasamento.trim() || null, pais: paisCasamento.trim() || null
               })
             })
             if (!(await uniaoOk(rUniao, 'Erro ao atualizar a união'))) return
@@ -2759,7 +2764,7 @@ function EditPersonModal({
               pessoa1Id: pessoa.id,
               pessoa2Id: Number(conjugeId),
               data_inicio: dataCasamento ? new Date(dataCasamento).toISOString() : null,
-              local: localCasamento.trim() || null,
+              local: cidadeCasamento.trim() || null, estado: estadoCasamento.trim() || null, pais: paisCasamento.trim() || null,
               tipo: 'casamento'
             })
           })
@@ -2912,18 +2917,14 @@ function EditPersonModal({
                 <TravaDoRegistro travado={travadosPessoa.has("PESSOA.data_nasc")}><DatePickerField value={dataNasc} onChange={(value) => setDataNasc(value)} /></TravaDoRegistro>
                 <SeloMaioridade nascimento={dataNasc} marcador={requerente} mostrarSemData={jaEhRequerente} />
               </div>
-              <div data-campo="pais_nasc">
-                <label className="block text-sm font-medium text-gray-700 mb-1">País de Nascimento</label>
-                <TravaDoRegistro travado={travadosPessoa.has("PESSOA.pais_nasc")}><CampoPaisNascimento value={paisNasc} onChange={setPaisNasc} inputClass={inputClass} /></TravaDoRegistro>
-              </div>
-              <div data-campo="estado_nasc">
-                <label className="block text-sm font-medium text-gray-700 mb-1">{rotuloDaDivisao(paisNasc)} de Nascimento</label>
-                <TravaDoRegistro travado={travadosPessoa.has("PESSOA.estado_nasc")}><CampoEstadoNascimento value={estadoNasc} onChange={setEstadoNasc} pais={paisNasc} inputClass={inputClass} /></TravaDoRegistro>
-              </div>
-              <div data-campo="cidade_nasc">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cidade de Nascimento</label>
-                <TravaDoRegistro travado={travadosPessoa.has("PESSOA.local_nasc")}><CampoCidadeNascimento value={localNasc} onChange={setLocalNasc} pais={paisNasc} uf={estadoNasc} inputClass={inputClass} /></TravaDoRegistro>
-              </div>
+              <CamposDeLocalidade
+                valor={{ pais: paisNasc, estado: estadoNasc, cidade: localNasc }}
+                onChange={(v) => { if (v.pais !== paisNasc) setPaisNasc(v.pais); setEstadoNasc(v.estado); setLocalNasc(v.cidade) }}
+                rotulos={{ pais: 'País de Nascimento', divisao: (r) => `${r} de Nascimento`, cidade: 'Cidade de Nascimento' }}
+                classeDoRotulo="block text-sm font-medium text-gray-700 mb-1" classeDoCampo={inputClass} idPrefixo="arv-ed-nasc-" nomes={{ pais: 'pais_nasc', estado: 'estado_nasc', cidade: 'local_nasc' }}
+                dataCampo={{ pais: 'pais_nasc', estado: 'estado_nasc', cidade: 'cidade_nasc' }}
+                envolver={(c, n) => <TravaDoRegistro travado={travadosPessoa.has(c === 'pais' ? 'PESSOA.pais_nasc' : c === 'estado' ? 'PESSOA.estado_nasc' : 'PESSOA.local_nasc')}>{n}</TravaDoRegistro>}
+              />
               <div data-campo="nacionalidade">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nacionalidade</label>
                 <CampoNacionalidade value={nacionalidade} onChange={setNacionalidade} inputClass={inputClass} />
@@ -2963,10 +2964,14 @@ function EditPersonModal({
                     <label className="block text-sm font-medium text-gray-700 mb-1">Data do Casamento</label>
                     <TravaDoRegistro travado={travadosUniao.has("UNIAO.data_inicio")}><DatePickerField value={dataCasamento} onChange={(value) => setDataCasamento(value)} /></TravaDoRegistro>
                   </div>
-                  <div data-campo="local_casamento">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Local do Casamento</label>
-                    <TravaDoRegistro travado={travadosUniao.has("UNIAO.local")}><input type="text" value={localCasamento} onChange={(e) => setLocalCasamento(e.target.value)} placeholder="Cidade - Estado" className={inputClass} /></TravaDoRegistro>
-                  </div>
+                  <CamposDeLocalidade
+                    valor={{ pais: paisCasamento, estado: estadoCasamento, cidade: cidadeCasamento }}
+                    onChange={(v) => { setPaisCasamento(v.pais); setEstadoCasamento(v.estado); setCidadeCasamento(v.cidade) }}
+                    rotulos={{ pais: 'País do Casamento', divisao: (r) => `${r} do Casamento`, cidade: 'Cidade do Casamento' }}
+                    classeDoRotulo="block text-sm font-medium text-gray-700 mb-1" classeDoCampo={inputClass} idPrefixo="arv-ed-cas-" nomes={{ pais: 'pais_casamento', estado: 'estado_casamento', cidade: 'local_casamento' }}
+                    dataCampo={{ pais: 'pais_casamento', estado: 'estado_casamento', cidade: 'local_casamento' }}
+                    envolver={(c, n) => <TravaDoRegistro travado={travadosUniao.has(c === 'pais' ? 'UNIAO.pais' : c === 'estado' ? 'UNIAO.estado' : 'UNIAO.local')}>{n}</TravaDoRegistro>}
+                  />
                 </div>
               </div>
             )}
@@ -2979,10 +2984,14 @@ function EditPersonModal({
                     <label className="block text-sm font-medium text-gray-700 mb-1">Data de Falecimento</label>
                     <TravaDoRegistro travado={travadosPessoa.has("PESSOA.data_obito")}><DatePickerField value={dataObito} onChange={(value) => setDataObito(value)} /></TravaDoRegistro>
                   </div>
-                  <div data-campo="local_obito">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Local de Falecimento</label>
-                    <input type="text" value={localObito} onChange={(e) => setLocalObito(e.target.value)} placeholder="Cidade - Estado" className={inputClass} />
-                  </div>
+                  <CamposDeLocalidade
+                    valor={{ pais: paisObito, estado: estadoObito, cidade: cidadeObito }}
+                    onChange={(v) => { setPaisObito(v.pais); setEstadoObito(v.estado); setCidadeObito(v.cidade) }}
+                    rotulos={{ pais: 'País de Falecimento', divisao: (r) => `${r} de Falecimento`, cidade: 'Cidade de Falecimento' }}
+                    classeDoRotulo="block text-sm font-medium text-gray-700 mb-1" classeDoCampo={inputClass} idPrefixo="arv-ed-obito-" nomes={{ pais: 'pais_obito', estado: 'estado_obito', cidade: 'local_obito' }}
+                    dataCampo={{ pais: 'pais_obito', estado: 'estado_obito', cidade: 'local_obito' }}
+                    envolver={(c, n) => <TravaDoRegistro travado={travadosPessoa.has(c === 'pais' ? 'PESSOA.pais_obito' : c === 'estado' ? 'PESSOA.estado_obito' : 'PESSOA.local_obito')}>{n}</TravaDoRegistro>}
+                  />
                 </div>
               </div>
             )}

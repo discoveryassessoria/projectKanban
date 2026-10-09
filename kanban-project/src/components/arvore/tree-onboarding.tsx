@@ -5,7 +5,8 @@ import { Loader2, ArrowLeft, Check } from "lucide-react"
 import { DatePickerField } from "@/components/ui/date-picker-field"
 import { enviar } from "@/src/lib/dados"
 import { RequerenteSelector } from "./requerente-selector"
-import { CampoNacionalidade, CampoPaisNascimento, SeloMaioridade, useNascimentoPessoa } from "./campos-nascimento"
+import { CampoNacionalidade, SeloMaioridade, useNascimentoPessoa } from "./campos-nascimento"
+import { CamposDeLocalidade } from "@/src/components/localidade/campos-de-localidade"
 import { gentilicoDoPais } from "@/src/lib/genealogia/gentilico"
 import { marcadorRequerenteParaGravar } from "@/src/lib/documentos/maioridade"
 
@@ -402,9 +403,13 @@ function Step2PersonForm({
               <DatePickerField value={dataNasc} onChange={setDataNasc} />
               <SeloMaioridade nascimento={dataNasc} marcador={type === "applicant" ? "sim" : "nao"} mostrarSemData={type === "applicant"} />
             </FormField>
-            <FormField label="País de Nascimento">
-              <CampoPaisNascimento value={paisNasc} onChange={setPaisNasc} inputClass={inputCls} placeholder="Brasil" />
-            </FormField>
+            <div>
+              <CamposDeLocalidade
+                campos={["pais"]} valor={{ pais: paisNasc, estado: "", cidade: "" }} onChange={(v) => setPaisNasc(v.pais)}
+                rotulos={{ pais: "País de Nascimento", divisao: (r) => r, cidade: "Cidade" }}
+                classeDoRotulo="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5" classeDoCampo={inputCls} idPrefixo="arv-onb-nasc-" nomes={{ pais: "pais_nasc", estado: "estado_nasc", cidade: "local_nasc" }}
+              />
+            </div>
             <FormField label="Nacionalidade">
               <CampoNacionalidade value={nacionalidade} onChange={setNacionalidade} inputClass={inputCls} placeholder="Brasileira" />
             </FormField>
