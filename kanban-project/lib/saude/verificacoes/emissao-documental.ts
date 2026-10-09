@@ -1208,7 +1208,8 @@ registrar({
     })
     if (!candidatas.length) return vazio({ semProximaAcao: 0 }, 'Nenhuma Tarefa aberta da Emissão Documental no momento.')
     const estados = await estadosTemporaisDasOperacoes(prisma, candidatas.map((c) => c.id), new Date())
-    const CODIGOS = ['SEM_PROXIMO_ACONTECIMENTO_DETERMINAVEL', 'SEM_RESPONSAVEL_PARA_PROXIMA_ACAO']
+    // SEM_RESPONSAVEL_PARA_PROXIMA_ACAO NÃO entra: tarefa aberta na fila esperando delegação é o estado normal (regra do Marco, 09/10/2026), não defeito.
+    const CODIGOS = ['SEM_PROXIMO_ACONTECIMENTO_DETERMINAVEL']
     const semProximaAcao = candidatas
       .map((c) => ({ tarefa: c, estado: estados.get(c.id) }))
       .filter((x) => x.estado && x.estado.motivosRisco.some((m) => CODIGOS.some((cod) => m.startsWith(cod))))
