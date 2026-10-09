@@ -61,9 +61,10 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
   const [segundos, setSegundos] = useState(0)
 
   useEffect(() => {
-    if (etapa !== "analisando") { setSegundos(0); return }
-    const t = setInterval(() => setSegundos((s) => s + 1), 1000)
-    return () => clearInterval(t)
+    if (etapa !== "analisando") return
+    const inicio = Date.now()
+    const t = setInterval(() => setSegundos(Math.floor((Date.now() - inicio) / 1000)), 1000)
+    return () => { clearInterval(t); setSegundos(0) }
   }, [etapa])
 
   if (!aberto) return null
