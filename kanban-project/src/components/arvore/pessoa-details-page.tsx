@@ -4,6 +4,7 @@ import { LinkDeAnexo } from "@/src/lib/anexos/cliente"
 import { useState } from "react"
 import type { PessoaArvore, UniaoArvore, CampoEdicaoPessoa } from "./types"
 import { localDaUniao, rotuloTipoDaUniao } from "@/src/lib/genealogia/uniao-rotulos"
+import { localCompletoDoObito } from "@/src/lib/genealogia/local-obito"
 import { 
   ChevronLeft, 
   ChevronUp, 
@@ -329,7 +330,7 @@ export function PessoaDetailsPage({
                     />
                     <InfoItem 
                       label="Local de falecimento" 
-                      value={pessoa.local_obito} 
+                      value={localCompletoDoObito(pessoa) || null} 
                       icon={MapPin}
                       onPreencher={preencher("local_obito")}
                     />

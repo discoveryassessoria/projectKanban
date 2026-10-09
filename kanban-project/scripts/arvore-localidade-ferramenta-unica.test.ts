@@ -34,5 +34,11 @@ ok("o onboarding usa a mesma ferramenta (só o país)", /CamposDeLocalidade/.tes
 ok("campos-nascimento não tem mais lista de localidade própria", !/\/api\/localidades|UFS_BR|municipios-br/.test(ler("src/components/arvore/campos-nascimento.tsx")))
 ok("a aba «Editar dados registrais» da Genealogia usa a mesma ferramenta", /<CamposDeLocalidade/.test(ler("src/components/kanban/documento/EditarDadosRegistrais.tsx")))
 
+console.log("\n4) O painel de leitura mostra o local COMPLETO (cidade, estado, país)")
+import { localCompletoDoObito } from "../src/lib/genealogia/local-obito"
+ok("óbito: «Itapira, SP, Brasil»", localCompletoDoObito({ local_obito: "Itapira", estado_obito: "SP", pais_obito: "Brasil" }) === "Itapira, SP, Brasil")
+ok("óbito sem país ainda mostra cidade e estado; vazio fica vazio", localCompletoDoObito({ local_obito: "Itapira", estado_obito: "SP" }) === "Itapira, SP" && localCompletoDoObito({}) === "")
+const sb = ler("src/components/arvore/pessoa-sidebar.tsx")
+ok("o painel usa o local completo do casamento e do óbito", /localDaUniao\(casamento\)/.test(sb) && /localCompletoDoObito\(pessoa\)/.test(sb))
 console.log(`\n${n - falhou}/${n} verificações`)
 if (falhou) process.exit(1)

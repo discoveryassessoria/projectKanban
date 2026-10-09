@@ -33,6 +33,12 @@ export function podeLerComoObito(p: { vivo?: boolean | null; data_obito?: Date |
   return faleceu && !emigrou
 }
 
+/** Para MOSTRAR (painel da pessoa): «Cidade, Estado, País» do óbito, na mesma ordem do nascimento e do casamento; sem nenhum dos três, o texto antigo de `textoDoLocalDeObito`. */
+export function localCompletoDoObito(p: { local_obito?: string | null; estado_obito?: string | null; pais_obito?: string | null; local_emigracao?: string | null }): string {
+  const partes = [p.local_obito, p.estado_obito, p.pais_obito].map((v) => v?.trim()).filter(Boolean)
+  return partes.length ? partes.join(", ") : textoDoLocalDeObito(p)
+}
+
 /** Para o formulário («Cidade - Estado»): junta cidade e estado do óbito. */
 export function textoDoLocalDeObito(p: { local_obito?: string | null; estado_obito?: string | null; local_emigracao?: string | null }): string {
   if (p.local_obito) return p.estado_obito ? `${p.local_obito}-${p.estado_obito}` : p.local_obito

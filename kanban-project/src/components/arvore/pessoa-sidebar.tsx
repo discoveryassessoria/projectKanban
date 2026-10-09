@@ -2,7 +2,8 @@
 
 "use client"
 
-import { textoDoLocalDeObito } from "@/src/lib/genealogia/local-obito"
+import { localCompletoDoObito } from "@/src/lib/genealogia/local-obito"
+import { localDaUniao } from "@/src/lib/genealogia/uniao-rotulos"
 import { LinkDeAnexo } from "@/src/lib/anexos/cliente"
 import { useState, useEffect } from "react"
 import { 
@@ -706,7 +707,7 @@ function ConteudoSidebar({
                 <InfoItem 
                   icon={MapPin} 
                   label="Local de Nascimento" 
-                  value={pessoa.local_nasc} 
+                  value={[pessoa.local_nasc, pessoa.estado_nasc].filter(Boolean).join(", ") || null} 
                 />
                 <InfoItem 
                   icon={Globe} 
@@ -745,7 +746,7 @@ function ConteudoSidebar({
                         <InfoItem 
                           icon={MapPin} 
                           label="Local de Casamento" 
-                          value={casamento.local} 
+                          value={localDaUniao(casamento) || null} 
                         />
                       </div>
                     )
@@ -767,7 +768,7 @@ function ConteudoSidebar({
                 <InfoItem 
                   icon={MapPin} 
                   label="Local de Falecimento" 
-                  value={textoDoLocalDeObito(pessoa)} 
+                  value={localCompletoDoObito(pessoa) || null} 
                 />
               </div>
             </CollapsibleSection>
