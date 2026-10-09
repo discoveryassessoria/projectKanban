@@ -70,7 +70,7 @@ async function main() {
   const ler = (f: string) => readFileSync(f, "utf8")
   ok("Planilha documental lê local_obito/estado_obito para o óbito", /categoria === 'OBITO' \? lugar\(p\.local_obito, p\.estado_obito\)/.test(ler("lib/financeiro/leitura/planilha-documental.ts")))
   ok("árvore (sidebar) e motor leem as colunas novas", /textoDoLocalDeObito\(pessoa\)/.test(ler("src/components/arvore/pessoa-sidebar.tsx")) && /cidadeObito/.test(ler("src/lib/genealogia/motor/eventos.ts")))
-  ok("o formulário e a importação gravam local_obito e não tocam mais em local_emigracao", /colunasDoLocalDeObito\(localObito\)/.test(ler("src/components/arvore/arvore-genealogica-view.tsx")) && !/local_emigracao: isFalecido/.test(ler("src/components/arvore/arvore-genealogica-view.tsx")) && /local_obito: texto\(p\.local_obito\)/.test(ler("src/app/api/genealogy/arvore/importar/route.ts")))
+  ok("o formulário e a importação gravam local_obito e não tocam mais em local_emigracao", /local_obito: isFalecido \? cidadeObito\.trim\(\) \|\| null : null/.test(ler("src/components/arvore/arvore-genealogica-view.tsx")) && /pais_obito: isFalecido/.test(ler("src/components/arvore/arvore-genealogica-view.tsx")) && !/local_emigracao: isFalecido/.test(ler("src/components/arvore/arvore-genealogica-view.tsx")) && /local_obito: texto\(p\.local_obito\)/.test(ler("src/app/api/genealogy/arvore/importar/route.ts")))
   ok("a migration é só ADITIVA (ADD COLUMN IF NOT EXISTS; nada de DROP/UPDATE/DELETE)", (() => { const m = ler("prisma/migrations/20261007200000_pessoa_local_obito/migration.sql").replace(/--.*$/gm, ""); return (m.match(/ADD COLUMN IF NOT EXISTS/g) ?? []).length === 3 && !/DROP|UPDATE|DELETE|ALTER COLUMN/i.test(m) })())
 
   await P.limpar()

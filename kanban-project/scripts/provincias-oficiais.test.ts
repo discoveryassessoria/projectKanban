@@ -42,7 +42,7 @@ async function main() {
 
   console.log("\n5) Todos os pontos de entrada leem a MESMA fonte")
   ok("a rota de províncias e a de cidades chamam o serviço único", /provinciasDoPais/.test(ler("src/app/api/localidades/provincias/route.ts")) && /cidadesDaProvincia/.test(ler("src/app/api/localidades/cidades/route.ts")))
-  ok("o hook único (Dados registrados e Editar dados registrais) e os campos de nascimento da árvore usam essas rotas — e nenhum embute lista de província", /\/api\/localidades\/provincias/.test(ler("lib/localidade/use-localidade.ts")) && /\/api\/localidades\/provincias/.test(ler("src/components/arvore/campos-nascimento.tsx")) && ["src/components/kanban/workflow/EditorRegistralModal.tsx", "src/components/kanban/documento/EditarDadosRegistrais.tsx", "src/components/arvore/campos-nascimento.tsx"].every((f) => !/Lombardia|Emilia-Romagna|Galicia/.test(ler(f))))
+  ok("o hook único (Dados registrados e Editar dados registrais) e a ferramenta única de localidade (a mesma na árvore) usam essas rotas — e nenhum embute lista de província", /\/api\/localidades\/provincias/.test(ler("lib/localidade/use-localidade.ts")) && /useLocalidade\(/.test(ler("src/components/localidade/campos-de-localidade.tsx")) && ["src/components/kanban/workflow/EditorRegistralModal.tsx", "src/components/kanban/documento/EditarDadosRegistrais.tsx", "src/components/localidade/campos-de-localidade.tsx", "src/components/arvore/campos-nascimento.tsx"].every((f) => !/Lombardia|Emilia-Romagna|Galicia/.test(ler(f))))
 
   console.log("\n6) O vigia vivo das listas")
   const v = await detectarRegraT()
