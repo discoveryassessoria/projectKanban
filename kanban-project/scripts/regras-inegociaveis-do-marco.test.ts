@@ -136,7 +136,6 @@ async function main() {
       "src/components/operacao/distribuicao-tarefas.tsx": "SUCESSÃO EM MASSA (férias/afastamento: a carteira de UMA pessoa passa a outra, origem «sucessao-em-massa») — não é atribuição por processo; o resto leva ao processo",
       "src/components/torre/TorreTarefas.tsx": "o LOTE da Torre (useLoteDeAtribuicao → /api/torre/tarefas/lote), que o Marco usa; «Atribuir» da linha só abre o processo",
       "src/components/torre/acoes-do-item.tsx": "ATRIBUIR_SUGERIDO/ATRIBUIR_ESCOLHIDO só ABREM o processo (router.push); o servidor recusa essas ações sem a origem da página",
-      "src/components/operacao/tabela-familia.tsx": "código MORTO (só central-operacional.tsx a importa e nenhuma página monta); o servidor recusa as chamadas dela",
     }
     const portas = portasDeAtribuicaoForaDoProcesso()
     const novas = portas.filter((p) => !(p in PERMITIDAS_FORA_DO_PROCESSO))

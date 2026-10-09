@@ -205,12 +205,8 @@ function main() {
   ok('§3) ninguém mais fabrica prazo somando milissegundos',
     inventores.length === 0, inventores.join(', ') || 'nenhum')
 
-  // A frase do prazo é do servidor; a tela escolhe a cor. `minha-operacao.tsx`
-  // foi extraído/fundido em `tabela-familia.tsx` (fusão Central Operacional +
-  // Minha Operação, 25/09/2026) — é lá que a linha da fila vive agora.
-  const fila = semComentarios(ler('src/components/operacao/tabela-familia.tsx'))
-  // A coluna Prazo passou a usar a função única `textoPrazoDaTarefa` (Seção 3.17), que parte de `rotuloDoPrazo` — a frase do servidor.
-  ok('§16) a fila mostra a frase canônica', /textoPrazoDaTarefa\(l\)/.test(fila) && /l\.rotuloDoPrazo/.test(semComentarios(ler('src/lib/tarefa/texto-prazo.ts'))))
+  // A frase do prazo é do servidor; a tela escolhe a cor (a coluna da fila `tabela-familia.tsx` foi removida em 09/10/2026: código morto).
+  ok('§16) a frase canônica vem de `rotuloDoPrazo` (servidor) pela função única', /l\.rotuloDoPrazo/.test(semComentarios(ler('src/lib/tarefa/texto-prazo.ts'))))
   const painel = semComentarios(ler('src/components/kanban/PainelDaFase.tsx'))
   ok('§16) a tabela da fase também', /const texto = f\.rotuloDoPrazo/.test(painel))
   // A régua migrou para o servidor (document-operational-projection.ts) — o

@@ -422,3 +422,51 @@ registrar({
     }
   },
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CRON-006 — OS SEIS CRONS QUE NÃO DEIXAVAM RASTRO (09/10/2026)
+// ═══════════════════════════════════════════════════════════════════════════
+// COB-001 acusava /api/cron/avisos-prazo, /api/cron/resumo-diario, /api/cron/cartorios, /api/cron/coleta-purga, /api/cron/coleta-orfaos e
+// /api/cron/conferidor-orfaos como jobs sem vigia. Cada um agora grava, ao terminar bem, a hora da última passagem (`lib/operacional/cron-rastro.ts`);
+// aqui se cobra a idade desse rastro contra o ritmo do vercel.json (hora em hora, diário, semanal).
+registrar({
+  id: 'saude.cron.rastro-dos-jobs',
+  codigo: 'CRON-006',
+  nome: 'Os jobs avisos-prazo, resumo-diario, cartorios, coleta-purga, coleta-orfaos e conferidor-orfaos estão rodando',
+  descricao: 'Vigia /api/cron/avisos-prazo, /api/cron/resumo-diario, /api/cron/cartorios, /api/cron/coleta-purga, /api/cron/coleta-orfaos e /api/cron/conferidor-orfaos pela hora da última passagem que cada um grava ao terminar bem.',
+  dominio: 'OBSERVABILIDADE',
+  modulo: 'Plataforma / Jobs agendados',
+  severidadePadrao: 'ALERTA',
+  obrigatoria: false,
+  modos: ['COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '2.2.0',
+  timeoutMs: 15_000,
+  orientacao: 'Confira o cron na Vercel (agendamento, CRON_SECRET e o bloqueio de crons no middleware) e rode-o à mão com ?ensaio=1 quando houver.',
+  rotaCorrecao: '/administrator?screen=syshealth',
+  responsavel: 'Plataforma',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    const { CRONS_COM_RASTRO, chaveDoRastro, situacaoDoRastro } = await import('@/lib/operacional/cron-rastro')
+    const agora = new Date()
+    const registros = await prisma.configuracaoSistema.findMany({ where: { chave: { in: CRONS_COM_RASTRO.map((c) => chaveDoRastro(c.chave)) } }, select: { chave: true, valor: true } })
+    const porChave = new Map(registros.map((r) => [r.chave, r.valor ? new Date(r.valor) : null]))
+    const achados: Achado[] = []
+    for (const c of CRONS_COM_RASTRO) {
+      const ultimo = porChave.get(chaveDoRastro(c.chave)) ?? null
+      const s = situacaoDoRastro({ ultimo: ultimo && !Number.isNaN(ultimo.getTime()) ? ultimo : null, agora, maxHoras: c.maxHoras })
+      if (!s.atrasado) continue
+      achados.push({
+        chave: `cron-sem-rastro:${c.chave}`,
+        severidade: 'ALERTA',
+        titulo: `O job /api/cron/${c.chave} (${c.descricao}) não deixa rastro há ${Math.floor(s.horas)} h`,
+        descricao: s.nuncaRodou ? `Nenhuma passagem registrada desde que o rastro existe (09/10/2026); o esperado é no máximo ${c.maxHoras} h entre passagens.` : `A última passagem registrada é de ${ultimo!.toISOString()}; o esperado é no máximo ${c.maxHoras} h entre passagens.`,
+        explicacao: 'Um cron parado não emite erro, emite silêncio. Este job grava a hora em que terminou bem; sem ela recente, ele não está rodando (ou está falhando antes de terminar).',
+        impacto: 'O trabalho do job fica por fazer sem que ninguém perceba.',
+        entidade: 'Cron', registroId: c.chave, quantidade: 1, link: '/administrator?screen=syshealth',
+        recomendacao: `Verifique o agendamento e os logs de /api/cron/${c.chave} na Vercel.`,
+        evidencia: { cron: c.chave, ultimo: ultimo?.toISOString() ?? null, maxHoras: c.maxHoras },
+      })
+    }
+    return { achados, metricas: { crons: CRONS_COM_RASTRO.length, atrasados: achados.length }, resumo: `${CRONS_COM_RASTRO.length} job(s) vigiado(s) pelo rastro da última passagem; ${achados.length} atrasado(s).` }
+  },
+})

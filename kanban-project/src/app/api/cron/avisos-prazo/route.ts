@@ -21,6 +21,7 @@
 // ============================================================================
 import { type NextRequest, NextResponse } from 'next/server'
 import { rodarVarreduraHoraria } from '@/lib/operacional/avisos-sino'
+import { registrarExecucaoDeCron } from "@/lib/operacional/cron-rastro"
 import { extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { temPermissao } from '@/src/lib/permissoes'
 
@@ -49,6 +50,7 @@ async function executar(req: NextRequest) {
       `criados=${r.gestor.criados} removidos=${r.gestor.removidos} | posse retiradas=${r.posse?.retiradas ?? '-'} ` +
       `expirados=${r.expurgo?.expirados ?? '-'} lidosApagados=${r.expurgo?.apagadosLidos ?? '-'}`,
     )
+    if (!ensaio) await registrarExecucaoDeCron('avisos-prazo')
     return NextResponse.json(r)
   } catch (e) {
     console.error('[cron/avisos-prazo] falha na varredura:', e)

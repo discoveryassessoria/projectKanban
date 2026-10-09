@@ -21,6 +21,7 @@
 // ============================================================================
 import { type NextRequest, NextResponse } from 'next/server'
 import { rodarResumoDiario } from '@/lib/operacional/avisos-sino'
+import { registrarExecucaoDeCron } from "@/lib/operacional/cron-rastro"
 import { extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { temPermissao } from '@/src/lib/permissoes'
 
@@ -49,6 +50,7 @@ async function executar(req: NextRequest) {
       `criados=${r.gestor.criados} removidos=${r.gestor.removidos} | menções grupos=${r.mencoes.grupos} ` +
       `menções=${r.mencoes.mencoes} avisos novos=${r.mencoes.criados}`,
     )
+    if (!ensaio) await registrarExecucaoDeCron('resumo-diario')
     return NextResponse.json(r)
   } catch (e) {
     console.error('[cron/resumo-diario] falha na varredura:', e)

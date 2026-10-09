@@ -6,6 +6,7 @@
 // (CRON_SECRET ou header oficial da Vercel). Idempotente.
 import { NextRequest, NextResponse } from "next/server"
 import { rodarRetencaoDaColeta } from "@/src/services/coleta/coleta-purga"
+import { registrarExecucaoDeCron } from "@/lib/operacional/cron-rastro"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
@@ -21,7 +22,9 @@ function autorizado(req: NextRequest): boolean {
 export async function GET(req: NextRequest) {
   if (!autorizado(req)) return NextResponse.json({ error: "não autorizado" }, { status: 401 })
   try {
-    return NextResponse.json(await rodarRetencaoDaColeta())
+    const r = await rodarRetencaoDaColeta()
+    await registrarExecucaoDeCron("coleta-purga")
+    return NextResponse.json(r)
   } catch (e) {
     console.error("[cron coleta-purga] falha:", e)
     return NextResponse.json({ error: "falha na purga da coleta" }, { status: 500 })

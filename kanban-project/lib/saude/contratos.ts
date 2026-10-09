@@ -146,7 +146,7 @@ export async function contratoOrganizacao(): Promise<ResultadoContrato> {
   const orgs = await prisma.orgaoProtocolo.findMany({
     where: { ativo: true },
     select: {
-      id: true, name: true, publicCode: true, paisId: true, funcoes: true,
+      id: true, name: true, publicCode: true, paisId: true, type: true, funcoes: true,
       categorias: { select: { categoriaId: true } },
     },
   })
@@ -156,7 +156,9 @@ export async function contratoOrganizacao(): Promise<ResultadoContrato> {
     if (!o.publicCode) faltando.push('código público')
     // "Tem país" virou "tem VÍNCULO com o país" — texto preenchido com uma
     // grafia qualquer deixava o cadastro passar por completo sem estar.
-    if (o.paisId == null) faltando.push('país')
+    // CARTÓRIO DO BRASIL fica sem país DE PROPÓSITO: a lista de cartórios do Brasil é exatamente `type='cartorio'` sem país (regra única da Localidade,
+    // `lib/localidade/regra-localidade.ts`). Exigir país aqui acusava ~57 cadastros certos e os tirava da lista.
+    if (o.paisId == null && (o.type ?? '').trim().toLowerCase() !== 'cartorio') faltando.push('país')
     if (!o.funcoes.length) faltando.push('função')
     if (!o.categorias.length) faltando.push('categoria')
     if (faltando.length) incompletos.push({ id: o.id, rotulo: o.name, faltando })

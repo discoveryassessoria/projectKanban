@@ -4,6 +4,7 @@
 // auto-verifica (CRON_SECRET ou header oficial da Vercel).
 import { NextRequest, NextResponse } from "next/server"
 import { conferirOrfaos } from "@/src/services/conferidor-orfaos"
+import { registrarExecucaoDeCron } from "@/lib/operacional/cron-rastro"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -20,6 +21,7 @@ export async function GET(req: NextRequest) {
   if (!autorizado(req)) return NextResponse.json({ error: "não autorizado" }, { status: 401 })
   try {
     const r = await conferirOrfaos()
+    await registrarExecucaoDeCron("conferidor-orfaos")
     // Só o resumo (as chaves ficam na auditoria): a resposta do cron não vira vazamento de nomes de arquivo.
     return NextResponse.json({
       geradoEm: r.geradoEm, totais: r.totais, orfaos: r.orfaos.length, bytesOrfaos: r.bytesOrfaos,

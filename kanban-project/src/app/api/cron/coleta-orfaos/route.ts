@@ -4,6 +4,7 @@
 // Mesma convenção dos outros crons: o middleware libera, o handler se auto-verifica (CRON_SECRET ou header oficial da Vercel).
 import { NextRequest, NextResponse } from "next/server"
 import { rodarVarreduraDaColeta } from "@/src/services/coleta/coleta-orfaos"
+import { registrarExecucaoDeCron } from "@/lib/operacional/cron-rastro"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
@@ -20,6 +21,7 @@ export async function GET(req: NextRequest) {
   if (!autorizado(req)) return NextResponse.json({ error: "não autorizado" }, { status: 401 })
   try {
     const r = await rodarVarreduraDaColeta()
+    await registrarExecucaoDeCron("coleta-orfaos")
     // Só o resumo: as chaves ficam na auditoria (a resposta do cron não espalha nomes de arquivo).
     return NextResponse.json({ geradoEm: r.geradoEm, modo: r.modo, totais: r.totais, apagados: r.apagados.length, pulados: r.pulados.length, falhas: r.falhas.length })
   } catch (e) {

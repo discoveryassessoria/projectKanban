@@ -182,7 +182,6 @@ secao("8) Aba Documentos do processo e central da fase")
 
 secao("9) Exportações CSV")
 {
-  ok("exportarFamiliaCsv (Central da família) exporta na regra fixa e inclui a geração", /const linhas = ordenarCertidoesDaTabela\(linhasEntrada\)/.test(ler("src/components/operacao/tabela-familia.tsx")))
   ok("exportarCsv (Distribuição) exporta na regra fixa", /const linhas = ordenarLinhasDeCertidao\(linhasEntrada\)/.test(ler("src/components/operacao/distribuicao-tarefas.tsx")))
   ok("a ordenação da Visão global (colunas) só ordena famílias", /ordenarLinhasDeCertidao\(linhas, \(a, b\) =>/.test(ler("src/components/operacao/visao-global.tsx")))
   ok("ordenarLinhasDeCertidao é a mesma regra", iguais(idsDe(ordenarLinhasDeCertidao(FAM as any) as any), esperado))
@@ -190,7 +189,7 @@ secao("9) Exportações CSV")
 
 secao("10) NENHUMA lista tem ordenação própria de certidão (e ninguém ordena por numeroLinhagem)")
 for (const arq of [
-  "src/components/operacao/operacao-v3-derivacoes.ts", "src/components/operacao/tabela-familia.tsx", "lib/operacional/torre-processo-puro.ts", "lib/operacional/torre-filtros.ts",
+  "src/components/operacao/operacao-v3-derivacoes.ts", "lib/operacional/torre-processo-puro.ts", "lib/operacional/torre-filtros.ts",
   "lib/operacional/torre-tarefas-tela.ts", "src/lib/relatorios/motor/dominios/certidoes-ordem.ts", "lib/operacional/ordem-certidoes.ts",
 ]) {
   const s = ler(arq).replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "")

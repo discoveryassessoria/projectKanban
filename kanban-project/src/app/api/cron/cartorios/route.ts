@@ -5,6 +5,7 @@
 // fluxo paralelo). Idempotente e com trava de concorrência.
 import { NextRequest, NextResponse } from "next/server"
 import { sincronizarCartorios } from "@/src/services/cartorios/cartorio-sync-service"
+import { registrarExecucaoDeCron } from "@/lib/operacional/cron-rastro"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 120
@@ -21,6 +22,7 @@ export async function GET(req: NextRequest) {
   if (!autorizado(req)) return NextResponse.json({ error: "não autorizado" }, { status: 401 })
   try {
     const r = await sincronizarCartorios({ gatilho: "cron" })
+    await registrarExecucaoDeCron("cartorios")
     return NextResponse.json(r)
   } catch (e) {
     console.error("[cron cartorios] falha:", e)
