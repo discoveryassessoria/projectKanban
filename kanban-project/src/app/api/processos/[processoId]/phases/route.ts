@@ -29,6 +29,7 @@ import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { FASES, phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
 import { ehFaseAguardandoFechamento } from "@/src/lib/process-stage/fase-pre-contrato"
 import { resolveOperationalProjection } from "@/src/lib/process-stage/operational-projection"
+import { fechouDeVerdade } from "@/lib/operacional/fase-fechou-de-verdade"
 import { resolverRotuloDaFase } from "@/src/lib/process-stage/escopo-operacional-da-fase"
 import { resolverMacroWorkflowDoProcesso } from "@/src/lib/motor/resolver-macro-workflow"
 import type { FaseCode } from "@prisma/client"
@@ -166,7 +167,10 @@ export async function GET(
       const latest = cycles[0] ?? null
       const alcancada = f.ordem <= ordemAtual
       // "Aguardando fechamento" (pré-trabalho) fica com a instância ATIVA por desenho: depois que o processo a deixa, é fase CONCLUÍDA (a barra e o Caminho concordam).
-      const concluida = alcancada && (latest?.status === "CONCLUIDO" || (ehFaseAguardandoFechamento(f.phaseKey) && f.phaseKey !== faseAtualKey))
+      // CONCLUÍDA = a instância fechou E o trabalho medido pela projeção continua inteiro. Reabrir UMA tarefa de uma fase que o processo já deixou (ex.: uma
+      // certidão da Emissão enquanto o processo está na Análise) não muda o status da instância, mas muda o que a projeção mede: a fase volta a ser ABERTA e
+      // a barra mostra a % real (86%), nunca um 100% que o trabalho já não tem (09/10/2026, Ageitos Brion).
+      const concluida = alcancada && (fechouDeVerdade({ statusDaInstancia: latest?.status, progressoMedido: progressos[i] }) || (ehFaseAguardandoFechamento(f.phaseKey) && f.phaseKey !== faseAtualKey))
       const state: PhaseState =
         f.phaseKey === faseAtualKey ? "ACTIVE"
         : concluida ? "COMPLETED"

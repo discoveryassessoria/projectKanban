@@ -32,6 +32,7 @@ import { historicoDaOperacaoDaUnidade } from "@/src/services/operacao-da-etapa"
 import { descendentes, ESTADOS_CUMPRIDOS, type PassoComDependencia } from "@/src/services/dependencias-do-passo"
 import { definicaoHistoricaDoPasso } from "@/src/services/versao-publicada"
 import { escopoDaUnidade, sincronizarTarefaComWorkflow } from "@/lib/operacional/tarefa-canonica"
+import { avisarChegouTrabalho } from "@/lib/operacional/avisos-fatos"
 import { resolverRotuloDaFase } from "@/src/lib/process-stage/escopo-operacional-da-fase"
 
 /** Quem é a unidade — em nomes, para a tela poder dizer de quem é o trabalho. */
@@ -310,7 +311,7 @@ export async function executarReabertura(p: PedidoDeReabertura): Promise<Resulta
         necessidadeId: passo.necessidadeId,
         documentoId: passo.documentoId,
       },
-      select: { id: true },
+      select: { id: true, responsavelId: true, processoId: true },
       orderBy: { id: "asc" },
     })
     if (tarefaDaUnidade) {
@@ -340,6 +341,11 @@ export async function executarReabertura(p: PedidoDeReabertura): Promise<Resulta
           },
         )
       }
+    }
+    // O SINO DE QUEM TEM A TAREFA: reabrir devolve trabalho a quem já era o dono (a Daniela fez, o gestor reabriu). Antes só aparecia dentro da tela de Operação;
+    // o aviso do sino — o mesmo «chegou trabalho» de uma atribuição — nasce na MESMA transação. Quem reabre para si mesmo não é avisado do que ele próprio fez.
+    if (tarefaDaUnidade?.responsavelId != null && tarefaDaUnidade.responsavelId !== p.actorId) {
+      await avisarChegouTrabalho(tx, { destinatarioId: tarefaDaUnidade.responsavelId, tarefas: [{ id: tarefaDaUnidade.id, processoId: tarefaDaUnidade.processoId }], autorId: p.actorId })
     }
     return res
   })
