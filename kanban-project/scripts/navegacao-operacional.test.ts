@@ -67,18 +67,15 @@ async function main() {
   ok('§4) sem processo, ainda leva à tarefa',
     urlOperacionalDaTarefa({ taskId: 42, processoId: null }) === '/operacao?taskId=42')
 
-  // Todas as entradas usam a MESMA função. `minha-operacao.tsx` foi extraído/
-  // fundido em `tabela-familia.tsx` (fusão Central Operacional + Minha
-  // Operação, 25/09/2026).
+  // Todas as entradas usam a MESMA função.
   for (const [tela, arquivo] of [
-    ['Minha Fila', 'src/components/operacao/tabela-familia.tsx'],
     ['Tarefas e Projetos / Kanban global', 'src/components/operacao/visao-global.tsx'],
     ['notificações', 'lib/operacional/tarefa-comandos.ts'],
   ] as const) {
     ok(`§36-§38) ${tela} usa o helper canônico`,
       /urlOperacionalDaTarefa/.test(semComentarios(ler(arquivo))))
   }
-  const espalhadas = ['src/components/operacao/tabela-familia.tsx', 'src/components/operacao/visao-global.tsx']
+  const espalhadas = ['src/components/operacao/visao-global.tsx']
     .filter((f) => /`\/kanban\?/.test(semComentarios(ler(f))))
   ok('§39) e ninguém concatena URL à mão', espalhadas.length === 0, espalhadas.join(', ') || 'nenhuma')
 
@@ -176,7 +173,6 @@ async function main() {
   const comDecisao = (await minhaFila(dani.id)).find((l) => l.taskId === alvoDecisao)
   ok('§26) a fila marca a tarefa', comDecisao?.requerDecisao === true)
 
-  const tela = semComentarios(ler('src/components/operacao/tabela-familia.tsx'))
   const kit = semComentarios(ler('src/components/operacao/kit-operacional.tsx'))
   ok('§27) e a ação principal deixa de ser "Continuar"',
     /requerDecisao\) return \{ rotulo: 'Ver decisão'|requerDecisao\) return \{ rotulo: "Ver decisão"/.test(kit))
@@ -247,23 +243,7 @@ async function main() {
   ok('§16) a linha alvo recebe realce', /documentoDestacadoId/.test(painel) && /ring-sky-300/.test(painel))
   ok('§17) e entra em vista sozinha', /scrollIntoView/.test(painel))
   ok('§18) a pessoa do alvo expande — e só ela', /chaveDaPessoaAlvo/.test(painel))
-  ok('§12) a Minha Fila não virou executor: "Continuar" navega',
-    /router\.push\(urlOperacionalDaTarefa/.test(tela))
-
-  // ── ABRIR ≠ INICIAR, INCLUSIVE NO GESTO ──────────────────────────────────
-  // Clicar no cartão e clicar no botão chegam ao mesmo lugar e NÃO fazem a
-  // mesma coisa. Enquanto o cartão inteiro chamava a ação principal, passar os
-  // olhos numa tarefa A FAZER a marcava como iniciada: data de início, evento e
-  // prazo correndo, sem ninguém ter decidido nada.
-  ok('§33) abrir o cartão apenas navega',
-    /const abrirOTrabalho = useCallback\(\(l: LinhaOperacional\) => \{\s*router\.push/.test(tela),
-    'sem comando nenhum antes do push')
-  ok('§33) e é a LINHA (clicar para olhar) que usa só isso — nunca o botão',
-    /<tr\s[\s\S]{0,40}onClick=\{aoSelecionar\}/.test(tela))
-  ok('§34) iniciar continua explícito, no botão',
-    /onClick=\{[^}]*aoExecutar\(\)[^}]*\}[\s\S]{0,500}?\{ocupado && acao\.comando === "iniciar"/.test(tela))
-  ok('§34) e só o botão comanda',
-    /const irParaOTrabalho[\s\S]{0,400}?acao\.comando === "iniciar"[\s\S]{0,200}?comandar\(/.test(tela))
+  // §12/§33/§34 (a Minha Fila navega, abrir ≠ iniciar) valiam para `tabela-familia.tsx`, removida em 09/10/2026 (código morto: nenhuma página a montava).
 
   // ══════════════════════════════════════════════════════════════════════════
   secao('§1/§18/§22) NÃO EXISTEM DOIS LUGARES PARA EXECUTAR O MESMO TRABALHO')
@@ -272,7 +252,6 @@ async function main() {
   ok('§18) o painel local da Minha Fila não existe mais',
     !existsSync(join(RAIZ, 'src/components/operacao/tarefa-operacional.tsx')),
     'era um segundo lugar para executar a mesma etapa')
-  ok('§1) a Minha Fila não monta executor de etapa', !/StepEditorRouter/.test(tela))
   const global = semComentarios(ler('src/components/operacao/visao-global.tsx'))
   ok('§17) a visão global também não', !/StepEditorRouter/.test(global))
 
@@ -321,7 +300,6 @@ async function main() {
   secao('§13/§14) TODA superfície usa o MESMO construtor de URL')
   // ══════════════════════════════════════════════════════════════════════════
   const superficies = [
-    ['Minha Fila / cockpit', 'src/components/operacao/tabela-familia.tsx'],
     ['Visão global (Tarefas e Projetos)', 'src/components/operacao/visao-global.tsx'],
   ] as const
   for (const [nome, arq] of superficies) {

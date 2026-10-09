@@ -255,6 +255,7 @@
     "scripts/localidade-regra-unica.test.ts",
     "scripts/provincias-oficiais.test.ts",
     "scripts/anexo-abre-sem-baixar.test.ts",
+    "scripts/cron-rastro.test.ts",
     "scripts/arvore-localidade-ferramenta-unica.test.ts",
     "scripts/prazo-sem-previsao-vale-o-da-tarefa.test.ts",
     "scripts/vinculo-requerente-varios-processos.test.ts",

@@ -200,8 +200,8 @@ registrar({
 registrar({
   id: 'saude.tarefas.sem-responsavel',
   codigo: 'TAR-001',
-  nome: 'Tarefa aberta com responsável',
-  descricao: 'Tarefa aberta sem responsável não é de ninguém — e não sai do lugar.',
+  nome: 'Tarefa aberta com responsável ou na fila da equipe',
+  descricao: 'Tarefa aberta sem responsável e sem fila não é de ninguém — e a que dorme na fila da equipe há mais de 3 dias também não sai do lugar.',
   dominio: 'TAREFAS',
   modulo: 'Tarefas e Projetos',
   severidadePadrao: 'ALERTA',
@@ -213,17 +213,25 @@ registrar({
   rotaCorrecao: ROTA_TAREFAS,
   responsavel: 'Operação',
   ativo: true,
-  executar: async (): Promise<ResultadoVerificacao> => {
+  executar: async ({ agora }): Promise<ResultadoVerificacao> => {
     // `concluida` nunca vira `true` para CANCELADA/SUPERSEDIDA — sem excluir o
     // status terminal, tarefa já encerrada contava como "aberta sem responsável".
-    const n = await prisma.tarefa.count({ where: { concluida: false, responsavelId: null, statusTarefa: { notIn: STATUS_TERMINAIS } } })
-    if (!n) return { achados: [], metricas: { semResponsavel: 0 }, resumo: 'Toda tarefa aberta tem responsável.' }
+    // FILA DA EQUIPE NÃO É ABANDONO: a tarefa nasce na fila (`equipeKey`) e o gestor delega uma a uma (regra do Marco, 09/10/2026). Só é problema a
+    // tarefa SEM DONO E SEM FILA, ou a que dorme na fila há mais de 3 dias sem ninguém pegar.
+    const limite = new Date(agora.getTime() - 3 * 86_400_000)
+    const n = await prisma.tarefa.count({
+      where: {
+        concluida: false, responsavelId: null, statusTarefa: { notIn: STATUS_TERMINAIS },
+        OR: [{ equipeKey: null }, { createdAt: { lt: limite } }],
+      },
+    })
+    if (!n) return { achados: [], metricas: { semResponsavel: 0 }, resumo: 'Nenhuma tarefa aberta está sem dono e sem fila, nem parada na fila há mais de 3 dias.' }
     return {
       achados: [{
         chave: 'tarefa-sem-responsavel',
         severidade: 'ALERTA',
-        titulo: `${n} tarefa(s) aberta(s) sem responsável`,
-        descricao: `${n} tarefa(s) não concluídas estão sem responsável atribuído.`,
+        titulo: `${n} tarefa(s) aberta(s) sem dono e sem fila, ou parada(s) na fila há mais de 3 dias`,
+        descricao: `${n} tarefa(s) não concluídas estão sem responsável e sem fila da equipe, ou esperando na fila há mais de 3 dias.`,
         explicacao: 'Tarefa sem dono não entra na fila de trabalho de ninguém.',
         impacto: 'O trabalho fica parado sem que ninguém perceba.',
         entidade: 'Tarefa',

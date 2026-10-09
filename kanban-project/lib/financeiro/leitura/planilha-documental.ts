@@ -51,6 +51,8 @@ import { listarColunasConfiguradas, type ColunaConfigurada } from './planilha-co
 import { resolverElegibilidadeDocumental } from '@/src/lib/motor/elegibilidade-documental'
 import { resolverPrecoPorConfigDB } from '@/src/lib/motor/resolver-preco-financeiro.prisma'
 import { pessoasAtivasDaArvore } from '@/src/lib/genealogia/vinculo-ativo'
+import { calcularGeracoes } from '@/src/lib/genealogia/geracao'
+import { compararCertidoesDaFamilia } from '@/lib/operacional/ordem-certidoes'
 import { montarPessoasDoProcesso } from '@/src/lib/process-stage/central-operacional-core'
 import {
   resolverIntersecao, chaveDaCelula,
@@ -383,16 +385,12 @@ export async function montarEstruturaDocumental(processoId: number): Promise<Blo
     })) as never,
     unioes,
   )
-  // GERAÇÃO EXIBIDA CONTA DE CIMA PARA BAIXO, como na referência: 1 é o
-  // ascendente mais antigo da árvore e o requerente é o número mais alto.
-  //
-  // O motor conta ao contrário — `geracao` é a distância ATÉ o requerente (0 =
-  // requerente, 1 = pai, 2 = avô) — porque é isso que o parentesco precisa
-  // saber. Inverter é apresentação, não recálculo: não se toca no motor, só se
-  // lê a mesma medida a partir do outro extremo.
-  const maiorGeracao = roster.reduce((m, r) => (r.geracao == null ? m : Math.max(m, r.geracao)), 0)
-  const geracaoPorPessoa = new Map(
-    roster.map((r) => [r.pessoaId, r.geracao == null ? null : maiorGeracao - r.geracao + 1]),
+  // GERAÇÃO EXIBIDA = A DE VERDADE (`calcularGeracoes`, o mesmo «G» de toda lista do sistema — ver `src/lib/genealogia/geracao.ts`): G1 é o ancestral
+  // que origina o direito, o cônjuge tem a geração do parceiro, irmãos têm a mesma. Antes a planilha invertia a distância ao requerente do motor de
+  // parentesco: com mais de um requerente em gerações diferentes ela dava «G2» a um filho do G3 e a ordem dos blocos saía fora da regra fixa (vigia e).
+  const geracaoPorPessoa = calcularGeracoes(
+    pessoas.map((p) => ({ id: p.id, paiId: p.paiId, maeId: p.maeId, linhaReta: p.linhaReta, requerente: p.requerente })),
+    unioes,
   )
   const principalPorPessoa = new Map(roster.map((r) => [r.pessoaId, r.classificacao === "LINHA_PRINCIPAL"]))
   // O papel na linhagem ("bisavô", "pai", "Requerente") é do motor de parentesco.
@@ -407,7 +405,7 @@ export async function montarEstruturaDocumental(processoId: number): Promise<Blo
     : []
   const tipoIdDoDoc = (d: { documentTypeId: number | null; tipo: unknown }) => d.documentTypeId ?? (d.tipo ? tipoPorEnum.get(String(d.tipo))?.id ?? null : null)
 
-  return pessoas.map((p) => {
+  const blocos = pessoas.map((p) => {
     const docPorTipo = new Map<number, (typeof p.documentos)[number]>()
     for (const d of p.documentos) {
       const tipoId = d.documentTypeId ?? (d.tipo ? tipoPorEnum.get(String(d.tipo))?.id ?? null : null)
@@ -483,6 +481,13 @@ export async function montarEstruturaDocumental(processoId: number): Promise<Blo
       linhas,
     }
   })
+
+  // A ORDEM FIXA, a mesma de toda lista (`compararCertidoesDaFamilia`): geração → linha reta antes de fora da linha → nascimento da pessoa.
+  // `numeroLinhagem` continua ordenando só a pasta documental; aqui ele só desempata pela ordem em que a consulta já traz.
+  const nascimentoDe = new Map(pessoas.map((p) => [p.id, p.data_nasc]))
+  const linhaRetaDe = new Map(pessoas.map((p) => [p.id, p.linhaReta]))
+  const chave = (b: { pessoaId: number; geracao: number | null }) => ({ geracao: b.geracao, linhaReta: linhaRetaDe.get(b.pessoaId) === true, pessoaNascimento: nascimentoDe.get(b.pessoaId) ?? null, pessoaId: b.pessoaId })
+  return blocos.sort((a, b) => compararCertidoesDaFamilia(chave(a), chave(b)))
 
 }
 
