@@ -16,6 +16,7 @@
 // a segunda criava o Documento. Nasce vazio (rascunho, sem cartório/livro/folha) —
 // ver `documentoTemDadosPreenchidos` para distinguir rascunho de dado real.
 
+import { garantirTentativa, MOTIVOS_DE_TENTATIVA } from "@/src/services/execucao-do-passo"
 import { slaDoPassoDaNecessidade } from "@/lib/operacional/prazo-por-pais"
 import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
 import { reabrirGenealogiaParaNecessidadeTardiaTx, reconciliarGenealogiaEEmissaoTx } from "@/src/services/genealogia/trava-emissao-por-genealogia"
@@ -490,7 +491,7 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
           if (jaExiste) {
             res.stepsReusados++
           } else {
-            await db.phaseWorkflowStepInstance.create({
+            const passoCriado = await db.phaseWorkflowStepInstance.create({
               data: {
                 workflowInstanceId: instancia.id, stepKey: STEP_LOCALIZAR, processoId,
                 faseMacroKey: FASE_GENEALOGIA, ordem: 1, tipo: "HUMANO",
@@ -515,6 +516,8 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
                 snapshotSchemaVersion: 1,
               },
             })
+            // A OBRIGAÇÃO NASCE COM A PRIMEIRA TENTATIVA (mesma regra de `instanciarWorkflowDaFase`): passo sem tentativa não sobrevive a uma reabertura (EXE-002).
+            await garantirTentativa(passoCriado.id, { motivo: MOTIVOS_DE_TENTATIVA.ABERTURA, status: passoCriado.status, startedAt: passoCriado.startedAt, completedAt: passoCriado.completedAt }, db)
             res.stepsCriados++
           }
         }
