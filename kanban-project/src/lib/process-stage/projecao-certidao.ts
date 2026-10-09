@@ -173,13 +173,15 @@ export function statusEPrazoEfetivos(
   if (!temOrigem || STATUS_TAREFA_NUNCA_CALCULADOS.has(tarefa.statusTarefa)) {
     return { statusTarefa: tarefa.statusTarefa, dataPrazo: tarefa.dataPrazo, origem: "GRAVADO" }
   }
-  // Prazo sempre vem da projeção (é o que `previsaoRetorno` decide sozinho).
+  // Prazo: a PREVISÃO DO ÓRGÃO (`previsaoRetorno`) decide sozinha quando existe. ANTES do pedido não há previsão (a projeção é `null`) e o prazo
+  // que vale é o da própria Tarefa (entrada na fase + SLA do passo) — `null` não significa «sem prazo», significa «o órgão ainda não deu previsão»
+  // (08/10/2026: a Carlota Salvarani, prazo 16/10, era acusada de divergir da projeção «sem prazo»).
   // Status só troca quando a situação PROVA a transição (aguardando terceiro
   // ou concluído); no meio do caminho, o gravado continua sendo o fato —
   // ver o comentário de `statusTarefaEquivalente`.
   return {
     statusTarefa: projecao.statusTarefaEquivalente ?? tarefa.statusTarefa,
-    dataPrazo: projecao.prazo,
+    dataPrazo: projecao.prazo ?? tarefa.dataPrazo,
     origem: "CERTIDAO",
   }
 }
