@@ -256,6 +256,7 @@
     "scripts/provincias-oficiais.test.ts",
     "scripts/anexo-abre-sem-baixar.test.ts",
     "scripts/cron-rastro.test.ts",
+    "scripts/genealogia-passo-nasce-com-tentativa.test.ts",
     "scripts/arvore-localidade-ferramenta-unica.test.ts",
     "scripts/prazo-sem-previsao-vale-o-da-tarefa.test.ts",
     "scripts/vinculo-requerente-varios-processos.test.ts",
