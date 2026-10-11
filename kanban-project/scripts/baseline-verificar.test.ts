@@ -609,6 +609,9 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20261006100000_aptidoes_traducao_apostilamento',
   '20261007200000_pessoa_local_obito',
   '20261008190000_regra_temporal_pais',
+  // Leads (10/10/2026, docs/leads-mandato.md): duas tabelas NOVAS (LeadConversa, LeadMensagem).
+  // Só ADITIVO e idempotente; nenhuma tabela existente é alterada.
+  '20261010200000_leads_conversa_mensagem',
 ]
 
 const CAMINHO_MANIFESTO = join(RAIZ, 'prisma', 'baseline', 'migrations-absorvidas.json')
