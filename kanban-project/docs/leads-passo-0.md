@@ -5,17 +5,20 @@ levantamento. Compara `docs/leads-mandato.md` com `docs/leads-prototipo.html` e 
 
 ## 1. Mandato × protótipo
 
-Os dois dizem a mesma coisa. O protótipo desenha as regras 19 a 28 do mandato (situações, lista,
-conversa, painel, responsável, devolver, encerrar, sino). O motor (regras 1 a 18) não tem tela.
+Os dois dizem a mesma coisa. O protótipo desenha as regras 19 a 27 do mandato (situações, lista,
+conversa, painel, devolver, encerrar, sino). O motor (regras 1 a 18) não tem tela.
+
+Decisão do dono do produto em 10/10/2026, depois da primeira versão deste Passo 0: **somente o Marco vê
+e responde os leads.** Saíram do mandato e do protótipo o responsável por lead, a passagem para outra
+pessoa e a regra de quem vê o quê.
 
 Diferenças em relação ao **primeiro** protótipo de Leads (10/10/2026, no artefato de Design):
 
 | Primeiro protótipo | Agora | Motivo |
 | --- | --- | --- |
-| Atendente continua pelo aplicativo do WhatsApp | Atendente responde pela tela de Leads | Número só na API não tem aplicativo |
+| Atendente continua pelo aplicativo do WhatsApp | O Marco responde pela tela de Leads | Número só na API não tem aplicativo |
 | Situações "Conversa agendada", "Pronto para fechar", "Virou processo" | Fora do mandato (§6) | Dependem de decisão comercial e de "criar processo a partir do lead" |
-| Aba "Distribuição dos leads" (manual, rodízio, país, carga) | Só manual (§6) | O modo automático ainda não foi escolhido |
-| Atendentes de exemplo fixos | Usuários reais com `leads.atender` | — |
+| Aba "Distribuição dos leads" (manual, rodízio, país, carga) e responsável por lead | Fora do mandato (§6) | Só o Marco atende |
 
 ## 2. O que existe hoje em produção
 
@@ -34,22 +37,22 @@ Diferenças em relação ao **primeiro** protótipo de Leads (10/10/2026, no art
 | Rota pública que se confere sozinha | Precedente do link de coleta (`/api/coleta/`) e dos crons; lista `API_PUBLICA` do `middleware.ts` |
 | Cron com rastro | `lib/operacional/cron-rastro.ts`, modelo `cron/coleta-purga` |
 | Permissão em rota | `verificarPermissao` / `extrairUsuarioComPermissoes` (`src/lib/verificar-permissao.ts`) |
-| Permissões e perfis | `PERMISSOES`, `MODULOS_PERMISSOES` (`src/lib/permissoes.ts`); sem migration (Json) |
+| Permissão só do Marco | `PERMISSOES_EXCLUSIVAS` (`src/lib/permissoes.ts`): não vale por ser administrador, só por concessão nominal; sem migration (Json) |
 | Menu lateral | `menuItems` em `src/components/bitrix-sidebar.tsx` + `itemDeMenuVisivel` |
 | Tela lista + detalhe | Casca de `/torre` (`HeaderBarApp`, `api()` de `torre-base.tsx`, estilos `torre.css`) |
 | Sino | Porta canônica `somarAoAviso` (`lib/operacional/notificacao-canonica.ts`), aviso agrupado |
-| Seletor de pessoa | `ROTULO_ESCOLHA_DA_PESSOA` / `PESSOA_ESCOLHIDA_INICIAL` (`src/lib/ui/atribuicao.ts`) |
 | Telefone | `src/lib/telefone/` |
 | Teste com banco | `scripts/_banco-de-teste.ts` + suíte crítica |
 
 ## 4. O que falta criar
 
-- 1 migration aditiva (2 tabelas, índices, 2 chaves estrangeiras para `Usuario`), declarada em
+- 1 migration aditiva (2 tabelas, índices, 1 chave estrangeira para `Usuario`), declarada em
   `MIGRATIONS_POS_BASELINE` no mesmo commit.
 - `src/services/leads/` (5 arquivos, §7 do mandato).
-- 1 rota pública (`/api/whatsapp/webhook`), 1 cron (`/api/cron/leads-retomar`), 7 rotas `/api/leads`.
+- 1 rota pública (`/api/whatsapp/webhook`), 1 cron (`/api/cron/leads-retomar`), 6 rotas `/api/leads`.
 - Página `/leads` e componentes em `src/components/leads/`.
-- 3 chaves de permissão e 1 bloco "Leads" em `MODULOS_PERMISSOES`.
+- 1 chave de permissão exclusiva (`leads.atender`), 1 bloco "Leads" em `MODULOS_PERMISSOES` e a concessão
+  nominal ao usuário do Marco (feita pela tela de usuários, não por script).
 - 1 tipo de aviso novo no sino (`TipoAviso`, `textoDoAviso`, `FatoSomavel`) e um resolvedor "todos os
   usuários com a permissão X", que hoje não existe.
 - Testes na suíte crítica (§10 do mandato).
@@ -76,11 +79,12 @@ Riscos do próprio módulo e do deploy:
    `/api/whatsapp/webhook`, nunca `/api/leads` nem `/api/whatsapp`.
 5. **Gate de build.** Os testes rodam sem as variáveis do WhatsApp e da IA: nenhum arquivo do módulo pode
    falhar ao ser importado sem elas, e os testes usam WhatsApp e IA simulados.
-6. **Guards que uma tela nova aciona:** seletor de pessoa (`seletores-sem-pessoa-preselecionada`),
-   detector de "porta de atribuição" de Tarefa (`_regras-do-marco-codigo.ts`), `text-white` sobre fundo
-   escuro, campos de data, e `select` obrigatório em toda consulta de `Usuario`. O responsável pelo lead
-   usa rota e nomes próprios porque **não é** atribuição de Tarefa; se algum guard acusar, o caso entra na
-   lista nominal com a justificativa, nunca é contornado.
+6. **Guards que uma tela nova aciona:** `text-white` sobre fundo escuro, campos de data e `select`
+   obrigatório em toda consulta de `Usuario`. Como o módulo não tem responsável nem seletor de pessoa, os
+   guards de atribuição não se aplicam; se algum acusar, o caso entra na lista nominal com a
+   justificativa, nunca é contornado.
+6b. **A tela de usuários tem uma cópia desatualizada dos módulos de permissão** (`UsersTab.tsx`). Para a
+   concessão nominal de `leads.atender` aparecer ali, o bloco "Leads" precisa entrar nessa cópia também.
 7. **Sino.** Sem `processoId`, os avisos do mesmo tipo de um usuário viram um só. Para lead isso é o
    comportamento desejado (regra 27), mas exige o tipo e o texto próprios, senão sai como "Tarefas avulsas".
 8. **Custo da IA.** Cada lead atendido custa cerca de 25 centavos de dólar com o modelo padrão
@@ -98,4 +102,5 @@ Riscos do próprio módulo e do deploy:
 
 ## 7. Aguardando
 
-OK do dono do produto para: (a) as regras **[CONFIRMAR]** da seção 4 do mandato; (b) começar o Bloco 1.
+OK do dono do produto para: (a) a regra 26 do mandato (encerrar lead), ainda **[CONFIRMAR]**; (b) começar
+o Bloco 1.
