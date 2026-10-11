@@ -16,6 +16,8 @@ export type TipoAviso =
   | 'ESCALADA' | 'SEM_RESPONSAVEL' | 'INTEGRIDADE' | 'FASE_CONCLUIDA'
   /** Torre nova (H): alguém te mencionou (@) num comentário da família/tarefa. */
   | 'MENCAO'
+  /** Leads (docs/leads-mandato.md, regra 27): lead que passou do agente ou escreveu de novo. NÃO é tarefa nem tem família. */
+  | 'LEAD'
 
 export interface ResumoDoAviso {
   /** Ids das tarefas por categoria (PRECISA_AGIR, e as 3 primeiras também no gestor). */
@@ -89,6 +91,9 @@ export function textoDoAviso(
       return `${f} — ${q(n, 'alerta crítico de integridade', 'alertas críticos de integridade')}`
     case 'FASE_CONCLUIDA':
       return `${f} — ${q(n, 'fase concluída', 'fases concluídas')}`
+    case 'LEAD':
+      // Sem família e sem "tarefa": lead não é tarefa. A contagem é de LEADS (um item por conversa).
+      return n === 1 ? '1 lead aguardando resposta' : `${n} leads aguardando resposta`
     case 'MENCAO': {
       const u = d.resumo?.ultima
       if (n <= 1 && u) return `${u.autor} mencionou você em ${f}: \u201c${u.trecho}\u201d`

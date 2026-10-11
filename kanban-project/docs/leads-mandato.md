@@ -1,8 +1,9 @@
 # MANDATO — Leads (agente de primeiro atendimento no WhatsApp + tela de Leads)
 
 Proposto em 10/10/2026, a partir das decisões do dono do produto na conversa de construção do agente
-(mesma data). **Ainda não aprovado por inteiro**: a regra marcada com **[CONFIRMAR]** é proposta e precisa
-do OK dele antes do Bloco 2. Protótipo: `docs/leads-prototipo.html`. Passo 0: `docs/leads-passo-0.md`.
+(mesma data). As regras 26 (encerrar e reabrir) e 28 (teto de respostas) foram propostas a ele e aplicadas
+no mesmo dia, com a ordem de terminar o Bloco 2 sem parar; continuam ajustáveis por decisão dele.
+Protótipo: `docs/leads-prototipo.html`. Passo 0: `docs/leads-passo-0.md`.
 Este documento é a especificação. Qualquer divergência: perguntar, não decidir.
 
 ## 1. O que é
@@ -66,8 +67,8 @@ mesma hospedagem e no mesmo banco. Motivo: custo zero de infraestrutura nova.
     nem responde. Não existe responsável por lead, distribuição nem passagem para outra pessoa.
 20. **Permissão:** uma só, `leads.atender` (ver a tela, responder, devolver ao agente e encerrar). É
     **exclusiva** (`PERMISSOES_EXCLUSIVAS`): ser administrador não basta, ela só vale por concessão
-    nominal no cadastro do usuário. Nasce concedida apenas ao usuário do Marco. O item "Leads" do menu só
-    aparece para quem a tem.
+    nominal no cadastro do usuário (Gerenciamento › Usuários), e a única concessão prevista é a do
+    usuário do Marco. O item "Leads" do menu só aparece para quem a tem.
 21. **Situação do lead** (uma regra só, no servidor; a tela só desenha):
     - **Com o agente** — o agente está atendendo.
     - **Aguardando resposta** — já passou para o Marco e a última palavra foi do lead, ou ele ainda não
@@ -82,11 +83,17 @@ mesma hospedagem e no mesmo banco. Motivo: custo zero de infraestrutura nova.
     pesquisa"), resumo e motivo da passagem.
 25. **Devolver ao agente:** a conversa pode ser devolvida; o agente volta sabendo o que foi dito enquanto
     esteve fora.
-26. **Encerrar [CONFIRMAR]:** exige motivo escrito. Lead encerrado que escreve de novo volta para o agente
-    como conversa nova; o que já se sabia dele fica guardado.
+26. **Encerrar e reabrir** (aplicada em 10/10/2026, por decisão "termine tudo"; ajustável): encerrar
+    exige motivo escrito. Lead encerrado que escreve de novo volta para o agente como conversa nova; o
+    que já se sabia dele (ficha, pessoas, resumo e mensagens antigas) fica guardado. "Reabrir lead"
+    desfaz um encerramento e devolve o lead ao Marco, nunca direto ao agente.
 27. **Aviso no sino:** quando um lead passa do agente para o Marco, e a cada mensagem nova de um lead que
     já está com ele. Um aviso só, com a contagem ("3 leads aguardando resposta"), que leva à lista
-    filtrada. Recebe quem tem `leads.atender`.
+    filtrada. Recebe quem tem `leads.atender`. O lead respondido, devolvido ao agente ou encerrado sai
+    da contagem do aviso ainda não lido.
+28. **Teto de respostas do agente** (aplicada em 10/10/2026; ajustável): depois de 30 respostas do agente
+    na mesma conversa, a seguinte é "Um momento, por favor." e a conversa passa para o Marco, com o
+    motivo "Conversa longa". Uma triagem usa de 8 a 15 respostas.
 
 ## 5. O que o lead NÃO é
 
@@ -126,7 +133,10 @@ mesma hospedagem e no mesmo banco. Motivo: custo zero de infraestrutura nova.
 - `src/services/leads/whatsapp.ts` — envio, "digitando", arquivos e conferência da assinatura da Meta.
 - `src/services/leads/ia.ts` — chamada à IA (mesmo padrão de `visao-cliente.ts`: `fetch`, sem SDK).
 - `src/services/leads/atendimento.ts` — a regra: receber, esperar, responder, passar, devolver, encerrar.
-- `src/services/leads/situacao.ts` — a função única da situação do lead (regra 19) e de "pode responder".
+- `src/services/leads/situacao.ts` — a função única da situação do lead (regra 21) e de "pode responder".
+- `src/services/leads/leitura.ts` — o que a tela lê (lista, contagem, lead aberto). Somente leitura.
+- `src/services/leads/destinatarios.ts` — quem tem `leads.atender` (quem recebe o aviso).
+- `src/services/leads/rota.ts` — o que as rotas `/api/leads` têm em comum (permissão e tradução de erro).
 
 **Rotas:**
 
@@ -136,8 +146,8 @@ mesma hospedagem e no mesmo banco. Motivo: custo zero de infraestrutura nova.
 - `GET /api/cron/leads-retomar` — a cada 10 minutos, responde quem ficou sem resposta (rede de segurança).
   Com rastro, no `vercel.json`, no `middleware.ts` e na verificação CRON-006.
 - `GET /api/leads`, `GET /api/leads/[id]`, `POST /api/leads/[id]/mensagens`,
-  `POST /api/leads/[id]/devolver`, `POST /api/leads/[id]/encerrar`, `GET /api/leads/arquivo/[midiaId]` —
-  todas com `leads.atender` conferida no servidor.
+  `POST /api/leads/[id]/devolver`, `POST /api/leads/[id]/encerrar`, `POST /api/leads/[id]/reabrir`,
+  `GET /api/leads/arquivo/[mensagemId]` — todas com `leads.atender` conferida no servidor.
 
 **Variáveis de ambiente** (nenhuma derruba o sistema quando falta): `WHATSAPP_TOKEN`,
 `WHATSAPP_PHONE_ID`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `LEADS_SO_ATENDER` (modo de teste),
@@ -148,7 +158,9 @@ mesma hospedagem e no mesmo banco. Motivo: custo zero de infraestrutura nova.
 - O webhook só aceita chamada com a assinatura da Meta válida (HMAC com a chave secreta do aplicativo).
 - Nenhuma chave vai ao navegador: a tela fala só com as rotas `/api/leads`.
 - O texto do lead é conversa, nunca instrução para o agente.
-- O arquivo do lead é entregue pela rota do sistema, com permissão; o endereço da Meta nunca é exposto.
+- O arquivo do lead é entregue pela rota do sistema, com permissão; o endereço e o identificador da Meta
+  nunca são expostos (a tela pede pelo id da mensagem). Só foto, áudio, vídeo e PDF abrem no navegador;
+  qualquer outro tipo (HTML, SVG, executável) sai como download, para nunca rodar dentro do sistema.
 - A página `/leads` não é protegida pelo `middleware.ts`; a proteção real é `leads.atender` em cada rota.
 
 ## 9. Blocos
@@ -177,14 +189,38 @@ O que o código faz além do que as seções acima já dizem, e o que ficou de f
   que ficou sem resposta é retomado pelo cron depois de um minuto.
 - **Trava:** `LeadConversa.processandoAte` (150 segundos). Só uma chamada responde a conversa de cada vez.
 - **Lead encerrado:** enquanto a regra 26 não é confirmada, mensagem nova de lead encerrado é só
-  registrada, como a de um lead que já passou. Nada no Bloco 1 encerra lead.
+  registrada, como a de um lead que já passou. Nada no Bloco 1 encerra lead. (Mudou no Bloco 2: vale a
+  regra 26.)
 - **Variáveis a mais:** `LEADS_NOME_AGENTE` e `WHATSAPP_API_VERSAO`, opcionais.
 - **Não entrou (Bloco 2):** aviso no sino, permissão, tela e resposta de pessoa. No Bloco 1, quando a
   conversa passa, ninguém é avisado: por isso ele só roda em modo de teste.
 
-**Pendência para decisão:** não existe limite de respostas por conversa nem por dia. Com o número
-divulgado em anúncio, alguém pode conversar com o agente à vontade, e cada resposta custa. O modo de
-teste cobre isso por enquanto.
+**Pendência do Bloco 1, resolvida no Bloco 2:** o limite de respostas por conversa (regra 28). Limite por
+dia, somando todas as conversas, continua não existindo.
+
+## 9c. Bloco 2 — como foi construído (10/10/2026)
+
+- **Permissão:** `leads.atender` em `PERMISSOES` e em `PERMISSOES_EXCLUSIVAS`; oferecida em Gerenciamento
+  › Usuários, no grupo das exclusivas. **Não nasce concedida a ninguém:** enquanto a concessão não for
+  marcada no usuário do Marco, o menu não aparece, as rotas respondem 403 e nenhum aviso é criado.
+- **Tela:** `/leads` (`src/app/leads/page.tsx`, `src/components/leads/`), com o casco e as cores da
+  Torre. Item "Leads" no menu, antes de "Processos". Sem canal em tempo real no sistema: a lista se
+  atualiza a cada 10 segundos e a conversa aberta a cada 7.
+- **Lista:** as 500 conversas de atividade mais recente; acima disso a tela avisa que cortou. Lista e
+  contadores saem do mesmo conjunto, então sempre fecham.
+- **Resposta da pessoa:** texto, até 4096 letras, só dentro das 24 horas. A conversa é assumida antes do
+  envio (o agente para mesmo no meio de uma resposta). Se o WhatsApp recusa o envio, a tela mostra o
+  erro e nada fica gravado como enviado.
+- **Devolver ao agente:** o que o lead e a pessoa disseram depois da passagem entra no contexto da IA. Se
+  a última palavra é do lead, o agente responde em seguida; se é da pessoa, ele espera o lead escrever.
+- **Histórico:** assumir, devolver, encerrar e reabrir gravam uma linha em `LogAuditoria`
+  (`LEAD_CONVERSA`), com quem fez.
+- **Sino:** tipo de aviso `LEAD`, escrito só pela porta do sino (`notificacao-canonica.ts`). Sem família e
+  sem tarefa: o item é a conversa.
+- **Arquivos:** não são copiados para o sistema. São buscados na Meta na hora, e a Meta os guarda por
+  tempo limitado; depois disso a tela diz que o arquivo não está mais disponível.
+- **Não entrou:** enviar arquivo ou áudio, puxar conversa depois das 24 horas, limite de respostas por
+  dia e tudo o que está na seção 6.
 
 ## 10. Testes e critério de aceite
 
@@ -201,4 +237,15 @@ Cada bloco entra com testes na suíte crítica (`scripts/ci/suite-critica.json`)
 - modo de teste ignora quem não está na lista;
 - a situação do lead na lista, na conversa e no sino sai da mesma função;
 - administrador sem a concessão nominal de `leads.atender` não vê o menu nem recebe dado das rotas;
-- lead nunca aparece em contador de tarefas (Torre, Operação, Home).
+- lead nunca aparece em contador de tarefas (Torre, Operação, Home);
+- a pessoa responde: a mensagem sai, a situação vira "Respondido" e o agente não fala mais;
+- devolver ao agente: ele volta sabendo o que foi dito e só responde se a última palavra é do lead;
+- encerrar exige motivo; lead encerrado que escreve volta ao agente com a ficha guardada; reabrir volta
+  para a pessoa;
+- teto de respostas: na resposta seguinte à 30ª a IA não é chamada e a conversa passa;
+- o aviso do sino conta leads (um por conversa), só para quem tem a permissão, e baixa quando o lead é
+  respondido, devolvido ou encerrado;
+- arquivo do lead: o identificador da Meta não chega à tela; HTML e SVG só saem como download.
+
+Arquivos: `scripts/leads-whatsapp-ia.test.ts`, `scripts/leads-motor.test.ts` (Bloco 1) e
+`scripts/leads-tela.test.ts` (Bloco 2).

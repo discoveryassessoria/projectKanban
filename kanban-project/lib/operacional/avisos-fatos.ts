@@ -10,7 +10,7 @@
 // ============================================================================
 import type { Prisma, PrismaClient } from '@prisma/client'
 import { urlOperacaoDaFamilia } from './navegacao'
-import { somarAoAviso, rotuloDaFamilia, sincronizarAvisosDeTarefas, SELECT_ROTULO_FAMILIA } from './notificacao-canonica'
+import { retirarItemDosAvisos, somarAoAviso, rotuloDaFamilia, sincronizarAvisosDeTarefas, SELECT_ROTULO_FAMILIA } from './notificacao-canonica'
 
 type Db = PrismaClient | Prisma.TransactionClient
 
@@ -113,4 +113,32 @@ export async function avisarMencao(
     ultima: { autor: args.autorNome, trecho: trechoDoComentario(args.texto) },
   })
   return { avisoId: r.id, criado: r.criado }
+}
+
+/** Para onde o aviso de lead leva: a lista filtrada em "Aguardando resposta". */
+export const LINK_DOS_LEADS_AGUARDANDO = '/leads?situacao=AGUARDANDO_RESPOSTA'
+
+const itemDoLead = (conversaId: number) => `lead:${conversaId}`
+
+/**
+ * "N leads aguardando resposta" — LEAD NÃO É TAREFA (docs/leads-mandato.md §5): o aviso não tem família
+ * nem tarefa, só o item `lead:<conversaId>`. Idempotente por conversa: o mesmo lead escrevendo várias
+ * vezes conta UMA vez no aviso aberto; depois do clique, o próximo fato abre um aviso novo.
+ */
+export async function avisarLeadAguardando(
+  db: Db, args: { destinatarioId: number; conversaId: number },
+): Promise<{ avisoId: number; criado: boolean }> {
+  const r = await somarAoAviso(db, {
+    tipo: 'LEAD', destinatarioId: args.destinatarioId, processoId: null, familiaNome: null,
+    itens: [itemDoLead(args.conversaId)], link: LINK_DOS_LEADS_AGUARDANDO,
+  })
+  return { avisoId: r.id, criado: r.criado }
+}
+
+/**
+ * O lead deixou de aguardar resposta (foi respondido, devolvido ao agente ou encerrado): sai do aviso
+ * ainda não lido de todos. O número do sino acompanha o da tela. Aviso que fica vazio some.
+ */
+export async function retirarAvisoDeLead(db: Db, conversaId: number): Promise<void> {
+  await retirarItemDosAvisos(db, { tipo: 'LEAD', item: itemDoLead(conversaId) })
 }

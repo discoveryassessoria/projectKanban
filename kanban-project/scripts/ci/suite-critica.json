@@ -236,7 +236,8 @@
   ],
   "leads — agente de primeiro atendimento no WhatsApp (docs/leads-mandato.md)": [
    "scripts/leads-whatsapp-ia.test.ts",
-   "scripts/leads-motor.test.ts"
+   "scripts/leads-motor.test.ts",
+   "scripts/leads-tela.test.ts"
   ]
  },
  "arquivos": [
@@ -520,6 +521,7 @@
   "scripts/ativar-fase-aguardando-fechamento.test.ts",
   "scripts/catalogo-fases-aguardando-fechamento.test.ts",
   "scripts/leads-whatsapp-ia.test.ts",
-  "scripts/leads-motor.test.ts"
+  "scripts/leads-motor.test.ts",
+  "scripts/leads-tela.test.ts"
  ]
 }
