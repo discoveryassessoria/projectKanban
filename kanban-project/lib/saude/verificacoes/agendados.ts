@@ -432,8 +432,8 @@ registrar({
 registrar({
   id: 'saude.cron.rastro-dos-jobs',
   codigo: 'CRON-006',
-  nome: 'Os jobs avisos-prazo, resumo-diario, cartorios, coleta-purga, coleta-orfaos e conferidor-orfaos estão rodando',
-  descricao: 'Vigia /api/cron/avisos-prazo, /api/cron/resumo-diario, /api/cron/cartorios, /api/cron/coleta-purga, /api/cron/coleta-orfaos e /api/cron/conferidor-orfaos pela hora da última passagem que cada um grava ao terminar bem.',
+  nome: 'Os jobs avisos-prazo, resumo-diario, cartorios, coleta-purga, coleta-orfaos, conferidor-orfaos e leads-retomar estão rodando',
+  descricao: 'Vigia /api/cron/avisos-prazo, /api/cron/resumo-diario, /api/cron/cartorios, /api/cron/coleta-purga, /api/cron/coleta-orfaos, /api/cron/conferidor-orfaos e /api/cron/leads-retomar pela hora da última passagem que cada um grava ao terminar bem.',
   dominio: 'OBSERVABILIDADE',
   modulo: 'Plataforma / Jobs agendados',
   severidadePadrao: 'ALERTA',

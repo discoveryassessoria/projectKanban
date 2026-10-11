@@ -51,6 +51,10 @@
     {
       "path": "/api/cron/conferidor-orfaos",
       "schedule": "0 8 * * 1"
+    },
+    {
+      "path": "/api/cron/leads-retomar",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

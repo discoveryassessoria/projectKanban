@@ -161,6 +161,31 @@ mesma hospedagem e no mesmo banco. Motivo: custo zero de infraestrutura nova.
   e aviso no sino.
 - Só depois do Bloco 2 o modo de teste é desligado e um anúncio aponta para o número.
 
+## 9b. Bloco 1 — como foi construído (10/10/2026)
+
+O que o código faz além do que as seções acima já dizem, e o que ficou de fora de propósito:
+
+- **Instruções:** texto da versão 17, palavra por palavra. Única mudança de forma: a frase "Agora são
+  HH:MM." saiu do primeiro parágrafo e vai num bloco depois do texto fixo. O modelo lê o mesmo; o texto
+  fixo passa a ficar em cache na API, o que barateia cada resposta.
+- **Formato da resposta:** pedido à API como formato fixo (`output_config.format`), o mesmo recurso que a
+  leitura de árvore por foto já usa. A leitura tolerante do texto e a segunda tentativa continuam.
+- **Só o número do agente:** o webhook ignora mensagens recebidas por outro número do mesmo aplicativo
+  da Meta (o número de teste, por exemplo).
+- **Ordem de gravação:** a mensagem do lead é gravada antes de qualquer espera; a decisão do agente é
+  gravada antes do envio. Se a função morrer no meio, o lead não recebe a mesma resposta duas vezes, e o
+  que ficou sem resposta é retomado pelo cron depois de um minuto.
+- **Trava:** `LeadConversa.processandoAte` (150 segundos). Só uma chamada responde a conversa de cada vez.
+- **Lead encerrado:** enquanto a regra 26 não é confirmada, mensagem nova de lead encerrado é só
+  registrada, como a de um lead que já passou. Nada no Bloco 1 encerra lead.
+- **Variáveis a mais:** `LEADS_NOME_AGENTE` e `WHATSAPP_API_VERSAO`, opcionais.
+- **Não entrou (Bloco 2):** aviso no sino, permissão, tela e resposta de pessoa. No Bloco 1, quando a
+  conversa passa, ninguém é avisado: por isso ele só roda em modo de teste.
+
+**Pendência para decisão:** não existe limite de respostas por conversa nem por dia. Com o número
+divulgado em anúncio, alguém pode conversar com o agente à vontade, e cada resposta custa. O modo de
+teste cobre isso por enquanto.
+
 ## 10. Testes e critério de aceite
 
 Cada bloco entra com testes na suíte crítica (`scripts/ci/suite-critica.json`):

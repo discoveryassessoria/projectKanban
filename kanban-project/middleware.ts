@@ -96,11 +96,19 @@ const API_PUBLICA: string[] = [
   "/api/cron/coleta-purga",
   "/api/cron/coleta-orfaos",
   "/api/cron/conferidor-orfaos",
+  // Rede de segurança do agente de leads (a cada 10 min, docs/leads-mandato.md §7). Auto-verifica:
+  // x-vercel-cron ou CRON_SECRET.
+  "/api/cron/leads-retomar",
   // LINK PÚBLICO DE COLETA DE DADOS (docs/coleta-de-dados-mandato.md): o cliente não tem login. O que
   // autoriza é o CÓDIGO aleatório do link, conferido em cada handler (inexistente, encerrado e processo
   // fora de "Aguardando fechamento" respondem IGUAL). Nada daqui devolve dado já enviado. As rotas do
   // administrador moram em /api/processos/[id]/coleta e continuam exigindo JWT + permissão.
   "/api/coleta/",
+  // WEBHOOK DO WHATSAPP (docs/leads-mandato.md §7 e §8): quem chama é a Meta, sem login. Caminho EXATO,
+  // nunca "/api/whatsapp" nem "/api/leads" (o casamento é por prefixo). O handler se auto-verifica: o GET
+  // confere a senha de verificação e o POST só vale com a assinatura da Meta (HMAC com a chave secreta
+  // do aplicativo). Sem as chaves configuradas responde "não configurado" e não grava nada.
+  "/api/whatsapp/webhook",
 ]
 
 function isApiPublica(pathname: string): boolean {
