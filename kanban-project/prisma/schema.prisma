@@ -39,6 +39,7 @@ model Usuario {
   processosRegularizados Processo[]              @relation("ProcessoRegularizadoPor")
   coletaLinksCriados     ColetaLink[]            @relation("ColetaLinkCriadoPor")
   coletaEnviosDecididos  ColetaEnvio[]           @relation("ColetaEnvioDecididoPor")
+  leadMensagensEscritas  LeadMensagem[]          @relation("LeadMensagemAutor")
 
   lotesRegistrais           LoteRegistral[]             @relation("LoteRegistralAutor")
   fatosRegistraisAfirmados  FatoRegistral[]             @relation("FatoRegistralResponsavel")
@@ -9163,4 +9164,83 @@ model ColetaArquivo {
   criadoEm DateTime @default(now())
 
   @@index([envioId])
+}
+
+// ============================================================================
+// LEADS — primeiro atendimento pelo WhatsApp (agente de IA) e tela de Leads.
+// Mandato: docs/leads-mandato.md. Grain = LEAD (um por telefone). Lead NÃO é
+// Tarefa, Processo, Contratante nem Requerente: nada aqui entra em Torre,
+// Operação ou contador de tarefas. Dono de escrita único: src/services/leads/.
+// ============================================================================
+
+/// Uma conversa por telefone. `estado` é o fato gravado; a SITUAÇÃO mostrada na
+/// tela (Com o agente, Aguardando resposta, Respondido, Encerrado) é calculada
+/// na leitura por `situacaoDoLead` — nunca gravada.
+model LeadConversa {
+  id        Int     @id @default(autoincrement())
+  /// Identificador do WhatsApp (`wa_id`), só dígitos, como a Meta entrega.
+  telefone  String  @unique @db.VarChar(32)
+  nomeWhats String? @db.VarChar(200)
+
+  /// AGENTE | EQUIPE | ENCERRADA — vocabulário fechado, conferido no serviço.
+  estado         String  @default("AGENTE") @db.VarChar(12)
+  /// Por que saiu do agente (triagem concluída, pediu uma pessoa, áudio…).
+  motivoPassagem String? @db.VarChar(300)
+
+  /// O que o agente levantou: campos da triagem e a lista de pessoas da linhagem.
+  ficha      Json?
+  linhagem   Json?
+  resumo     String?
+  /// Turnos que a IA relê a cada resposta (o texto para pessoas está em LeadMensagem).
+  contextoIa Json?
+
+  ultimaDoLeadEm    DateTime?
+  /// `wamid` da última mensagem do lead — usado para marcar como lida e mostrar "digitando…".
+  ultimaDoLeadWamid String?   @db.VarChar(200)
+  ultimaAtividadeEm DateTime?
+  passouEm          DateTime?
+
+  encerradaEm        DateTime?
+  motivoEncerramento String?   @db.VarChar(300)
+
+  /// Trava de processamento: enquanto for futuro, outra chamada não responde a mesma conversa.
+  processandoAte DateTime?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  mensagens LeadMensagem[]
+
+  @@index([estado, ultimaAtividadeEm])
+}
+
+/// Uma mensagem da conversa. `wamid` único é o que impede responder duas vezes a
+/// mesma mensagem quando a Meta reentrega.
+model LeadMensagem {
+  id         Int          @id @default(autoincrement())
+  conversaId Int
+  conversa   LeadConversa @relation(fields: [conversaId], references: [id], onDelete: Cascade)
+
+  /// LEAD | AGENTE | ATENDENTE
+  de      String   @db.VarChar(12)
+  /// Quem escreveu, quando a resposta é de uma pessoa (ATENDENTE).
+  autorId Int?
+  autor   Usuario? @relation("LeadMensagemAutor", fields: [autorId], references: [id], onDelete: SetNull)
+
+  texto String
+  wamid String? @unique @db.VarChar(200)
+
+  /// Arquivo que o lead mandou (id da mídia na Meta; o conteúdo não é copiado).
+  midiaId   String? @db.VarChar(200)
+  /// audio | image | document | video
+  midiaTipo String? @db.VarChar(20)
+  midiaNome String? @db.VarChar(300)
+
+  /// Mensagem do lead que o agente ainda não respondeu.
+  aguardaAgente Boolean @default(false)
+
+  criadoEm DateTime @default(now())
+
+  @@index([conversaId, criadoEm])
+  @@index([conversaId, aguardaAgente])
 }
