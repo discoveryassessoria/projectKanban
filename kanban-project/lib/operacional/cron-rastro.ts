@@ -17,6 +17,7 @@ export const CRONS_COM_RASTRO: readonly CronComRastro[] = [
   { chave: "coleta-purga", descricao: "retenção da coleta de dados", maxHoras: 36 },
   { chave: "coleta-orfaos", descricao: "varredura de arquivos órfãos da coleta", maxHoras: 36 },
   { chave: "conferidor-orfaos", descricao: "conferidor semanal de arquivos órfãos", maxHoras: 24 * 9 },
+  { chave: "leads-retomar", descricao: "retomada das conversas de leads sem resposta do agente", maxHoras: 3 },
 ]
 
 /** Antes desta data nenhum cron podia ter deixado rastro (o registro nasceu nela): a contagem da idade começa aqui, nunca antes. */

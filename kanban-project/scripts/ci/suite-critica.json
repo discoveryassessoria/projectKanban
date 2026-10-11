@@ -233,6 +233,10 @@
    "scripts/torre-aguardando-fechamento-fora-da-torre.test.ts",
    "scripts/ativar-fase-aguardando-fechamento.test.ts",
    "scripts/catalogo-fases-aguardando-fechamento.test.ts"
+  ],
+  "leads — agente de primeiro atendimento no WhatsApp (docs/leads-mandato.md)": [
+   "scripts/leads-whatsapp-ia.test.ts",
+   "scripts/leads-motor.test.ts"
   ]
  },
  "arquivos": [
@@ -514,6 +518,8 @@
   "scripts/sincronizacao-registral-arvore.test.ts",
   "scripts/torre-aguardando-fechamento-fora-da-torre.test.ts",
   "scripts/ativar-fase-aguardando-fechamento.test.ts",
-  "scripts/catalogo-fases-aguardando-fechamento.test.ts"
+  "scripts/catalogo-fases-aguardando-fechamento.test.ts",
+  "scripts/leads-whatsapp-ia.test.ts",
+  "scripts/leads-motor.test.ts"
  ]
 }
