@@ -24,6 +24,7 @@ import { ManagementIcon } from "@/src/components/icons/management-icon"
 import { ScrollIcon } from "@/src/components/icons/scroll-icon"
 import { ReportIcon } from "@/src/components/icons/report-icon"
 import { RadarIcon } from "@/src/components/icons/radar-icon"
+import { ChatIcon } from "@/src/components/icons/chat-icon"
 import { itemDeMenuVisivel } from "@/src/lib/menu-visibilidade"
 
 const menuItems = [
@@ -33,6 +34,17 @@ const menuItems = [
     icon: HouseIcon,
     textOffset: "translate-y-[0.2px]",
     iconOffset: "",
+  },
+  {
+    // LEADS — quem chegou pelo WhatsApp e ainda não virou processo (docs/leads-mandato.md). Vem ANTES de
+    // Processos porque é o que acontece antes dele. Permissão EXCLUSIVA: só aparece para quem recebeu a
+    // concessão nominal de `leads.atender` (nem o administrador a tem por padrão).
+    title: "Leads",
+    url: "/leads",
+    icon: ChatIcon,
+    textOffset: "",
+    iconOffset: "",
+    permissao: "leads.atender",
   },
   {
     title: "Processos",

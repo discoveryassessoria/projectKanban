@@ -319,7 +319,7 @@ async function main() {
     for (const k of chaves) delete process.env[k]
   }
 
-  console.log("\n16) Lead não é tarefa: o módulo não toca tarefa, processo nem sino")
+  console.log("\n16) Lead não é tarefa: o módulo não toca tarefa nem processo; sem ninguém com `leads.atender`, nenhum aviso")
   {
     const depois = { tarefas: await prisma.tarefa.count(), processos: await prisma.processo.count(), avisos: await prisma.notificacaoOperacional.count() }
     ok("nenhuma Tarefa, Processo ou aviso do sino foi criado ou removido", igual(antes, depois), `${JSON.stringify(antes)} → ${JSON.stringify(depois)}`)

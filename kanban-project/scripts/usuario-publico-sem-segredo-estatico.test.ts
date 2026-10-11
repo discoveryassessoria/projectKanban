@@ -37,6 +37,7 @@ const PERMISSOES_CUSTOM: Record<string, string> = {
   "lib/operacional/obrigacao-atribuicao.ts": "calcula elegibilidade; não serializa",
   "lib/operacional/precisa-de-voce.ts": "calcula elegibilidade; não serializa",
   "lib/operacional/elegibilidade.ts": "calcula elegibilidade; não serializa",
+  "src/services/leads/destinatarios.ts": "calcula quem tem `leads.atender` (quem recebe o aviso de lead); devolve só os ids",
 }
 
 function arquivos(dir: string, acc: string[] = []): string[] {

@@ -254,7 +254,7 @@ export async function marcarAtribuicaoComoLidaAoProgredir(
 // fase ou histórico.
 // ============================================================================
 
-export const TIPOS_AVISO_OPERADOR = ["CHEGOU_TRABALHO", "PRECISA_AGIR", "MUDOU_DE_MAO", "MENCAO"] as const
+export const TIPOS_AVISO_OPERADOR = ["CHEGOU_TRABALHO", "PRECISA_AGIR", "MUDOU_DE_MAO", "MENCAO", "LEAD"] as const
 export const TIPOS_AVISO_GESTOR = ["ESCALADA", "SEM_RESPONSAVEL", "INTEGRIDADE", "FASE_CONCLUIDA"] as const
 export const TIPOS_AVISO: readonly TipoAviso[] = [...TIPOS_AVISO_OPERADOR, ...TIPOS_AVISO_GESTOR]
 
@@ -336,7 +336,7 @@ const chaveDeLinha = (dest: number, proc: number | null, tipo: string) =>
   `aviso::u${dest}::p${proc ?? 0}::${tipo}::${randomUUID()}`
 
 export interface FatoSomavel {
-  tipo: "CHEGOU_TRABALHO" | "MUDOU_DE_MAO" | "FASE_CONCLUIDA" | "MENCAO"
+  tipo: "CHEGOU_TRABALHO" | "MUDOU_DE_MAO" | "FASE_CONCLUIDA" | "MENCAO" | "LEAD"
   destinatarioId: number
   /** A FAMÍLIA. Nulo = tarefa avulsa (sem processo). */
   processoId: number | null
@@ -489,6 +489,39 @@ export async function gravarFotoDoAviso(db: Leitor, f: FotoDeAviso): Promise<{ a
 /** Remove um aviso que já não diz nada (a foto do dia ficou vazia). Só a porta apaga. */
 export async function removerAviso(db: Leitor, id: number): Promise<void> {
   await db.notificacaoOperacional.deleteMany({ where: { id } })
+}
+
+/**
+ * RETIRAR UM ITEM — o fato deixou de pedir atenção (ex.: o lead foi respondido, devolvido ao agente ou
+ * encerrado). O item sai dos avisos NÃO LIDOS de todos os destinatários; aviso que fica sem nada deixa
+ * de existir. Aviso já lido não muda: é histórico do que foi avisado. Idempotente.
+ */
+export async function retirarItemDosAvisos(db: Leitor, f: { tipo: "LEAD"; item: string }): Promise<{ avisosRemovidos: number; avisosAtualizados: number }> {
+  const candidatos = await db.notificacaoOperacional.findMany({
+    where: { tipo: f.tipo, agrupado: true, lidaEm: null },
+    select: { id: true, destinatarioId: true, processoId: true, resumo: true },
+  })
+  let avisosRemovidos = 0, avisosAtualizados = 0
+  for (const c of candidatos) {
+    if (!((c.resumo ?? {}) as ResumoDoAviso).itens?.includes(f.item)) continue
+    await comTrava(db, c.destinatarioId, c.processoId, f.tipo, async (tx) => {
+      // Relido sob a trava: outro fato pode ter somado ao aviso (ou a pessoa pode tê-lo lido) nesse meio tempo.
+      const a = await tx.notificacaoOperacional.findFirst({ where: { id: c.id, lidaEm: null }, select: { id: true, tarefaIds: true, resumo: true } })
+      if (!a) return
+      const resumo = (a.resumo ?? {}) as ResumoDoAviso
+      const itens = (resumo.itens ?? []).filter((i) => i !== f.item)
+      if (itens.length === (resumo.itens ?? []).length) return
+      const contagem = a.tarefaIds.length + itens.length
+      if (contagem === 0) { await tx.notificacaoOperacional.delete({ where: { id: a.id } }); avisosRemovidos++; return }
+      const resumoNovo: ResumoDoAviso = { ...resumo, itens }
+      await tx.notificacaoOperacional.update({
+        where: { id: a.id },
+        data: { contagem, resumo: resumoNovo as Prisma.InputJsonValue, titulo: textoDoAviso(f.tipo, null, { contagem, resumo: resumoNovo }).slice(0, 200) },
+      })
+      avisosAtualizados++
+    })
+  }
+  return { avisosRemovidos, avisosAtualizados }
 }
 
 /**

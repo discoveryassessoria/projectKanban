@@ -56,6 +56,7 @@ const COR_DO_TIPO: Record<string, string> = {
   CHEGOU_TRABALHO: "border-[var(--action-primary)]",
   PRECISA_AGIR: "border-amber-500",
   MUDOU_DE_MAO: "border-[var(--border-strong)]",
+  LEAD: "border-[var(--action-primary)]",
   ESCALADA: "border-red-500",
   SEM_RESPONSAVEL: "border-red-500",
   INTEGRIDADE: "border-red-500",

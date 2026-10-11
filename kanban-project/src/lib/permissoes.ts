@@ -57,6 +57,12 @@ export const PERMISSOES = {
   // concessão nominal.
   'processos.excluirDefinitivo': 'Excluir processo definitivamente (ação irreversível, alcança tarefas, workflow e obrigações financeiras do processo)',
 
+  // Leads (docs/leads-mandato.md, regras 19 e 20)
+  // UMA permissão: ver a tela de Leads, responder, devolver ao agente, encerrar e reabrir.
+  // EXCLUSIVA (ver PERMISSOES_EXCLUSIVAS): decisão do dono do produto em 10/10/2026 — só ele vê e
+  // responde os leads. Ser administrador não basta; só vale por concessão nominal no usuário.
+  'leads.atender': 'Leads: ver as conversas do WhatsApp e responder aos leads (só por concessão nominal)',
+
   // Relatórios
   // MÓDULO PRÓPRIO. O menu de Relatórios estava pendurado em
   // `processos.ver_paginas` — permissão de "ver Protocolos/Informações do
@@ -378,6 +384,8 @@ export const PERMISSOES_EXCLUSIVAS = new Set<string>([
   'processos.regularizarHistorico',
   'processos.moverFaseManual',
   'processos.excluirDefinitivo',
+  // Leads: só quem recebeu a concessão nominal vê e responde (docs/leads-mandato.md, regra 20).
+  'leads.atender',
 ])
 
 export const PERMISSOES_OPT_IN = new Set<string>([

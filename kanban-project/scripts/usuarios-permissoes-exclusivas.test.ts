@@ -29,8 +29,8 @@ const EXCL = "processos.excluirDefinitivo"
 
 async function main() {
   secao("1) Regras puras — exclusivas e diff")
-  ok("a tela oferece EXATAMENTE as três exclusivas (as mesmas de PERMISSOES_EXCLUSIVAS)", EXCLUSIVAS_DA_TELA.map((e) => e.chave).sort().join("|") === [...PERMISSOES_EXCLUSIVAS].sort().join("|") && EXCLUSIVAS_DA_TELA.length === 3)
-  ok("as três existem em PERMISSOES (com texto oficial)", EXCLUSIVAS_DA_TELA.every((e) => e.chave in PERMISSOES))
+  ok("a tela oferece EXATAMENTE as exclusivas de PERMISSOES_EXCLUSIVAS (quatro, com leads.atender)", EXCLUSIVAS_DA_TELA.map((e) => e.chave).sort().join("|") === [...PERMISSOES_EXCLUSIVAS].sort().join("|") && EXCLUSIVAS_DA_TELA.length === 4)
+  ok("todas existem em PERMISSOES (com texto oficial)", EXCLUSIVAS_DA_TELA.every((e) => e.chave in PERMISSOES))
   ok("exclusiva concedida que sumiria → 'perdida'", exclusivasPerdidas({ [EXCL]: true }, null).join() === EXCL && exclusivasPerdidas({ [EXCL]: true }, {}).join() === EXCL && exclusivasPerdidas({ [EXCL]: true }, { [EXCL]: false }).join() === EXCL)
   ok("exclusiva mantida (ou só outras mudando) → nada perdido", exclusivasPerdidas({ [EXCL]: true }, { [EXCL]: true, "tarefas.ver": true }).length === 0 && exclusivasPerdidas(null, null).length === 0 && exclusivasPerdidas({ "tarefas.ver": true }, null).length === 0)
   const d = diffPermissoesCustom({ a: true, b: false }, { a: true, c: true, [EXCL]: true })

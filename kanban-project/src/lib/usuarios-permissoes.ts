@@ -14,11 +14,12 @@ import { PERMISSOES, PERMISSOES_EXCLUSIVAS } from './permissoes'
 
 export type MapaCustom = Record<string, boolean>
 
-/** As três exclusivas, na ordem em que a tela as mostra, com o texto oficial de `PERMISSOES`. */
+/** As exclusivas, na ordem em que a tela as mostra, com o texto oficial de `PERMISSOES`. */
 export const EXCLUSIVAS_DA_TELA: ReadonlyArray<{ chave: string; label: string }> = [
   { chave: 'processos.excluirDefinitivo', label: 'Excluir processo definitivamente' },
   { chave: 'processos.moverFaseManual', label: 'Mover o processo de fase manualmente' },
   { chave: 'processos.regularizarHistorico', label: 'Regularizar histórico (cadastrar em fase avançada)' },
+  { chave: 'leads.atender', label: 'Leads: ver e responder as conversas do WhatsApp' },
 ]
 
 /** O que cada exclusiva faz — o mesmo texto de `PERMISSOES`, para a tela explicar sem inventar. */

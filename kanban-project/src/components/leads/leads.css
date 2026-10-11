@@ -1,0 +1,57 @@
+/* Leads — estilos próprios da tela (tokens do Discovery Design System; nenhuma cor fora deles).
+   Botões, chips e campos vêm do kit da Torre (.tor-btn, .tor-p, .tor-in, .tor-card). */
+.ld-filtros { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; }
+.ld-filtro { font-size: 12.5px; font-weight: 600; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border-default); background: var(--surface-popover); color: var(--text-primary); cursor: pointer; }
+.ld-filtro[aria-pressed="true"] { background: var(--action-primary); color: var(--action-primary-ink); border-color: transparent; }
+.ld-filtro b { margin-left: 6px; font-weight: 800; }
+.ld-corpo { display: grid; grid-template-columns: minmax(250px, 330px) minmax(0, 1fr) minmax(240px, 310px); gap: 12px; align-items: start; }
+.ld-lista { display: flex; flex-direction: column; max-height: calc(100vh - 290px); overflow-y: auto; }
+.ld-linha { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border: 0; border-top: 1px solid var(--border-default); background: transparent; color: var(--text-primary); text-align: left; width: 100%; cursor: pointer; }
+.ld-linha:first-child { border-top: 0; }
+.ld-linha:hover { background: var(--surface-tertiary); }
+.ld-linha[aria-current="true"] { background: var(--info-tile); }
+.ld-linha .topo { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.ld-linha .nome { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ld-linha .quando { font-size: 11.5px; color: var(--text-secondary); white-space: nowrap; }
+.ld-linha .previa { font-size: 12.5px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ld-linha .rodape { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 11.5px; color: var(--text-secondary); }
+.ld-conversa { display: flex; flex-direction: column; min-height: 420px; max-height: calc(100vh - 230px); }
+.ld-cab { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--border-default); }
+.ld-cab .titulo { font-size: 15px; font-weight: 800; }
+.ld-faixa { margin: 10px 14px 0; padding: 8px 12px; border-radius: 8px; font-size: 12.5px; background: var(--info-tile); color: var(--info-text); }
+.ld-faixa.alerta { background: var(--warning-tile); color: var(--warning-text); }
+.ld-msgs { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.ld-msg { max-width: 78%; padding: 7px 11px; border-radius: 12px; border: 1px solid var(--border-default); background: var(--surface-popover); white-space: pre-wrap; overflow-wrap: anywhere; }
+.ld-msg.nossa { align-self: flex-end; background: var(--surface-tertiary); }
+.ld-msg.pessoa { background: var(--success-tile); }
+.ld-msg .quem { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); margin-bottom: 2px; }
+.ld-msg .hora { font-size: 10.5px; color: var(--text-muted); text-align: right; margin-top: 2px; }
+.ld-msg img { display: block; max-width: 100%; max-height: 320px; border-radius: 8px; margin-top: 6px; }
+.ld-msg audio { display: block; width: 240px; max-width: 100%; margin-top: 6px; }
+.ld-resp { display: flex; gap: 8px; align-items: flex-end; padding: 10px 14px; border-top: 1px solid var(--border-default); }
+.ld-resp textarea { flex: 1; min-height: 44px; resize: vertical; }
+.ld-painel { display: flex; flex-direction: column; gap: 12px; max-height: calc(100vh - 230px); overflow-y: auto; }
+.ld-painel > .tor-card { margin-bottom: 0; flex-shrink: 0; }
+.ld-painel h3 { font-size: 13px; font-weight: 800; margin-bottom: 6px; }
+.ld-ficha { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; }
+.ld-ficha dt { color: var(--text-secondary); }
+.ld-ficha dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.ld-pessoas { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.ld-acoes { display: flex; flex-direction: column; gap: 6px; }
+.ld-vazio { padding: 28px 16px; text-align: center; color: var(--text-secondary); }
+.ld-voltar { display: none; }
+.ld-perigo { color: var(--danger-text); }
+@media (max-width: 1180px) {
+  .ld-corpo { grid-template-columns: minmax(230px, 300px) minmax(0, 1fr); }
+  .ld-painel { grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; max-height: none; overflow-y: visible; }
+  .ld-painel > .tor-card { flex: 1 1 240px; }
+}
+@media (max-width: 760px) {
+  .ld-corpo { grid-template-columns: minmax(0, 1fr); }
+  .ld-corpo.aberto .ld-coluna-lista { display: none; }
+  .ld-corpo:not(.aberto) .ld-conversa, .ld-corpo:not(.aberto) .ld-painel { display: none; }
+  .ld-voltar { display: inline-flex; }
+  .ld-msg { max-width: 92%; }
+  .ld-lista { max-height: none; }
+  .ld-conversa { max-height: none; }
+}
