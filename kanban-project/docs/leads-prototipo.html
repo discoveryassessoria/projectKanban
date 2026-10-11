@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leads — protótipo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Protótipo do módulo Leads (mandato: docs/leads-mandato.md). Pessoas, telefones e conversas são exemplos.
+   Só o Marco vê esta tela (regra 19). Layout: menu do sistema à esquerda, lista de leads, conversa aberta e painel do lead. Em tela estreita empilha. */
+:root{
+  --bg:#ddeffc; --surface:#ffffff; --surface-2:#f4f8fc; --surface-3:#eaf5fc; --line:#bfd8e8; --line-2:#a7c9de;
+  --fg:#10273a; --muted:#4e6879; --navy:#0d2c58; --link:#174d76;
+  --red:#b42318; --red-bg:#fdecea; --amb:#7a4a00; --amb-bg:#fff1d6; --grn:#155e39; --grn-bg:#e1f3e8; --blu:#1d3f8f; --blu-bg:#e3ebfa; --gry:#4c5568; --gry-bg:#eceff4;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--fg);font:14px/1.45 Inter,system-ui,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #4f91c5;outline-offset:2px}
+#app{display:flex;min-height:100vh}
+nav{flex:0 0 220px;background:var(--surface-2);border-right:1px solid var(--line);padding:24px 14px;display:flex;flex-direction:column;gap:2px}
+nav .marca{font-size:17px;font-weight:700;color:var(--navy);padding:0 12px 18px}
+nav span{padding:9px 12px;color:#45516b;border-radius:10px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+nav span.atual{background:var(--navy);color:#fff;font-weight:600}
+nav span.atual b{background:#fff;color:var(--navy);border-radius:999px;padding:1px 8px;font-size:12px}
+main{flex:1;min-width:0;padding:22px 26px 40px;display:flex;flex-direction:column;gap:16px}
+header{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start;justify-content:space-between}
+h1{margin:0;font-size:26px;color:var(--navy)}
+.sub{color:var(--muted)}
+.campo{display:flex;flex-direction:column;gap:4px}
+.campo label{font-size:12px;font-weight:600;color:var(--muted)}
+select,input[type=search],textarea{min-height:40px;padding:8px 12px;border:1px solid var(--line-2);border-radius:10px;background:var(--surface)}
+.btn{min-height:40px;padding:0 14px;border:1px solid var(--line-2);border-radius:10px;background:var(--surface-2);color:var(--navy);font-weight:600}
+.btn.pri{background:var(--navy);border-color:var(--navy);color:#fff}
+.btn.perigo{color:var(--red);border-color:#e9b4ae;background:#fff}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.sino{position:relative}
+.sino .n{background:var(--red);color:#fff;border-radius:999px;padding:1px 8px;font-size:12px;margin-left:6px}
+.sino .caixa{position:absolute;right:0;top:46px;z-index:5;width:330px;max-width:86vw;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;box-shadow:0 12px 32px rgba(13,44,88,.18);display:flex;flex-direction:column;gap:8px}
+.sino .caixa[hidden]{display:none}
+.sino .caixa button{text-align:left;min-height:44px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface-3)}
+.filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chipf{min-height:36px;padding:0 12px;border:1px solid var(--line-2);border-radius:999px;background:var(--surface);font-weight:600;color:var(--navy)}
+.chipf.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.chipf b{font-weight:700;margin-left:4px}
+.corpo{display:grid;grid-template-columns:minmax(260px,340px) minmax(0,1fr) minmax(250px,320px);gap:14px;align-items:start}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.lista{display:flex;flex-direction:column;max-height:76vh;overflow:auto}
+.linha{display:flex;flex-direction:column;gap:4px;padding:12px 14px;border:0;border-bottom:1px solid var(--line);background:transparent;text-align:left;width:100%}
+.linha:last-child{border-bottom:0}
+.linha.on{background:var(--surface-3)}
+.linha .topo{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.linha .nome{font-weight:700;color:var(--navy)}
+.linha .quando{font-size:12px;color:var(--muted);white-space:nowrap}
+.linha .previa{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.linha .rod{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:var(--muted)}
+.p{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700}
+.p.red{background:var(--red-bg);color:var(--red)} .p.amb{background:var(--amb-bg);color:var(--amb)} .p.grn{background:var(--grn-bg);color:var(--grn)} .p.blu{background:var(--blu-bg);color:var(--blu)} .p.gry{background:var(--gry-bg);color:var(--gry)}
+.conversa{display:flex;flex-direction:column;min-height:60vh}
+.conversa .cab{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center}
+.conversa .cab .tit{font-weight:700;color:var(--navy);font-size:16px}
+.faixa{margin:12px 16px 0;padding:10px 12px;border-radius:10px;background:var(--blu-bg);color:var(--blu);font-weight:500}
+.faixa.amb{background:var(--amb-bg);color:var(--amb)}
+.msgs{flex:1;padding:14px 16px;display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow:auto}
+.m{max-width:78%;padding:8px 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface-2)}
+.m .quem{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:2px}
+.m.nosso{align-self:flex-end;background:#e6f4ea;border-color:#bfe0c9}
+.m.nosso.agente{background:var(--surface-3);border-color:var(--line)}
+.m .hora{font-size:11px;color:var(--muted);text-align:right;margin-top:2px}
+.m a{color:var(--link);font-weight:600}
+.resp{border-top:1px solid var(--line);padding:12px 16px;display:flex;gap:10px;align-items:flex-end}
+.resp textarea{flex:1;min-height:44px;resize:vertical}
+.painel{display:flex;flex-direction:column;gap:12px}
+.painel .card{padding:14px}
+.painel h2{margin:0 0 8px;font-size:14px;color:var(--navy)}
+dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 10px}
+dt{color:var(--muted)} dd{margin:0;font-weight:500}
+.pessoas{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.acoes{display:flex;flex-direction:column;gap:8px}
+.vazio{padding:28px;color:var(--muted);text-align:center}
+.voltar{display:none}
+.nota{font-size:12px;color:var(--muted)}
+@media (max-width:1100px){ .corpo{grid-template-columns:minmax(240px,320px) minmax(0,1fr)} .painel{grid-column:1 / -1;flex-direction:row;flex-wrap:wrap} .painel .card{flex:1 1 240px} }
+@media (max-width:760px){
+  #app{flex-direction:column} nav{flex:none;flex-direction:row;overflow:auto;padding:10px;border-right:0;border-bottom:1px solid var(--line)} nav .marca{display:none} nav span{white-space:nowrap}
+  main{padding:14px 16px 32px} .corpo{grid-template-columns:1fr}
+  .corpo.aberto .lista-card{display:none} .corpo:not(.aberto) .conversa, .corpo:not(.aberto) .painel{display:none}
+  .voltar{display:inline-flex} .m{max-width:90%}
+}
+</style>
+</head>
+<body>
+<div id="app">
+<nav aria-label="Menu do sistema">
+  <div class="marca">Grupo Discovery</div>
+  <span>Página Inicial</span>
+  <span class="atual" aria-current="page">Leads <b id="navN">0</b></span>
+  <span>Processos</span><span>Operação</span><span>Torre de Controle</span><span>Árvore Genealógica</span><span>Relatórios</span><span>Financeiro</span><span>Gerenciamento</span>
+</nav>
+<main>
+  <header>
+    <div>
+      <h1>Leads</h1>
+      <div class="sub">Quem chegou pelo WhatsApp e ainda não virou processo. O agente faz o primeiro atendimento; você continua por aqui.</div>
+    </div>
+    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+      <div class="sino"><button class="btn" id="sinoBtn" type="button" aria-label="Avisos">Avisos<span class="n" id="sinoN"></span></button><div class="caixa" id="sinoCx" hidden></div></div>
+    </div>
+  </header>
+
+  <div class="filtros" id="filtros"></div>
+
+  <div class="corpo" id="corpo">
+    <div class="card lista-card">
+      <div style="padding:12px 14px;border-bottom:1px solid var(--line)"><input type="search" id="busca" placeholder="Buscar por nome ou telefone" aria-label="Buscar lead" style="width:100%"></div>
+      <div class="lista" id="lista"></div>
+    </div>
+    <div class="card conversa" id="conversa"></div>
+    <div class="painel" id="painel"></div>
+  </div>
+</main>
+</div>
+
+<script>
+// ---------- Dados de exemplo ----------
+// Só o Marco vê e responde os leads (mandato, regra 19): não há responsável nem seletor de pessoa.
+const SIT = {
+  aguardando: { rotulo: 'Aguardando resposta', cor: 'red' },
+  equipe: { rotulo: 'Respondido', cor: 'grn' },
+  agente: { rotulo: 'Com o agente', cor: 'blu' },
+  encerrado: { rotulo: 'Encerrado', cor: 'gry' },
+};
+const FRASE = 'Um momento, vou iniciar a sua busca genealógica para verificar o que consigo localizar.';
+let leads = [
+  { id: 1, nome: 'Marcos Salvarani', tel: '+55 19 98765-4321', pais: 'Itália', estado: 'transferido', motivo: 'Triagem concluída', horasDesdeLead: 0.1,
+    ficha: { 'País': 'Itália', 'Ascendente': 'bisavô (a confirmar)', 'Linha': 'materna', 'Mais interessados': 'não' },
+    pessoas: ['Avô: José Salvarani, casado com Luiza Pollini', 'Mãe: nome não informado'],
+    resumo: 'Não sabe quem é o italiano; acha que são os bisavós maternos. Avô José Salvarani, casado com Luiza Pollini.',
+    msgs: [['lead', 'Oi, quero saber sobre cidadania italiana', '14:02'], ['agente', 'Olá, boa tarde. Tudo bem?', '14:02'], ['agente', 'Meu nome é Marco, prazer.', '14:02'], ['agente', 'Legal. Quem é o ascendente italiano na sua linhagem?', '14:03'], ['lead', 'Não sei, acho que meus bisavós', '14:04'], ['agente', 'Certo. Você sabe se existe um sobrenome italiano na sua família?', '14:04'], ['lead', 'Meu avô era José Salvarani', '14:05'], ['agente', 'Ok. Com quem seu avô foi casado?', '14:05'], ['lead', 'Com a Luiza Pollini', '14:06'], ['agente', FRASE, '14:08']] },
+  { id: 2, nome: 'Renata Albuquerque', tel: '+55 11 91234-5678', pais: 'Portugal', estado: 'transferido', motivo: 'Triagem concluída', horasDesdeLead: 0.5,
+    ficha: { 'País': 'Portugal', 'Ascendente': 'avô', 'Linha': 'paterna', 'Mais interessados': 'irmã' },
+    pessoas: ['Avô: António Albuquerque, nascido em Viseu', 'Pai: Carlos Albuquerque'],
+    resumo: 'Neta de português pelo pai. A irmã também tem interesse.',
+    msgs: [['lead', 'Boa tarde, meu avô era português', '11:20'], ['agente', FRASE, '11:31'], ['atendente:adm', 'Renata, já localizei o registro do seu avô em Viseu.', '11:58'], ['lead', 'Que ótimo! E agora?', '12:10'], ['lead', '[documento] certidao-avo.pdf', '12:11', { nome: 'certidao-avo.pdf' }]] },
+  { id: 3, nome: 'Paulo Henrique', tel: '+55 21 99888-7766', pais: 'Itália', estado: 'agente', motivo: '', horasDesdeLead: 0.02,
+    ficha: { 'País': 'Itália', 'Ascendente': 'avô' }, pessoas: ['Avô: nome ainda não informado'], resumo: 'Conversa em andamento.',
+    msgs: [['lead', 'Olá', '15:40'], ['agente', 'Olá, boa tarde. Tudo bem?', '15:40'], ['agente', 'Meu nome é Marco, prazer.', '15:40'], ['agente', 'Como posso ajudar?', '15:40'], ['lead', 'meu avô era italiano', '15:41'], ['agente', 'Legal. Você sabe o nome do seu avô?', '15:41']] },
+  { id: 4, nome: 'Juliana Krüger', tel: '+55 47 99111-2233', pais: 'Alemanha', estado: 'transferido', motivo: 'Pediu para falar com uma pessoa', horasDesdeLead: 30,
+    ficha: { 'País': 'Alemanha', 'Ascendente': 'bisavô' }, pessoas: ['Bisavô: Friedrich Krüger'], resumo: 'Bisneta de alemão. Pediu atendimento humano logo no início.',
+    msgs: [['lead', 'Quero falar com um atendente', 'ontem 09:12'], ['agente', 'Um momento, por favor.', 'ontem 09:12'], ['atendente:adm', 'Juliana, bom dia! Pode me contar um pouco da sua família?', 'ontem 09:40']] },
+  { id: 5, nome: 'Contato sem nome', tel: '+55 31 97777-0000', pais: '', estado: 'encerrado', motivo: 'Encerrado: engano', horasDesdeLead: 90,
+    ficha: {}, pessoas: [], resumo: 'Procurava outra empresa.', msgs: [['lead', 'É da imobiliária?', '03/10 16:00'], ['agente', 'Um momento, por favor.', '03/10 16:00'], ['atendente:adm', 'Olá! Aqui é a Discovery, de cidadania europeia. Acho que houve um engano.', '03/10 16:20']] },
+];
+
+// ---------- Regras de leitura (as mesmas que o servidor aplicará) ----------
+function situacao(l) {
+  if (l.estado === 'encerrado') return 'encerrado';
+  if (l.estado === 'agente') return 'agente';
+  const ultima = l.msgs[l.msgs.length - 1][0];
+  return ultima === 'lead' || !l.msgs.some((m) => m[0].startsWith('atendente')) ? 'aguardando' : 'equipe';
+}
+const podeResponder = (l) => l.estado !== 'encerrado' && l.horasDesdeLead < 24;
+
+let filtro = 'aguardando', aberto = null, busca = '', sinoAberto = false;
+const $ = (id) => document.getElementById(id);
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const visiveis = () => leads;
+
+function desenhar() {
+  const vis = visiveis();
+  const conta = (s) => vis.filter((l) => situacao(l) === s).length;
+  const nAguard = conta('aguardando');
+  $('navN').textContent = nAguard;
+  $('sinoN').textContent = nAguard || '';
+  $('sinoN').style.display = nAguard ? '' : 'none';
+  $('sinoCx').hidden = !sinoAberto;
+  $('sinoCx').innerHTML = nAguard
+    ? `<button type="button" id="avisoLeads">${nAguard} ${nAguard === 1 ? 'lead aguardando' : 'leads aguardando'} resposta</button>`
+    : '<div class="nota">Nenhum aviso novo.</div>';
+  const av = $('avisoLeads'); if (av) av.onclick = () => { filtro = 'aguardando'; sinoAberto = false; desenhar(); };
+
+  $('filtros').innerHTML = [['aguardando', 'Aguardando resposta'], ['equipe', 'Respondido'], ['agente', 'Com o agente'], ['encerrado', 'Encerrados'], ['todos', 'Todos']]
+    .map(([k, r]) => `<button type="button" class="chipf ${filtro === k ? 'on' : ''}" data-f="${k}">${r}<b>${k === 'todos' ? vis.length : conta(k)}</b></button>`).join('');
+  document.querySelectorAll('[data-f]').forEach((b) => (b.onclick = () => { filtro = b.dataset.f; desenhar(); }));
+
+  const lista = vis.filter((l) => (filtro === 'todos' || situacao(l) === filtro) && (l.nome + l.tel).toLowerCase().includes(busca.toLowerCase()));
+  $('lista').innerHTML = lista.length ? lista.map((l) => {
+    const s = SIT[situacao(l)], u = l.msgs[l.msgs.length - 1];
+    return `<button type="button" class="linha ${aberto === l.id ? 'on' : ''}" data-l="${l.id}">
+      <span class="topo"><span class="nome">${esc(l.nome)}</span><span class="quando">${esc(u[2])}</span></span>
+      <span class="previa">${esc(u[1])}</span>
+      <span class="rod"><span class="p ${s.cor}">${s.rotulo}</span>${l.pais ? esc(l.pais) : ''}</span></button>`;
+  }).join('') : '<div class="vazio">Nenhum lead nesta situação.</div>';
+  document.querySelectorAll('[data-l]').forEach((b) => (b.onclick = () => { aberto = Number(b.dataset.l); desenhar(); }));
+
+  const l = leads.find((x) => x.id === aberto && vis.includes(x));
+  $('corpo').classList.toggle('aberto', Boolean(l));
+  if (!l) { $('conversa').innerHTML = '<div class="vazio">Escolha um lead na lista para ver a conversa.</div>'; $('painel').innerHTML = ''; return; }
+  const s = SIT[situacao(l)];
+  const faixa = l.estado === 'agente' ? '<div class="faixa">O agente está atendendo. Se você responder, ele sai da conversa e ela passa a ser sua.</div>'
+    : l.estado === 'encerrado' ? '<div class="faixa amb">Lead encerrado. Se a pessoa escrever de novo, ele volta para o agente.</div>'
+    : !podeResponder(l) ? '<div class="faixa amb">Passaram mais de 24 horas desde a última mensagem do lead. O WhatsApp só libera a resposta quando ele escrever de novo.</div>' : '';
+  $('conversa').innerHTML = `
+    <div class="cab"><div><button type="button" class="btn voltar" id="voltar">← Lista</button> <span class="tit">${esc(l.nome)}</span> <span class="sub">${esc(l.tel)}</span></div><span class="p ${s.cor}">${s.rotulo}</span></div>
+    ${faixa}
+    <div class="msgs">${l.msgs.map((m) => {
+      const [de, texto, hora, midia] = m; const nosso = de !== 'lead';
+      const quem = de === 'lead' ? 'Lead' : de === 'agente' ? 'Agente' : 'Você';
+      const corpo = midia ? `<a href="#" onclick="alert('No sistema, abre o arquivo que o lead enviou.');return false">📎 ${esc(midia.nome)} — abrir</a>` : esc(texto);
+      return `<div class="m ${nosso ? 'nosso' : ''} ${de === 'agente' ? 'agente' : ''}"><div class="quem">${esc(quem)}</div>${corpo}<div class="hora">${esc(hora)}</div></div>`;
+    }).join('')}</div>
+    <div class="resp"><textarea id="texto" rows="2" placeholder="Escreva a resposta" aria-label="Resposta ao lead" ${podeResponder(l) ? '' : 'disabled'}></textarea><button type="button" class="btn pri" id="enviar" ${podeResponder(l) ? '' : 'disabled'}>Enviar</button></div>`;
+  const cx = document.querySelector('.msgs'); cx.scrollTop = cx.scrollHeight; // abre na mensagem mais recente
+  $('voltar').onclick = () => { aberto = null; desenhar(); };
+  $('enviar').onclick = () => {
+    const t = $('texto').value.trim(); if (!t) return;
+    l.msgs.push(['atendente:adm', t, 'agora']); l.estado = 'transferido'; if (!l.motivo) l.motivo = 'Assumido pela tela de Leads';
+    desenhar();
+  };
+
+  const ficha = Object.entries(l.ficha);
+  $('painel').innerHTML = `
+    <div class="card"><h2>O que o agente levantou</h2>
+      ${ficha.length ? `<dl>${ficha.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` : '<div class="nota">Nada levantado.</div>'}
+      ${l.motivo ? `<div class="nota" style="margin-top:8px">Motivo da passagem: ${esc(l.motivo)}</div>` : ''}
+    </div>
+    <div class="card"><h2>Pessoas para pesquisar</h2>
+      ${l.pessoas.length ? `<ol class="pessoas">${l.pessoas.map((p) => `<li>${esc(p)}</li>`).join('')}</ol><button type="button" class="btn" style="margin-top:10px" id="copiar">Copiar para a pesquisa</button>` : '<div class="nota">Nenhuma pessoa informada.</div>'}
+      ${l.resumo ? `<div class="nota" style="margin-top:8px">${esc(l.resumo)}</div>` : ''}
+    </div>
+    <div class="card"><h2>Ações</h2><div class="acoes">
+      ${l.estado === 'transferido' ? '<button type="button" class="btn" id="devolver">Devolver ao agente</button>' : ''}
+      ${l.estado !== 'encerrado' ? '<button type="button" class="btn perigo" id="encerrar">Encerrar lead</button>' : '<button type="button" class="btn" id="reabrir">Reabrir lead</button>'}
+      <div class="nota">Criar o processo a partir do lead fica para um bloco seguinte.</div>
+    </div></div>`;
+  const c = $('copiar'); if (c) c.onclick = () => { navigator.clipboard?.writeText(l.pessoas.join('\n')); c.textContent = 'Copiado'; };
+  const d = $('devolver'); if (d) d.onclick = () => { l.estado = 'agente'; l.motivo = ''; desenhar(); };
+  const e = $('encerrar'); if (e) e.onclick = () => { const m = prompt('Motivo do encerramento (aparece no histórico do lead):'); if (m && m.trim()) { l.estado = 'encerrado'; l.motivo = 'Encerrado: ' + m.trim(); desenhar(); } };
+  const r = $('reabrir'); if (r) r.onclick = () => { l.estado = 'transferido'; desenhar(); };
+}
+$('busca').oninput = (e) => { busca = e.target.value; desenhar(); $('busca').focus(); };
+$('sinoBtn').onclick = () => { sinoAberto = !sinoAberto; desenhar(); };
+desenhar();
+</script>
+</body>
+</html>
